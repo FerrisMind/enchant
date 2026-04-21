@@ -1,0 +1,17 @@
+[workspace]
+members = ["crates/magic-iced", "crates/wasm-demo"]
+resolver = "2"
+
+[profile.dev]
+incremental = true
+opt-level = 1
+debug = 1
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
+incremental = false
