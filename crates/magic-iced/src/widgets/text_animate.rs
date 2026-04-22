@@ -387,4 +387,19 @@ mod tests {
         state.tick(start + Duration::from_millis(1800), &props);
         assert_eq!(state.phase, TextAnimatePhase::Hidden);
     }
+
+    #[test]
+    fn text_animate_zero_duration_advances_without_dividing_by_zero() {
+        let props = TextAnimateProps {
+            duration_secs: 0.0,
+            ..TextAnimateProps::new()
+        };
+        let mut state = TextAnimateState::new(&props);
+        let start = Instant::now();
+
+        state.tick(start, &props);
+        state.tick(start + Duration::from_millis(20), &props);
+
+        assert_eq!(state.phase, TextAnimatePhase::Visible);
+    }
 }

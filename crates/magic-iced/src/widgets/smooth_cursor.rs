@@ -1,5 +1,7 @@
 use super::pointer::default_pointer_overlay;
-use crate::primitives::{AnimatedValue, MotionSpec, PointerMotion};
+use crate::primitives::{
+    AnimatedValue, MotionSpec, POINTER_SPEED_THRESHOLD_PX_PER_SEC, PointerMotion,
+};
 use iced::mouse;
 use iced::time::Instant;
 use iced::widget::{container, mouse_area, stack};
@@ -90,8 +92,14 @@ impl SmoothCursorState {
                 self.x.transition(position.x, now);
                 self.y.transition(position.y, now);
                 self.rotation.transition(sample.angle_deg, now);
-                self.scale
-                    .transition(if sample.speed > 480.0 { 0.95 } else { 1.0 }, now);
+                self.scale.transition(
+                    if sample.speed > POINTER_SPEED_THRESHOLD_PX_PER_SEC {
+                        0.95
+                    } else {
+                        1.0
+                    },
+                    now,
+                );
                 self.visible = true;
                 self.last_move_at = Some(now);
             }
@@ -264,5 +272,40 @@ mod tests {
 
         state.apply_action(&SmoothCursorAction::Exit, now, &props);
         assert!(!state.is_visible());
+    }
+
+    #[test]
+    fn smooth_cursor_scale_responds_only_above_pointer_speed_threshold() {
+        let props = props();
+        let start = Instant::now();
+
+        let mut slow = SmoothCursorState::new();
+        slow.apply_action(
+            &SmoothCursorAction::Move(Point::new(0.0, 0.0)),
+            start,
+            &props,
+        );
+        slow.apply_action(
+            &SmoothCursorAction::Move(Point::new(10.0, 0.0)),
+            start + Duration::from_millis(100),
+            &props,
+        );
+        let slow_scale = slow.scale_at(start + Duration::from_millis(200));
+
+        let mut fast = SmoothCursorState::new();
+        fast.apply_action(
+            &SmoothCursorAction::Move(Point::new(0.0, 0.0)),
+            start,
+            &props,
+        );
+        fast.apply_action(
+            &SmoothCursorAction::Move(Point::new(20.0, 0.0)),
+            start + Duration::from_millis(100),
+            &props,
+        );
+        let fast_scale = fast.scale_at(start + Duration::from_millis(200));
+
+        assert_eq!(slow_scale, 1.0);
+        assert!(fast_scale < slow_scale);
     }
 }

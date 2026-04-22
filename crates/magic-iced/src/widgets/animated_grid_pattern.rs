@@ -94,6 +94,10 @@ impl<Message> EffectProgram<Message> for AnimatedGridPatternProgram {
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
         let spec = self.props.pattern;
+        let (columns, rows) = grid_dimensions(bounds.size(), spec);
+        if columns == 0 || rows == 0 {
+            return vec![frame.into_geometry()];
+        }
 
         let dash_segments = [self.props.stroke_dasharray, self.props.stroke_dasharray];
         let dash = if self.props.stroke_dasharray > 0.0 {
@@ -129,7 +133,6 @@ impl<Message> EffectProgram<Message> for AnimatedGridPatternProgram {
             y += spec.cell_height;
         }
 
-        let (columns, rows) = grid_dimensions(bounds.size(), spec);
         let duration = self.props.duration_secs.max(0.05);
         let repeat_delay = self.props.repeat_delay_secs.max(0.0);
         let cycle = duration + repeat_delay;

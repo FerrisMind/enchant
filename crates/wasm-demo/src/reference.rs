@@ -227,7 +227,10 @@ pub struct StepItem {
 pub fn data() -> &'static ReferenceData {
     static DATA: OnceLock<ReferenceData> = OnceLock::new();
     DATA.get_or_init(|| {
-        serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/reference-data.json")))
-            .expect("generated reference data must be valid")
+        serde_json::from_str(include_str!(concat!(
+            env!("OUT_DIR"),
+            "/reference-data.json"
+        )))
+        .expect("generated reference data must be valid")
     })
 }

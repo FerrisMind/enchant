@@ -1,8 +1,7 @@
-use iced::time::Instant;
+use iced::time::{Duration, Instant};
 use std::ops::Range;
 use twill::backends::iced::to_duration;
 use twill::prelude::TransitionDuration;
-use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum TextSegmentMode {
@@ -42,9 +41,9 @@ impl Default for TextRunSpec {
         Self {
             unit: TextUnit::Grapheme,
             start_delay: TransitionDuration::Ms0,
-            typing_step: TransitionDuration::Ms75,
-            deleting_step: TransitionDuration::Ms75,
-            pause: TransitionDuration::Ms300,
+            typing_step: TransitionDuration::CustomMs(60),
+            deleting_step: TransitionDuration::CustomMs(50),
+            pause: TransitionDuration::Ms1000,
             loop_mode: TextLoopMode::Once,
         }
     }
@@ -113,73 +112,16 @@ pub struct TextRunner {
 
 pub fn segment_text_ranges(source: &str, mode: TextSegmentMode) -> Vec<Range<usize>> {
     match mode {
-        TextSegmentMode::Text => {
-            if source.is_empty() {
-                Vec::new()
-            } else {
-                std::iter::once(0..source.len()).collect()
-            }
-        }
+        TextSegmentMode::Text => std::iter::once(0..source.len()).collect(),
         TextSegmentMode::Word => {
-            let words = source.unicode_word_indices().collect::<Vec<_>>();
-            if words.is_empty() {
-                return if source.is_empty() {
-                    Vec::new()
-                } else {
-                    std::iter::once(0..source.len()).collect()
-                };
-            }
-
-            let mut ranges = Vec::with_capacity(words.len() * 2);
-            let mut cursor = 0;
-
-            for (start, word) in &words {
-                if cursor < *start {
-                    ranges.push(cursor..*start);
-                }
-
-                let end = *start + word.len();
-                ranges.push(*start..end);
-                cursor = end;
-            }
-
-            if cursor < source.len() {
-                ranges.push(cursor..source.len());
-            }
-
-            ranges
-        }
-        TextSegmentMode::Character => source
-            .grapheme_indices(true)
-            .map(|(start, grapheme)| start..start + grapheme.len())
-            .collect(),
-        TextSegmentMode::Line => {
             if source.is_empty() {
-                return Vec::new();
+                vec![0..0]
+            } else {
+                split_whitespace_ranges(source, true)
             }
-
-            let mut ranges = Vec::new();
-            let mut line_start = 0;
-
-            for (index, ch) in source.char_indices() {
-                if ch == '\n' {
-                    if line_start < index {
-                        ranges.push(line_start..index);
-                    }
-                    line_start = index + ch.len_utf8();
-                }
-            }
-
-            if line_start < source.len() {
-                ranges.push(line_start..source.len());
-            }
-
-            if ranges.is_empty() {
-                ranges.push(0..source.len());
-            }
-
-            ranges
         }
+        TextSegmentMode::Character => split_character_ranges(source),
+        TextSegmentMode::Line => split_line_ranges(source),
     }
 }
 
@@ -282,6 +224,8 @@ impl TextRunner {
         }
 
         let mut cursor = self.last_step_at.unwrap_or(started_at + delay);
+        let mut zero_step_guard = false;
+        let guard_zero_steps = matches!(self.spec.loop_mode, TextLoopMode::Loop);
 
         loop {
             let step = match self.phase {
@@ -290,6 +234,15 @@ impl TextRunner {
                 TextRunPhase::Deleting => to_duration(self.spec.deleting_step),
                 TextRunPhase::Done => break,
             };
+
+            if step == Duration::ZERO {
+                if guard_zero_steps && zero_step_guard {
+                    break;
+                }
+                if guard_zero_steps {
+                    zero_step_guard = true;
+                }
+            }
 
             if now < cursor + step {
                 break;
@@ -336,19 +289,66 @@ impl TextRunner {
 }
 
 fn segment_ranges(source: &str, unit: TextUnit) -> Vec<Range<usize>> {
-    let mut ranges = match unit {
-        TextUnit::Grapheme => source
-            .grapheme_indices(true)
-            .map(|(start, grapheme)| start..start + grapheme.len())
-            .collect::<Vec<_>>(),
-        TextUnit::Word => source
-            .unicode_word_indices()
-            .map(|(start, word)| start..start + word.len())
-            .collect::<Vec<_>>(),
-    };
+    match unit {
+        TextUnit::Grapheme => split_character_ranges(source),
+        TextUnit::Word => {
+            if source.is_empty() {
+                Vec::new()
+            } else {
+                split_whitespace_ranges(source, true)
+            }
+        }
+    }
+}
 
-    if ranges.is_empty() && !source.is_empty() {
-        ranges.push(0..source.len());
+fn split_character_ranges(source: &str) -> Vec<Range<usize>> {
+    source
+        .char_indices()
+        .map(|(start, ch)| start..start + ch.len_utf8())
+        .collect()
+}
+
+fn split_whitespace_ranges(source: &str, preserve_boundary_empties: bool) -> Vec<Range<usize>> {
+    if source.is_empty() {
+        return Vec::new();
+    }
+
+    let mut ranges = Vec::new();
+    let mut start = 0;
+    let mut in_whitespace = source.chars().next().is_some_and(char::is_whitespace);
+
+    for (index, ch) in source.char_indices() {
+        let is_whitespace = ch.is_whitespace();
+        if is_whitespace != in_whitespace {
+            ranges.push(start..index);
+            start = index;
+            in_whitespace = is_whitespace;
+        }
+    }
+
+    ranges.push(start..source.len());
+
+    if preserve_boundary_empties {
+        if source.chars().next().is_some_and(char::is_whitespace) {
+            ranges.insert(0, 0..0);
+        }
+
+        if source.chars().last().is_some_and(char::is_whitespace) {
+            ranges.push(source.len()..source.len());
+        }
+    }
+
+    ranges
+}
+
+fn split_line_ranges(source: &str) -> Vec<Range<usize>> {
+    let mut ranges = Vec::new();
+    let mut start = 0;
+
+    for line in source.split('\n') {
+        let end = start + line.len();
+        ranges.push(start..end);
+        start = end + 1;
     }
 
     ranges
@@ -357,18 +357,26 @@ fn segment_ranges(source: &str, unit: TextUnit) -> Vec<Range<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iced::time::Duration;
 
     #[test]
-    fn grapheme_segmentation_preserves_unicode_boundaries() {
-        let runner = TextRunner::new("A👨‍👩‍👧‍👦B", TextRunSpec::new().unit(TextUnit::Grapheme));
+    fn default_text_run_spec_matches_terminal_docs() {
+        let spec = TextRunSpec::default();
 
-        assert_eq!(runner.unit_ranges().len(), 3);
-        assert_eq!(&runner.source[runner.unit_ranges()[1].clone()], "👨‍👩‍👧‍👦");
+        assert_eq!(spec.typing_step, TransitionDuration::CustomMs(60));
+        assert_eq!(spec.deleting_step, TransitionDuration::CustomMs(50));
+        assert_eq!(spec.pause, TransitionDuration::Ms1000);
     }
 
     #[test]
-    fn word_segmentation_keeps_prefix_spacing_in_visible_text() {
+    fn character_unit_splits_emoji_sequences_into_codepoints() {
+        let runner = TextRunner::new("A👨‍👩‍👧‍👦B", TextRunSpec::new().unit(TextUnit::Grapheme));
+
+        assert_eq!(runner.unit_ranges().len(), 9);
+        assert_eq!(&runner.source[runner.unit_ranges()[1].clone()], "👨");
+    }
+
+    #[test]
+    fn word_segmentation_reveals_runs_and_spaces_in_order() {
         let mut runner = TextRunner::new(
             "Hello  world",
             TextRunSpec::new()
@@ -382,6 +390,9 @@ mod tests {
         assert_eq!(runner.visible_text(), "Hello");
 
         runner.advance(start + Duration::from_millis(160));
+        assert_eq!(runner.visible_text(), "Hello  ");
+
+        runner.advance(start + Duration::from_millis(240));
         assert_eq!(runner.visible_text(), "Hello  world");
     }
 
@@ -478,16 +489,46 @@ mod tests {
     }
 
     #[test]
-    fn segment_text_word_mode_preserves_gaps_as_segments() {
-        let segments = segment_text("Hello  world", TextSegmentMode::Word);
+    fn advance_with_zero_duration_loop_does_not_spin() {
+        let mut runner = TextRunner::new(
+            "Loop",
+            TextRunSpec::new()
+                .typing_step(TransitionDuration::Ms0)
+                .deleting_step(TransitionDuration::Ms0)
+                .pause(TransitionDuration::Ms0)
+                .loop_mode(TextLoopMode::Loop),
+        );
+        let start = Instant::now();
 
-        assert_eq!(segments, vec!["Hello", "  ", "world"]);
+        runner.advance(start);
+        let result = runner.advance_with_result(start + Duration::from_millis(1));
+
+        assert!(!result.finished);
+        assert!(runner.visible_units() > 0);
+        assert!(runner.visible_units() < runner.unit_ranges().len());
     }
 
     #[test]
-    fn segment_text_line_mode_splits_on_newlines_without_empty_tail() {
+    fn segment_text_word_mode_preserves_gaps_and_boundary_whitespace() {
+        let segments = segment_text("Hello  world", TextSegmentMode::Word);
+
+        assert_eq!(segments, vec!["Hello", "  ", "world"]);
+
+        let boundary_segments = segment_text(" Hello ", TextSegmentMode::Word);
+        assert_eq!(boundary_segments, vec!["", " ", "Hello", " ", ""]);
+    }
+
+    #[test]
+    fn segment_text_character_mode_splits_emoji_sequences_into_codepoints() {
+        let segments = segment_text("A👨‍👩‍👧‍👦B", TextSegmentMode::Character);
+
+        assert_eq!(segments, vec!["A", "👨", "‍", "👩", "‍", "👧", "‍", "👦", "B"]);
+    }
+
+    #[test]
+    fn segment_text_line_mode_splits_on_newlines_with_empty_tail() {
         let segments = segment_text("Alpha\nBeta\n", TextSegmentMode::Line);
 
-        assert_eq!(segments, vec!["Alpha", "Beta"]);
+        assert_eq!(segments, vec!["Alpha", "Beta", ""]);
     }
 }

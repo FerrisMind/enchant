@@ -3,10 +3,13 @@ use iced::{Point, Rectangle, Vector};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AmbientParticle {
-    pub origin: Point,
-    pub drift: Vector,
+    pub position: Point,
+    pub translate: Vector,
     pub size: f32,
     pub alpha: f32,
+    pub target_alpha: f32,
+    pub dx: f32,
+    pub dy: f32,
     pub magnetism: f32,
 }
 
@@ -50,20 +53,27 @@ pub fn ambient_particles(
     seed: u64,
     base_size: f32,
 ) -> Vec<AmbientParticle> {
-    let quantity = quantity.max(1);
+    if quantity == 0 {
+        return Vec::new();
+    }
+
     let mut rng = StableRng::new(seed);
     let mut particles = Vec::with_capacity(quantity);
+    let base_size = base_size.max(0.0);
 
     for _ in 0..quantity {
         particles.push(AmbientParticle {
-            origin: Point::new(
-                rng.next_f32() * bounds.width,
-                rng.next_f32() * bounds.height,
+            position: Point::new(
+                (rng.next_f32() * bounds.width.max(0.0)).floor(),
+                (rng.next_f32() * bounds.height.max(0.0)).floor(),
             ),
-            drift: Vector::new((rng.next_f32() - 0.5) * 18.0, (rng.next_f32() - 0.5) * 18.0),
-            size: base_size.max(0.2) + rng.next_f32() * base_size.max(0.4),
-            alpha: 0.16 + rng.next_f32() * 0.56,
-            magnetism: 0.3 + rng.next_f32() * 3.5,
+            translate: Vector::ZERO,
+            size: (rng.next_f32() * 2.0).floor() + base_size,
+            alpha: 0.0,
+            target_alpha: ((rng.next_f32() * 0.6 + 0.1) * 10.0).round() / 10.0,
+            dx: (rng.next_f32() - 0.5) * 0.1,
+            dy: (rng.next_f32() - 0.5) * 0.1,
+            magnetism: 0.1 + rng.next_f32() * 4.0,
         });
     }
 
@@ -71,47 +81,70 @@ pub fn ambient_particles(
 }
 
 pub fn sample_ambient_particle(
-    particle: AmbientParticle,
-    elapsed_secs: f32,
+    particle: &mut AmbientParticle,
+    frame_factor: f32,
     pointer: Option<Point>,
     staticity: f32,
     ease: f32,
     velocity: Vector,
     bounds: Rectangle,
 ) -> SampledParticle {
-    let travel = Vector::new(
-        particle.drift.x * elapsed_secs + velocity.x * elapsed_secs,
-        particle.drift.y * elapsed_secs + velocity.y * elapsed_secs,
-    );
-    let wobble = Vector::new(
-        (elapsed_secs * (0.7 + particle.magnetism * 0.12)).sin() * particle.size * 12.0,
-        (elapsed_secs * (0.9 + particle.magnetism * 0.18)).cos() * particle.size * 12.0,
-    );
-    let pointer_push = pointer.map_or(Vector::default(), |pointer| {
-        let dx = (pointer.x - bounds.width * 0.5) / staticity.max(1.0);
-        let dy = (pointer.y - bounds.height * 0.5) / staticity.max(1.0);
+    let frame_factor = frame_factor.max(0.0);
+    let pointer_push = pointer.map_or(Vector::ZERO, |pointer| {
+        let centered = Point::new(
+            pointer.x - bounds.width * 0.5,
+            pointer.y - bounds.height * 0.5,
+        );
+        let staticity = staticity.max(1.0);
+        let ease = ease.max(1.0);
         Vector::new(
-            dx * particle.magnetism / ease.max(1.0),
-            dy * particle.magnetism / ease.max(1.0),
+            (centered.x / (staticity / particle.magnetism) - particle.translate.x) / ease,
+            (centered.y / (staticity / particle.magnetism) - particle.translate.y) / ease,
         )
     });
 
-    let position = Point::new(
-        wrap_coordinate(
-            bounds.width,
-            particle.origin.x + travel.x + wobble.x + pointer_push.x,
-        ),
-        wrap_coordinate(
-            bounds.height,
-            particle.origin.y + travel.y + wobble.y + pointer_push.y,
-        ),
-    );
+    particle.position.x += (particle.dx + velocity.x) * frame_factor;
+    particle.position.y += (particle.dy + velocity.y) * frame_factor;
+    particle.translate.x += pointer_push.x * frame_factor;
+    particle.translate.y += pointer_push.y * frame_factor;
+
+    let closest_edge = [
+        particle.position.x + particle.translate.x - particle.size,
+        bounds.width - particle.position.x - particle.translate.x - particle.size,
+        particle.position.y + particle.translate.y - particle.size,
+        bounds.height - particle.position.y - particle.translate.y - particle.size,
+    ]
+    .into_iter()
+    .fold(f32::INFINITY, f32::min);
+
+    let edge_alpha = remap_value(closest_edge, 0.0, 20.0, 0.0, 1.0);
+    if edge_alpha > 1.0 {
+        particle.alpha = (particle.alpha + 0.02 * frame_factor).min(particle.target_alpha);
+    } else {
+        particle.alpha = particle.target_alpha * edge_alpha;
+    }
 
     SampledParticle {
-        position,
+        position: Point::new(
+            particle.position.x + particle.translate.x,
+            particle.position.y + particle.translate.y,
+        ),
         size: particle.size,
         opacity: particle.alpha.clamp(0.0, 1.0),
     }
+}
+
+pub(crate) fn ambient_particle_out_of_bounds(
+    particle: &AmbientParticle,
+    bounds: Rectangle,
+) -> bool {
+    let x = particle.position.x + particle.translate.x;
+    let y = particle.position.y + particle.translate.y;
+
+    x < -particle.size
+        || x > bounds.width + particle.size
+        || y < -particle.size
+        || y > bounds.height + particle.size
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -125,8 +158,11 @@ pub fn confetti_particles(
     scalar: f32,
     shapes: &[ParticleShape],
 ) -> Vec<ConfettiParticle> {
-    let quantity = quantity.max(1);
-    let scalar = scalar.max(0.1);
+    if quantity == 0 {
+        return Vec::new();
+    }
+
+    let scalar = scalar.max(0.0);
     let mut rng = StableRng::new(seed);
     let mut particles = Vec::with_capacity(quantity);
     let shapes = if shapes.is_empty() {
@@ -142,7 +178,7 @@ pub fn confetti_particles(
     for index in 0..quantity {
         let direction = angle_deg - spread_deg * 0.5 + rng.next_f32() * spread_deg.max(0.0);
         let radians = direction.to_radians();
-        let speed = start_velocity.max(1.0) * (0.65 + rng.next_f32() * 0.8);
+        let speed = start_velocity.max(0.0) * (0.65 + rng.next_f32() * 0.8);
         particles.push(ConfettiParticle {
             origin,
             velocity: Vector::new(radians.cos() * speed, -radians.sin() * speed),
@@ -186,12 +222,9 @@ pub fn sample_confetti_particle(
     })
 }
 
-fn wrap_coordinate(limit: f32, value: f32) -> f32 {
-    if limit <= 0.0 {
-        return value;
-    }
-
-    value.rem_euclid(limit)
+fn remap_value(value: f32, start1: f32, end1: f32, start2: f32, end2: f32) -> f32 {
+    let remapped = ((value - start1) * (end2 - start2)) / (end1 - start1) + start2;
+    remapped.max(0.0)
 }
 
 #[cfg(test)]
@@ -205,6 +238,66 @@ mod tests {
         let second = ambient_particles(8, bounds, 42, 0.5);
 
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn ambient_particles_allow_zero_quantity_and_zero_size() {
+        let bounds = Rectangle::with_size(iced::Size::new(320.0, 180.0));
+
+        assert!(ambient_particles(0, bounds, 42, 0.5).is_empty());
+        assert_eq!(ambient_particles(1, bounds, 42, 0.0).len(), 1);
+    }
+
+    #[test]
+    fn ambient_particle_does_not_wrap_coordinates() {
+        let mut particle = AmbientParticle {
+            position: Point::new(318.0, 178.0),
+            translate: Vector::ZERO,
+            size: 1.0,
+            alpha: 0.0,
+            target_alpha: 0.5,
+            dx: 5.0,
+            dy: 3.0,
+            magnetism: 1.0,
+        };
+
+        let sampled = sample_ambient_particle(
+            &mut particle,
+            1.0,
+            None,
+            50.0,
+            50.0,
+            Vector::ZERO,
+            Rectangle::with_size(iced::Size::new(320.0, 180.0)),
+        );
+
+        assert!(sampled.position.x > 320.0 || sampled.position.y > 180.0);
+    }
+
+    #[test]
+    fn confetti_particles_allow_zero_quantity_and_zero_scale() {
+        let origin = Point::new(10.0, 20.0);
+
+        assert!(
+            confetti_particles(
+                0,
+                origin,
+                7,
+                90.0,
+                10.0,
+                45.0,
+                1.0,
+                &[ParticleShape::Square],
+            )
+            .is_empty()
+        );
+
+        let particle =
+            confetti_particles(1, origin, 7, 90.0, 10.0, 0.0, 0.0, &[ParticleShape::Square])[0];
+
+        assert_eq!(particle.size, 0.0);
+        assert_eq!(particle.velocity.x, 0.0);
+        assert_eq!(particle.velocity.y, 0.0);
     }
 
     #[test]

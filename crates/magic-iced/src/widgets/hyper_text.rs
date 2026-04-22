@@ -206,10 +206,13 @@ mod tests {
     }
 
     #[test]
-    fn hyper_text_preserves_grapheme_clusters_when_scrambling() {
+    fn hyper_text_splits_emoji_sequences_into_codepoints() {
         let props = HyperTextProps::new();
+        let units = segment_text("A👨‍👩‍👧‍👦B", TextSegmentMode::Character);
         let display = build_display_text("A👨‍👩‍👧‍👦B", Some(0.0), &props);
 
-        assert!(display.contains("👨‍👩‍👧‍👦"));
+        assert_eq!(units[1], "👨");
+        assert!(display.starts_with('A'));
+        assert!(!display.contains("👨‍👩‍👧‍👦"));
     }
 }

@@ -22,19 +22,17 @@ impl WasmDemoApp {
         .align_y(Alignment::Center);
 
         let bar = container(
-            container(
-                button_content(
-                    container(banner_row)
-                        .width(Length::Fill)
-                        .center_x(Length::Fill)
-                        .center_y(Length::Fill),
-                    Some(Message::OpenUrl(banner.href.clone())),
-                    ButtonProps::new()
-                        .variant(ButtonVariant::Ghost)
-                        .size(ButtonSize::Size1),
-                    &self.theme,
-                ),
-            )
+            container(button_content(
+                container(banner_row)
+                    .width(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill),
+                Some(Message::OpenUrl(banner.href.clone())),
+                ButtonProps::new()
+                    .variant(ButtonVariant::Ghost)
+                    .size(ButtonSize::Size1),
+                &self.theme,
+            ))
             .max_width(reference::data().layout.container_max_width)
             .width(Length::Fill)
             .center_x(Length::Fill),
@@ -116,16 +114,20 @@ impl WasmDemoApp {
                         16,
                         self.theme.palette.foreground,
                     ),
-                    container(Space::new().width(Length::Fixed(7.0)).height(Length::Fixed(7.0)))
-                        .style(|_| iced::widget::container::Style {
-                            background: Some(Background::Color(rgba([34, 197, 94, 255]))),
-                            border: Border {
-                                color: Color::TRANSPARENT,
-                                width: 0.0,
-                                radius: BorderRadius::from(999.0),
-                            },
-                            ..iced::widget::container::Style::default()
-                        }),
+                    container(
+                        Space::new()
+                            .width(Length::Fixed(7.0))
+                            .height(Length::Fixed(7.0))
+                    )
+                    .style(|_| iced::widget::container::Style {
+                        background: Some(Background::Color(rgba([34, 197, 94, 255]))),
+                        border: Border {
+                            color: Color::TRANSPARENT,
+                            width: 0.0,
+                            radius: BorderRadius::from(999.0),
+                        },
+                        ..iced::widget::container::Style::default()
+                    }),
                     text(ref_data.header.discord_online.as_str())
                         .font(body_font())
                         .size(13)
@@ -299,7 +301,9 @@ impl WasmDemoApp {
 
         let author_link: Element<'_, Message> = button(
             "dillion",
-            Some(Message::OpenUrl(reference::data().footer.author_href.clone())),
+            Some(Message::OpenUrl(
+                reference::data().footer.author_href.clone(),
+            )),
             ButtonProps::new()
                 .variant(ButtonVariant::Ghost)
                 .size(ButtonSize::Size1),
@@ -308,7 +312,9 @@ impl WasmDemoApp {
         .into();
         let github_link: Element<'_, Message> = button(
             "GitHub",
-            Some(Message::OpenUrl(reference::data().footer.github_href.clone())),
+            Some(Message::OpenUrl(
+                reference::data().footer.github_href.clone(),
+            )),
             ButtonProps::new()
                 .variant(ButtonVariant::Ghost)
                 .size(ButtonSize::Size1),
@@ -432,32 +438,40 @@ impl WasmDemoApp {
     }
 
     pub(crate) fn mobile_nav_button(&self) -> Element<'_, Message> {
-        let top = container(Space::new().width(Length::Fixed(16.0)).height(Length::Fixed(2.0)))
-            .style({
-                let color = self.theme.palette.foreground;
-                move |_| iced::widget::container::Style {
-                    background: Some(Background::Color(color)),
-                    border: Border {
-                        color: Color::TRANSPARENT,
-                        width: 0.0,
-                        radius: BorderRadius::from(999.0),
-                    },
-                    ..iced::widget::container::Style::default()
-                }
-            });
-        let bottom =
-            container(Space::new().width(Length::Fixed(16.0)).height(Length::Fixed(2.0))).style({
-                let color = self.theme.palette.foreground;
-                move |_| iced::widget::container::Style {
-                    background: Some(Background::Color(color)),
-                    border: Border {
-                        color: Color::TRANSPARENT,
-                        width: 0.0,
-                        radius: BorderRadius::from(999.0),
-                    },
-                    ..iced::widget::container::Style::default()
-                }
-            });
+        let top = container(
+            Space::new()
+                .width(Length::Fixed(16.0))
+                .height(Length::Fixed(2.0)),
+        )
+        .style({
+            let color = self.theme.palette.foreground;
+            move |_| iced::widget::container::Style {
+                background: Some(Background::Color(color)),
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: BorderRadius::from(999.0),
+                },
+                ..iced::widget::container::Style::default()
+            }
+        });
+        let bottom = container(
+            Space::new()
+                .width(Length::Fixed(16.0))
+                .height(Length::Fixed(2.0)),
+        )
+        .style({
+            let color = self.theme.palette.foreground;
+            move |_| iced::widget::container::Style {
+                background: Some(Background::Color(color)),
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: BorderRadius::from(999.0),
+                },
+                ..iced::widget::container::Style::default()
+            }
+        });
         let glyph: Element<'_, Message> = if self.mobile_nav_open {
             text("✕")
                 .font(body_font())
@@ -465,7 +479,10 @@ impl WasmDemoApp {
                 .style(text_color(self.theme.palette.foreground))
                 .into()
         } else {
-            iced::widget::column![top, bottom].spacing(5).align_x(Alignment::Center).into()
+            iced::widget::column![top, bottom]
+                .spacing(5)
+                .align_x(Alignment::Center)
+                .into()
         };
 
         button_content(
@@ -539,7 +556,9 @@ impl WasmDemoApp {
                     row![
                         button(
                             "GitHub",
-                            Some(Message::OpenUrl(reference::data().header.github_href.clone())),
+                            Some(Message::OpenUrl(
+                                reference::data().header.github_href.clone()
+                            )),
                             ButtonProps::new()
                                 .variant(ButtonVariant::Ghost)
                                 .size(ButtonSize::Size1),
@@ -547,7 +566,9 @@ impl WasmDemoApp {
                         ),
                         button(
                             "Discord",
-                            Some(Message::OpenUrl(reference::data().header.discord_href.clone())),
+                            Some(Message::OpenUrl(
+                                reference::data().header.discord_href.clone()
+                            )),
                             ButtonProps::new()
                                 .variant(ButtonVariant::Ghost)
                                 .size(ButtonSize::Size1),
@@ -583,4 +604,3 @@ impl WasmDemoApp {
         .into()
     }
 }
-

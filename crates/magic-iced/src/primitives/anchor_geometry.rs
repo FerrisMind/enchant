@@ -186,7 +186,6 @@ pub fn beam_path(from: AnchorBounds, to: AnchorBounds, spec: BeamPathSpec) -> Be
 }
 
 pub fn point_at(path: BeamPath, t: f32) -> Point {
-    let t = t.clamp(0.0, 1.0);
     let one_minus_t = 1.0 - t;
     let x = one_minus_t.powi(2) * path.start.x
         + 2.0 * one_minus_t * t * path.control.x
@@ -279,6 +278,18 @@ mod tests {
         assert_eq!(point_at(path, 0.0), path.start);
         assert_eq!(point_at(path, 1.0), path.end);
         assert_eq!(point_at(path, 0.5), Point::new(50.0, -25.0));
+    }
+
+    #[test]
+    fn point_at_allows_extrapolation_past_endpoints() {
+        let path = BeamPath {
+            start: Point::new(0.0, 0.0),
+            control: Point::new(50.0, -50.0),
+            end: Point::new(100.0, 0.0),
+        };
+
+        assert_eq!(point_at(path, -0.5), Point::new(-50.0, 75.0));
+        assert_eq!(point_at(path, 1.5), Point::new(150.0, 75.0));
     }
 
     #[test]

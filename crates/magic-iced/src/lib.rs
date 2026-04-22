@@ -15,10 +15,9 @@ pub use primitives::{
     effect_canvas, fibonacci_sphere, focus_rotation, grid_cell_origin, grid_cell_rect,
     grid_dimensions, image_grid_cells, lat_lng_to_sphere, marquee_offset, measure_anchors,
     mockup_frame, mockup_frame_with_props, orbit_points, orbit_translation, point_at,
-    pointer_angle_deg, pointer_distance, pointer_speed, pointer_strength, pointer_velocity,
     project_equirectangular, project_sphere_point, rotate_sphere_point, sample_ambient_particle,
-    sample_confetti_particle, segment_progress, segment_text, segment_text_ranges,
-    stable_grid_cell, stable_noise, stagger_offset, world_point_cloud,
+    sample_confetti_particle, segment_progress, stable_grid_cell, stable_noise, stagger_offset,
+    world_point_cloud,
 };
 pub use sections::{BentoCardProps, BentoGridProps, bento_grid};
 pub use theme::MagicTheme;
@@ -44,10 +43,10 @@ pub use widgets::{
     MorphingTextProps, NeonColors, NeonGradientCardProps, NumberTickerDirection, NumberTickerProps,
     NumberTickerState, OrbitingCirclesProps, ParticlesAction, ParticlesProps, ParticlesState,
     PixelGrid, PixelGridPreset, PixelImageProps, PixelImageState, PointerAction, PointerProps,
-    PointerState, ProgressiveBlurPosition, ProgressiveBlurProps, RetroGridProps, SafariProps,
-    ScrollProgressProps, ScrollVelocityContainerProps, ScrollVelocityDirection, ScrollVelocityItem,
-    ScrollVelocityRowAction, ScrollVelocityRowProps, ScrollVelocityRowState, ShimmerButtonProps,
-    ShineBorderProps, ShinyButtonProps, SmoothCursorAction, SmoothCursorProps,
+    PointerState, ProgressiveBlurPosition, ProgressiveBlurProps, RetroGridProps, SafariMode,
+    SafariProps, ScrollProgressProps, ScrollVelocityContainerProps, ScrollVelocityDirection,
+    ScrollVelocityItem, ScrollVelocityRowAction, ScrollVelocityRowProps, ScrollVelocityRowState,
+    ShimmerButtonProps, ShineBorderProps, ShinyButtonProps, SmoothCursorAction, SmoothCursorProps,
     SmoothCursorSpringConfig, SmoothCursorState, SparklesColors, SparklesTextProps,
     SpinningTextProps, SpinningTextTransition, SpinningTextVariantState, SpinningTextVariants,
     StripedPatternDirection, StripedPatternProps, TerminalLine, TerminalLineMode, TerminalProps,

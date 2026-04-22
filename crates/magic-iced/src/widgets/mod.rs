@@ -117,7 +117,7 @@ pub use line_shadow_text::{LineShadowTextProps, line_shadow_text};
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
 pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee};
 pub use meteors::{MeteorsProps, meteors};
-pub use mockups::{AndroidProps, IphoneProps, SafariProps, android, iphone, safari};
+pub use mockups::{AndroidProps, IphoneProps, SafariMode, SafariProps, android, iphone, safari};
 pub use morphing_text::{MorphingTextProps, morphing_text};
 pub use neon_gradient_card::{NeonColors, NeonGradientCardProps, neon_gradient_card};
 pub use number_ticker::{

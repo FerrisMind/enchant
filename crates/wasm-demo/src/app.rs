@@ -4,7 +4,7 @@ use crate::route::{self, Route};
 use iced::border::Radius as BorderRadius;
 use iced::time::{Duration, Instant};
 use iced::widget::image;
-use iced::widget::{column, container, float, row, scrollable, stack, text, Space};
+use iced::widget::{Space, column, container, float, row, scrollable, stack, text};
 use iced::{
     Alignment, Background, Border, Color, Element, Font, Length, Radians, Subscription, Task,
     Theme as IcedTheme, Vector, gradient,
@@ -22,21 +22,21 @@ use magic_iced::{
     NumberTickerProps, NumberTickerState, ShimmerButtonProps, SparklesTextProps, TerminalLine,
     TerminalProps, TerminalSegment, TerminalState, TextRevealProps, TweetAsset, TweetAuthor,
     TweetCardData, TweetCardProps, TweetMedia, VideoTextProps, VideoTextSource, VideoTextState,
-    WordRotateProps, WordRotateState,
-    animated_gradient_text, animated_theme_toggler_with_controller, dock, dock_icon, globe,
-    hero_video_dialog, icon_cloud, magic_card, marquee, number_ticker, shimmer_button,
-    sparkles_text, terminal, text_reveal, tweet_card, video_text, word_rotate,
+    WordRotateProps, WordRotateState, animated_gradient_text,
+    animated_theme_toggler_with_controller, dock, dock_icon, globe, hero_video_dialog, icon_cloud,
+    magic_card, marquee, number_ticker, shimmer_button, sparkles_text, terminal, text_reveal,
+    tweet_card, video_text, word_rotate,
 };
-use twill::prelude::{Easing, TransitionDuration};
-use std::sync::OnceLock;
 use previews::*;
 pub(crate) use shared::*;
+use std::sync::OnceLock;
+use twill::prelude::{Easing, TransitionDuration};
 
-mod shell;
-mod home;
 mod docs;
+mod home;
 mod previews;
 mod shared;
+mod shell;
 
 mod generated_reference_assets {
     include!(concat!(env!("OUT_DIR"), "/reference-assets.rs"));
@@ -163,9 +163,11 @@ impl WasmDemoApp {
                 if let Some(width) = route::current_window_width() {
                     self.window_width = width;
                 }
-                self.terminal_state.tick(now, &self.terminal_lines, &self.terminal_props);
+                self.terminal_state
+                    .tick(now, &self.terminal_lines, &self.terminal_props);
                 self.word_rotate_state.tick(now, &self.word_rotate_props);
-                self.number_ticker_state.tick(now, &self.number_ticker_props);
+                self.number_ticker_state
+                    .tick(now, &self.number_ticker_props);
                 self.theme_toggler.tick(now, &theme_toggler_props());
                 self.globe_state.tick(now, &self.globe_props);
                 self.icon_cloud_state.tick(now, &self.icon_cloud_props);
@@ -195,10 +197,9 @@ impl WasmDemoApp {
             Message::SearchChanged(value) => self.search = value,
             Message::Dock(action) => self.dock_state.apply_action(&action),
             Message::Globe(action) => self.globe_state.apply_action(&action, &self.globe_props),
-            Message::IconCloud(action) => {
-                self.icon_cloud_state
-                    .apply_action(&action, &self.icon_cloud_props)
-            }
+            Message::IconCloud(action) => self
+                .icon_cloud_state
+                .apply_action(&action, &self.icon_cloud_props),
             Message::Noop => {}
         }
 
@@ -261,7 +262,8 @@ impl WasmDemoApp {
             ThemeMode::Dark => ThemeMode::Light,
         };
         self.theme = theme_for_mode(self.theme_mode);
-        self.theme_toggler.sync(matches!(self.theme_mode, ThemeMode::Dark));
+        self.theme_toggler
+            .sync(matches!(self.theme_mode, ThemeMode::Dark));
     }
 
     fn reset_demos(&mut self) {
@@ -369,4 +371,3 @@ fn theme_for_mode(mode: ThemeMode) -> ShadTheme {
 
     theme
 }
-

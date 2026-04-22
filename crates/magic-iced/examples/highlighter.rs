@@ -1,5 +1,5 @@
-use iced::widget::{column, text, container};
-use iced::{Element, Length, Task, Size};
+use iced::widget::{column, container, text};
+use iced::{Element, Length, Size, Task};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -31,15 +31,11 @@ impl HighlighterExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        container(
-            column![
-                text("Highlighter Example").size(24)
-            ]
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .into()
+        container(column![text("Highlighter Example").size(24)])
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .into()
     }
 }

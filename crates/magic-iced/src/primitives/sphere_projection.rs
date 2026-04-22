@@ -81,7 +81,10 @@ pub fn project_sphere_point(
     let opacity = depth.clamp(0.18, 1.0);
 
     ProjectedSpherePoint {
-        position: Point::new(bounds.width * 0.5 + point.x, bounds.height * 0.5 + point.y),
+        position: Point::new(
+            bounds.x + bounds.width * 0.5 + point.x,
+            bounds.y + bounds.height * 0.5 + point.y,
+        ),
         scale,
         opacity,
         depth,
@@ -124,5 +127,16 @@ mod tests {
 
         assert!(rotation.0.abs() < 0.001);
         assert!(rotation.1.abs() < 0.001);
+    }
+
+    #[test]
+    fn project_sphere_point_includes_bounds_origin() {
+        let projected = project_sphere_point(
+            SpherePoint::new(10.0, -5.0, 0.0),
+            Rectangle::new(iced::Point::new(25.0, 40.0), iced::Size::new(200.0, 100.0)),
+            100.0,
+        );
+
+        assert_eq!(projected.position, Point::new(135.0, 85.0));
     }
 }

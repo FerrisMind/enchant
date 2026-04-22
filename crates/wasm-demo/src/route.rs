@@ -64,11 +64,7 @@ pub fn sync_url(route: &Route) {
     }
 
     if let Ok(history) = window.history() {
-        let _ = history.replace_state_with_url(
-            &wasm_bindgen::JsValue::NULL,
-            "",
-            Some(&wanted),
-        );
+        let _ = history.replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some(&wanted));
     }
 }
 

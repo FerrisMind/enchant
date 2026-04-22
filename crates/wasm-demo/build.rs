@@ -29,7 +29,11 @@ fn main() {
 
     let home = parse_home_state(&ref_root, &sidebar, &assets_dir);
     let sources = load_registry_sources(&ref_root.join("public/r"));
-    let pages = load_doc_pages(&ref_root.join("content/docs/components"), &sidebar, &sources);
+    let pages = load_doc_pages(
+        &ref_root.join("content/docs/components"),
+        &sidebar,
+        &sources,
+    );
 
     let data = ReferenceData {
         layout,

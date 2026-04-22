@@ -108,7 +108,10 @@ First step text.
     assert_eq!(page.title, "Sample");
     assert_eq!(page.description, "Example");
     assert_eq!(page.toc.len(), 1);
-    assert!(matches!(page.blocks[0], BodyBlock::Heading { level: 2, .. }));
+    assert!(matches!(
+        page.blocks[0],
+        BodyBlock::Heading { level: 2, .. }
+    ));
     assert!(matches!(page.blocks[1], BodyBlock::Paragraph { .. }));
     assert!(matches!(page.blocks[2], BodyBlock::SourceRef { .. }));
 

@@ -4,10 +4,18 @@ use iced::Length;
 use iced::widget::container;
 use iced_shadcn::Theme;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum SafariMode {
+    #[default]
+    Default,
+    Simple,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SafariProps {
     pub width: Length,
     pub chrome_label: Option<&'static str>,
+    pub mode: SafariMode,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -27,6 +35,7 @@ impl Default for SafariProps {
         Self {
             width: Length::Fill,
             chrome_label: None,
+            mode: SafariMode::Default,
         }
     }
 }
@@ -61,6 +70,11 @@ impl SafariProps {
 
     pub fn chrome_label(mut self, chrome_label: &'static str) -> Self {
         self.chrome_label = Some(chrome_label);
+        self
+    }
+
+    pub fn mode(mut self, mode: SafariMode) -> Self {
+        self.mode = mode;
         self
     }
 
@@ -117,7 +131,7 @@ pub fn safari<'a, Message: Clone + 'a + 'static>(
     container(mockup_frame_with_props(
         props.frame_kind(),
         content,
-        &frame_props(props.chrome_label),
+        &frame_props(props.chrome_label, matches!(props.mode, SafariMode::Simple)),
         theme,
     ))
     .width(props.width)
@@ -132,7 +146,7 @@ pub fn iphone<'a, Message: Clone + 'a + 'static>(
     container(mockup_frame_with_props(
         props.frame_kind(),
         content,
-        &frame_props(props.chrome_label),
+        &frame_props(props.chrome_label, false),
         theme,
     ))
     .width(props.width)
@@ -147,18 +161,22 @@ pub fn android<'a, Message: Clone + 'a + 'static>(
     container(mockup_frame_with_props(
         props.frame_kind(),
         content,
-        &frame_props(props.chrome_label),
+        &frame_props(props.chrome_label, false),
         theme,
     ))
     .width(props.width)
     .into()
 }
 
-fn frame_props(chrome_label: Option<&'static str>) -> MockupFrameProps {
+fn frame_props(chrome_label: Option<&'static str>, safari_simple: bool) -> MockupFrameProps {
     let mut props = MockupFrameProps::new();
 
     if let Some(chrome_label) = chrome_label {
         props = props.chrome_label(chrome_label);
+    }
+
+    if safari_simple {
+        props = props.safari_simple(true);
     }
 
     props
@@ -192,6 +210,16 @@ mod tests {
                 .chrome_label("android-demo")
                 .chrome_label,
             Some("android-demo")
+        );
+    }
+
+    #[test]
+    fn safari_wrapper_forwards_simple_mode_to_primitives() {
+        let props = SafariProps::new().mode(SafariMode::Simple);
+
+        assert_eq!(props.mode, SafariMode::Simple);
+        assert!(
+            frame_props(props.chrome_label, matches!(props.mode, SafariMode::Simple)).safari_simple
         );
     }
 }

@@ -9,10 +9,12 @@ pub fn parse_layout_state(globals_css: &str, app_layout: &str) -> LayoutState {
         extract_calc_spacing_multiplier(app_layout, "--header-height").unwrap_or(14.0) * 4.0;
     let footer_height =
         extract_calc_spacing_multiplier(app_layout, "--footer-height").unwrap_or(14.0) * 4.0;
-    let footer_height_xl =
-        extract_breakpoint_spacing_multiplier(app_layout, "xl:[--footer-height:calc(var(--spacing)*")
-            .unwrap_or(24.0)
-            * 4.0;
+    let footer_height_xl = extract_breakpoint_spacing_multiplier(
+        app_layout,
+        "xl:[--footer-height:calc(var(--spacing)*",
+    )
+    .unwrap_or(24.0)
+        * 4.0;
 
     let container_max_width =
         extract_bracket_px(globals_css, "@utility container", "max-w-[", "px]").unwrap_or(1400.0);
@@ -193,7 +195,11 @@ fn parse_oklch(input: &str) -> Option<[u8; 4]> {
     };
 
     let mut components = color_part.split_whitespace();
-    let l = components.next()?.trim_end_matches('%').parse::<f32>().ok()?;
+    let l = components
+        .next()?
+        .trim_end_matches('%')
+        .parse::<f32>()
+        .ok()?;
     let c = components.next()?.parse::<f32>().ok()?;
     let h = components.next()?.parse::<f32>().ok()?;
     let alpha = alpha_part.and_then(parse_alpha).unwrap_or(1.0);

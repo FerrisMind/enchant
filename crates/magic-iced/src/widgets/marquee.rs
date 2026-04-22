@@ -6,7 +6,7 @@ use iced::Length;
 use iced::Radians;
 use iced::Vector;
 use iced::gradient;
-use iced::widget::{column, container, float, row, stack, mouse_area};
+use iced::widget::{column, container, float, mouse_area, row, stack};
 
 use iced_shadcn::Theme;
 use std::time::Duration;
@@ -100,7 +100,7 @@ pub fn marquee<'a, Message: 'a + Clone, T>(
     let track_extent = marquee_track_extent(items.len(), props);
     let translation = marquee_translation(elapsed, items.len(), props);
     let repeats = props.repeat.max(2);
-    
+
     // Wrap items in a track that handles hover internally
     let base = render_track(items, &render_item, &on_hover, repeats, props);
     let track = float(base).translate(move |_bounds, _viewport| translation);
@@ -119,7 +119,7 @@ pub fn marquee<'a, Message: 'a + Clone, T>(
     let frame = container(
         mouse_area(track)
             .on_enter(on_hover(true))
-            .on_exit(on_hover(false))
+            .on_exit(on_hover(false)),
     )
     .width(width)
     .height(height)
@@ -131,7 +131,7 @@ pub fn marquee<'a, Message: 'a + Clone, T>(
     }
 
     let overlays = edge_fades(props, theme);
-    
+
     // Stack overlays on top but ensure they are correctly sized
     container(stack(vec![frame.into(), overlays]))
         .width(width)
@@ -182,7 +182,13 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(0.0))
                         .add_stop(0.0, background)
-                        .add_stop(1.0, Color { a: 0.0, ..background })
+                        .add_stop(
+                            1.0,
+                            Color {
+                                a: 0.0,
+                                ..background
+                            },
+                        )
                         .into()
                 });
             let right = container(iced::widget::Space::new())
@@ -191,18 +197,20 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(std::f32::consts::PI))
                         .add_stop(0.0, background)
-                        .add_stop(1.0, Color { a: 0.0, ..background })
+                        .add_stop(
+                            1.0,
+                            Color {
+                                a: 0.0,
+                                ..background
+                            },
+                        )
                         .into()
                 });
 
-            row![
-                left,
-                iced::widget::Space::new().width(Length::Fill),
-                right
-            ]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+            row![left, iced::widget::Space::new().width(Length::Fill), right]
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
         }
         MarqueeOrientation::Vertical => {
             let top = container(iced::widget::Space::new())
@@ -211,7 +219,13 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(std::f32::consts::FRAC_PI_2))
                         .add_stop(0.0, background)
-                        .add_stop(1.0, Color { a: 0.0, ..background })
+                        .add_stop(
+                            1.0,
+                            Color {
+                                a: 0.0,
+                                ..background
+                            },
+                        )
                         .into()
                 });
             let bottom = container(iced::widget::Space::new())
@@ -220,18 +234,20 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(-std::f32::consts::FRAC_PI_2))
                         .add_stop(0.0, background)
-                        .add_stop(1.0, Color { a: 0.0, ..background })
+                        .add_stop(
+                            1.0,
+                            Color {
+                                a: 0.0,
+                                ..background
+                            },
+                        )
                         .into()
                 });
 
-            column![
-                top,
-                iced::widget::Space::new().height(Length::Fill),
-                bottom
-            ]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+            column![top, iced::widget::Space::new().height(Length::Fill), bottom]
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
         }
     }
 }

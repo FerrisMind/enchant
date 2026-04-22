@@ -9,6 +9,7 @@ use iced::time::Instant;
 use iced::widget::text::Span;
 use iced::widget::{Space, column, container, rich_text, row, text};
 use iced_shadcn::{CodeBlockGroupProps, CodeBlockProps, Theme, code_block, code_block_group};
+use twill::prelude::TransitionDuration;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TerminalSegment {
@@ -79,7 +80,11 @@ pub struct TerminalProps {
 impl Default for TerminalProps {
     fn default() -> Self {
         Self {
-            typing_spec: TextRunSpec::new().loop_mode(TextLoopMode::Once),
+            typing_spec: TextRunSpec::new()
+                .typing_step(TransitionDuration::CustomMs(60))
+                .deleting_step(TransitionDuration::CustomMs(50))
+                .pause(TransitionDuration::Ms1000)
+                .loop_mode(TextLoopMode::Once),
             padding: 16.0,
             line_gap: 6.0,
             max_width: 560.0,
@@ -269,6 +274,7 @@ fn traffic_light<'a, Message: 'a>(color: Color) -> Element<'a, Message> {
 mod tests {
     use super::*;
     use iced::time::Duration;
+    use twill::prelude::TransitionDuration;
 
     #[test]
     fn terminal_sequence_progresses_in_order() {
@@ -302,5 +308,34 @@ mod tests {
         let state = TerminalState::new(&lines, &props);
 
         assert_eq!(state.visible_bytes_for(1, &lines), 0);
+    }
+
+    #[test]
+    fn terminal_defaults_typing_duration_match_docs() {
+        let props = TerminalProps::new();
+
+        assert_eq!(
+            props.typing_spec.typing_step,
+            TransitionDuration::CustomMs(60)
+        );
+    }
+
+    #[test]
+    fn terminal_zero_duration_typing_completes_in_one_tick() {
+        let lines = vec![TerminalLine::typing(vec![TerminalSegment::new("typed")])];
+        let props = TerminalProps {
+            typing_spec: TextRunSpec::new()
+                .typing_step(TransitionDuration::Ms0)
+                .deleting_step(TransitionDuration::Ms0)
+                .pause(TransitionDuration::Ms0)
+                .loop_mode(TextLoopMode::Once),
+            ..TerminalProps::new()
+        };
+        let mut state = TerminalState::new(&lines, &props);
+        let start = Instant::now();
+
+        state.tick(start, &lines, &props);
+
+        assert!(state.is_complete(&lines));
     }
 }

@@ -240,6 +240,7 @@ impl<Message> EffectProgram<Message> for IconCloudProgram<'_> {
         _viewport: &Rectangle,
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
+        let local_bounds = Rectangle::with_size(bounds.size());
         let text_color = self.props.text_color.unwrap_or(Color::WHITE);
         let mut projected = self
             .props
@@ -249,7 +250,8 @@ impl<Message> EffectProgram<Message> for IconCloudProgram<'_> {
             .map(|(item, point)| {
                 let rotated =
                     rotate_sphere_point(*point, self.state.rotation_x, self.state.rotation_y);
-                let projection = project_sphere_point(rotated, bounds, self.props.camera_distance);
+                let projection =
+                    project_sphere_point(rotated, local_bounds, self.props.camera_distance);
                 (projection.depth, projection, item)
             })
             .collect::<Vec<_>>();

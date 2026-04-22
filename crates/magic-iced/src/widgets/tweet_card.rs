@@ -610,7 +610,7 @@ mod tests {
         state.apply_action(&ClientTweetCardAction::Loading);
         assert_eq!(state.status, ClientTweetCardStatus::Loading);
 
-        state.apply_action(&ClientTweetCardAction::Loaded(sample_data()));
+        state.apply_action(&ClientTweetCardAction::Loaded(Box::new(sample_data())));
         assert_eq!(state.status, ClientTweetCardStatus::Ready);
         assert!(state.data.is_some());
 

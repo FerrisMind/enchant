@@ -139,7 +139,11 @@ pub fn parse_docs_config(input: &str) -> (Vec<NavItem>, Vec<SidebarSection>) {
     (nav_items, sidebar_sections)
 }
 
-pub fn parse_home_state(ref_root: &Path, sidebar: &[SidebarSection], assets_dir: &Path) -> HomeState {
+pub fn parse_home_state(
+    ref_root: &Path,
+    sidebar: &[SidebarSection],
+    assets_dir: &Path,
+) -> HomeState {
     let hero = fs::read_to_string(ref_root.join("components/sections/hero.tsx")).unwrap();
     let showcase = fs::read_to_string(ref_root.join("components/sections/showcase.tsx")).unwrap();
     let testimonials =

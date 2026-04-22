@@ -3,6 +3,7 @@ use iced::Element;
 use iced::time::Instant;
 use iced::widget::text;
 use iced_shadcn::Theme;
+use twill::prelude::{Easing, TransitionDuration};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum NumberTickerDirection {
@@ -17,6 +18,7 @@ pub struct NumberTickerProps {
     pub start_value: f64,
     pub direction: NumberTickerDirection,
     pub decimal_places: u8,
+    pub delay_secs: f32,
     pub motion: MotionSpec,
     pub prefix: String,
     pub suffix: String,
@@ -30,7 +32,8 @@ impl Default for NumberTickerProps {
             start_value: 0.0,
             direction: NumberTickerDirection::Up,
             decimal_places: 0,
-            motion: MotionSpec::default(),
+            delay_secs: 0.0,
+            motion: default_motion(),
             prefix: String::new(),
             suffix: String::new(),
             font_size: 36,
@@ -61,6 +64,15 @@ impl NumberTickerProps {
         self
     }
 
+    pub fn delay(mut self, delay: f32) -> Self {
+        self.delay_secs = delay.max(0.0);
+        self
+    }
+
+    pub fn delay_secs(self, delay_secs: f32) -> Self {
+        self.delay(delay_secs)
+    }
+
     pub fn motion(mut self, motion: MotionSpec) -> Self {
         self.motion = motion;
         self
@@ -86,6 +98,7 @@ impl NumberTickerProps {
 pub struct NumberTickerState {
     animation: AnimatedValue,
     started: bool,
+    started_at: Option<Instant>,
     fingerprint: NumberTickerFingerprint,
 }
 
@@ -94,6 +107,7 @@ struct NumberTickerFingerprint {
     value: f64,
     start_value: f64,
     direction: NumberTickerDirection,
+    delay_secs: f32,
 }
 
 impl NumberTickerState {
@@ -101,10 +115,12 @@ impl NumberTickerState {
         Self {
             animation: AnimatedValue::with_spec(initial_value(props) as f32, props.motion),
             started: false,
+            started_at: None,
             fingerprint: NumberTickerFingerprint {
                 value: props.value,
                 start_value: props.start_value,
                 direction: props.direction,
+                delay_secs: props.delay_secs,
             },
         }
     }
@@ -114,17 +130,28 @@ impl NumberTickerState {
             value: props.value,
             start_value: props.start_value,
             direction: props.direction,
+            delay_secs: props.delay_secs,
         };
 
         if !self.started || fingerprint != self.fingerprint {
             self.animation = AnimatedValue::with_spec(initial_value(props) as f32, props.motion);
-            self.animation.transition(target_value(props) as f32, now);
             self.started = true;
+            self.started_at = None;
             self.fingerprint = fingerprint;
-            return;
         }
 
         self.animation.set_spec(props.motion);
+
+        let started_at = self.started_at.get_or_insert(now);
+        if !self.animation.is_animating(now)
+            && now.saturating_duration_since(*started_at).as_secs_f32() < props.delay_secs
+        {
+            return;
+        }
+
+        if !self.animation.is_animating(now) && props.delay_secs >= 0.0 {
+            self.animation.transition(target_value(props) as f32, now);
+        }
     }
 
     pub fn value_at(&self, now: Instant) -> f64 {
@@ -200,10 +227,17 @@ fn group_digits(value: u64) -> String {
     output.chars().rev().collect()
 }
 
+fn default_motion() -> MotionSpec {
+    MotionSpec::new()
+        .duration(TransitionDuration::CustomMs(250))
+        .easing(Easing::Out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use iced::time::Duration;
+    use twill::prelude::{Easing, TransitionDuration};
 
     #[test]
     fn format_number_adds_grouping_and_decimals() {
@@ -223,6 +257,35 @@ mod tests {
         assert_eq!(target_value(&up), 4200.0);
         assert_eq!(initial_value(&down), 4200.0);
         assert_eq!(target_value(&down), 0.0);
+    }
+
+    #[test]
+    fn ticker_delay_defers_animation_start() {
+        let now = Instant::now();
+        let props = NumberTickerProps::new(100.0).delay(0.5).motion(
+            MotionSpec::new()
+                .duration(twill::prelude::TransitionDuration::Ms100)
+                .easing(twill::prelude::Easing::Linear),
+        );
+        let mut state = NumberTickerState::new(&props);
+
+        state.tick(now, &props);
+        assert_eq!(state.value_at(now + Duration::from_millis(250)), 0.0);
+
+        state.tick(now + Duration::from_millis(600), &props);
+        assert!(state.value_at(now + Duration::from_millis(650)) > 0.0);
+    }
+
+    #[test]
+    fn ticker_defaults_use_upstream_motion_curve() {
+        let props = NumberTickerProps::default();
+
+        assert_eq!(
+            props.motion,
+            MotionSpec::new()
+                .duration(TransitionDuration::CustomMs(250))
+                .easing(Easing::Out)
+        );
     }
 
     #[test]

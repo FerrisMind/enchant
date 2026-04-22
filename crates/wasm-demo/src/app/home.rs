@@ -40,9 +40,12 @@ impl WasmDemoApp {
             .into()
         } else {
             container(
-                row![hero_primary_cta(&self.theme, self.elapsed), hero_secondary_cta(&self.theme)]
-                    .spacing(12)
-                    .align_y(Alignment::Center),
+                row![
+                    hero_primary_cta(&self.theme, self.elapsed),
+                    hero_secondary_cta(&self.theme)
+                ]
+                .spacing(12)
+                .align_y(Alignment::Center),
             )
             .width(Length::Fixed(320.0))
             .center_x(Length::Shrink)
@@ -60,7 +63,11 @@ impl WasmDemoApp {
                         .font(body_font())
                         .size(13)
                         .style(text_color(self.theme.palette.foreground)),
-                    lucide(LucideIcon::ChevronRight, 14, self.theme.palette.muted_foreground),
+                    lucide(
+                        LucideIcon::ChevronRight,
+                        14,
+                        self.theme.palette.muted_foreground
+                    ),
                 ]
                 .spacing(8)
                 .align_y(Alignment::Center),
@@ -128,12 +135,12 @@ impl WasmDemoApp {
                 .width(Length::Fill)
                 .center_x(Length::Fill),
         )
-            .width(Length::Fill)
-            .padding([
-                if self.is_lt_md() { 20.0 } else { 56.0 },
-                if self.is_lt_md() { 28.0 } else { 40.0 },
-            ])
-            .into()
+        .width(Length::Fill)
+        .padding([
+            if self.is_lt_md() { 20.0 } else { 56.0 },
+            if self.is_lt_md() { 28.0 } else { 40.0 },
+        ])
+        .into()
     }
 
     pub(crate) fn showcase_section(&self) -> Element<'_, Message> {
@@ -144,7 +151,12 @@ impl WasmDemoApp {
                 home.showcase_description.as_str(),
                 &self.theme,
             ),
-            showcase_track(&home.showcase_cards, self.elapsed, self.is_lt_md(), &self.theme),
+            showcase_track(
+                &home.showcase_cards,
+                self.elapsed,
+                self.is_lt_md(),
+                &self.theme
+            ),
         ]
         .spacing(24)
         .into()
@@ -265,7 +277,9 @@ fn hero_primary_cta(theme: &ShadTheme, elapsed: Duration) -> Element<'_, Message
         text(reference::data().home.hero.primary_cta.as_str())
             .font(body_font())
             .size(16),
-        Some(message_for_href(&reference::data().home.hero.primary_cta_href)),
+        Some(message_for_href(
+            &reference::data().home.hero.primary_cta_href,
+        )),
         elapsed,
         ShimmerButtonProps::new().button(
             ButtonProps::new()
@@ -279,7 +293,9 @@ fn hero_primary_cta(theme: &ShadTheme, elapsed: Duration) -> Element<'_, Message
 fn hero_secondary_cta(theme: &ShadTheme) -> Element<'_, Message> {
     button(
         reference::data().home.hero.secondary_cta.as_str(),
-        Some(message_for_href(&reference::data().home.hero.secondary_cta_href)),
+        Some(message_for_href(
+            &reference::data().home.hero.secondary_cta_href,
+        )),
         ButtonProps::new()
             .variant(ButtonVariant::Outline)
             .size(ButtonSize::Size3),
@@ -287,4 +303,3 @@ fn hero_secondary_cta(theme: &ShadTheme) -> Element<'_, Message> {
     )
     .into()
 }
-

@@ -76,7 +76,9 @@ pub(crate) fn showcase_track<'a>(
         .translate(move |_bounds, _viewport| Vector::new(offset, 0.0));
     let frame = container(track)
         .width(Length::Fill)
-        .height(Length::Fixed(preview_height + if mobile { 84.0 } else { 92.0 }))
+        .height(Length::Fixed(
+            preview_height + if mobile { 84.0 } else { 92.0 },
+        ))
         .clip(true);
 
     stack(vec![frame.into(), showcase_edge_fades(mobile, theme)]).into()
@@ -309,7 +311,10 @@ pub(crate) fn lucide<'a>(icon: LucideIcon, size: u16, color: Color) -> Element<'
 }
 
 pub(crate) fn reference_doc(slug: &str) -> Option<&'static RefDocPage> {
-    reference::data().pages.iter().find(|page| page.slug == slug)
+    reference::data()
+        .pages
+        .iter()
+        .find(|page| page.slug == slug)
 }
 
 pub(crate) fn is_supported_doc_slug(slug: &str) -> bool {
@@ -340,10 +345,14 @@ pub(crate) fn message_for_href(href: &str) -> Message {
 
 pub(crate) fn doc_primary_source(doc: &RefDocPage) -> Option<&str> {
     doc.blocks.iter().find_map(|block| match block {
-        BodyBlock::SourceRef { code: Some(code), .. } => Some(code.as_str()),
+        BodyBlock::SourceRef {
+            code: Some(code), ..
+        } => Some(code.as_str()),
         BodyBlock::Tabs { items, .. } => items.iter().find_map(|item| {
             item.blocks.iter().find_map(|block| match block {
-                BodyBlock::SourceRef { code: Some(code), .. } => Some(code.as_str()),
+                BodyBlock::SourceRef {
+                    code: Some(code), ..
+                } => Some(code.as_str()),
                 _ => None,
             })
         }),
@@ -539,7 +548,10 @@ mod tests {
 
     #[test]
     fn message_for_href_maps_internal_links() {
-        assert!(matches!(message_for_href("/"), Message::Navigate(Route::Home)));
+        assert!(matches!(
+            message_for_href("/"),
+            Message::Navigate(Route::Home)
+        ));
         assert!(matches!(
             message_for_href("/components"),
             Message::Navigate(Route::Components)
@@ -560,7 +572,10 @@ mod tests {
 
     #[test]
     fn preview_slug_from_name_handles_aliases() {
-        assert_eq!(preview_slug_from_name("hero-video-dialog"), Some("video-text"));
+        assert_eq!(
+            preview_slug_from_name("hero-video-dialog"),
+            Some("video-text")
+        );
         assert_eq!(preview_slug_from_name("bento-card"), Some("magic-card"));
     }
 

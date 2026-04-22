@@ -1,4 +1,4 @@
-use crate::primitives::{ScrollSample, TextSegmentMode, segment_progress, segment_text_ranges};
+use crate::primitives::{ScrollSample, segment_progress};
 use iced::Color;
 use iced::Element;
 use iced::widget::rich_text;
@@ -93,37 +93,7 @@ fn word_spans<'a>(content: &'a str, props: TextRevealProps, theme: &Theme) -> Ve
 }
 
 fn word_chunks(content: &str) -> Vec<&str> {
-    let ranges = segment_text_ranges(content, TextSegmentMode::Word);
-
-    if ranges.is_empty() {
-        return if content.is_empty() {
-            Vec::new()
-        } else {
-            vec![content]
-        };
-    }
-
-    let mut chunks = Vec::new();
-    let mut index = 0;
-
-    while index < ranges.len() {
-        let current = ranges[index].clone();
-        let next = ranges.get(index + 1).cloned();
-
-        if let Some(next) = next
-            && content[next.clone()].trim().is_empty()
-            && !content[current.clone()].trim().is_empty()
-        {
-            chunks.push(&content[current.start..next.end]);
-            index += 2;
-            continue;
-        }
-
-        chunks.push(&content[current]);
-        index += 1;
-    }
-
-    chunks
+    content.split(' ').collect()
 }
 
 fn apply_alpha(color: Color, alpha: f32) -> Color {
@@ -146,10 +116,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn word_chunks_preserve_spacing_between_words() {
+    fn word_chunks_match_literal_space_split() {
         let chunks = word_chunks("Hello  world from FerrisMind");
 
-        assert_eq!(chunks, vec!["Hello  ", "world ", "from ", "FerrisMind"]);
+        assert_eq!(chunks, vec!["Hello", "", "world", "from", "FerrisMind"]);
     }
 
     #[test]

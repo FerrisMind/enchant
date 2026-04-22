@@ -216,7 +216,11 @@ impl WasmDemoApp {
             dock_icon(lucide(LucideIcon::House, 18, self.theme.palette.foreground)),
             dock_icon(lucide(LucideIcon::Code, 18, self.theme.palette.foreground)),
             dock_icon(lucide(LucideIcon::Box, 18, self.theme.palette.foreground)),
-            dock_icon(lucide(LucideIcon::Sparkles, 18, self.theme.palette.foreground)),
+            dock_icon(lucide(
+                LucideIcon::Sparkles,
+                18,
+                self.theme.palette.foreground,
+            )),
         ];
 
         centered(dock(
@@ -254,7 +258,11 @@ impl WasmDemoApp {
     }
 
     pub(crate) fn preview_video_text(&self) -> Element<'_, Message> {
-        video_text(&self.video_text_state, Instant::now(), &self.video_text_props)
+        video_text(
+            &self.video_text_state,
+            Instant::now(),
+            &self.video_text_props,
+        )
     }
 
     pub(crate) fn preview_video_text_demo(&self) -> Element<'_, Message> {
@@ -328,7 +336,11 @@ pub(crate) fn sample_tweets(ids: &[String]) -> Vec<TweetCardData> {
                     verified: true,
                 },
                 url: Some(format!("https://x.com/i/status/{id}")),
-                timestamp: Some(format!("{:02}:{} PM", (index % 11) + 1, 10 + (index % 5) * 7)),
+                timestamp: Some(format!(
+                    "{:02}:{} PM",
+                    (index % 11) + 1,
+                    10 + (index % 5) * 7
+                )),
                 media,
             }
         })
@@ -360,13 +372,11 @@ pub(crate) fn terminal_lines_alt() -> &'static [TerminalLine] {
             TerminalLine::instant(vec![TerminalSegment::new("$ pnpm dlx shadcn@latest add")]),
             TerminalLine::instant(vec![
                 TerminalSegment::new("✔ "),
-                TerminalSegment::new("@magicui/terminal")
-                    .color(Color::from_rgb8(59, 130, 246)),
+                TerminalSegment::new("@magicui/terminal").color(Color::from_rgb8(59, 130, 246)),
             ]),
             TerminalLine::instant(vec![
                 TerminalSegment::new("Success. "),
-                TerminalSegment::new("1 file updated")
-                    .color(Color::from_rgb8(113, 113, 122)),
+                TerminalSegment::new("1 file updated").color(Color::from_rgb8(113, 113, 122)),
             ]),
         ]
     })

@@ -132,7 +132,8 @@ impl WasmDemoApp {
                 _ => self.docs_toc(),
             };
             row![
-                container(sidebar).width(Length::Fixed(reference::data().layout.docs_sidebar_width)),
+                container(sidebar)
+                    .width(Length::Fixed(reference::data().layout.docs_sidebar_width)),
                 container(main).width(Length::Fill),
                 right_rail,
             ]
@@ -232,9 +233,13 @@ impl WasmDemoApp {
             Space::new().width(Length::Shrink).into()
         };
 
-        row![previous_button, Space::new().width(Length::Fill), next_button,]
-            .align_y(Alignment::Center)
-            .into()
+        row![
+            previous_button,
+            Space::new().width(Length::Fill),
+            next_button,
+        ]
+        .align_y(Alignment::Center)
+        .into()
     }
 
     pub(crate) fn docs_sidebar(&self) -> Element<'_, Message> {
@@ -286,7 +291,10 @@ impl WasmDemoApp {
             let mut has_visible_items = false;
             for item in &group.items {
                 let visible = self.search.trim().is_empty()
-                    || item.title.to_lowercase().contains(&self.search.trim().to_lowercase())
+                    || item
+                        .title
+                        .to_lowercase()
+                        .contains(&self.search.trim().to_lowercase())
                     || ref_data
                         .pages
                         .iter()
@@ -331,9 +339,7 @@ impl WasmDemoApp {
             );
         }
 
-        container(content.spacing(12))
-            .width(Length::Fill)
-            .into()
+        container(content.spacing(12)).width(Length::Fill).into()
     }
 
     pub(crate) fn catalog_grid(&self) -> Element<'_, Message> {
@@ -641,37 +647,33 @@ impl WasmDemoApp {
         let mut items = iced::widget::column![];
         if !headers.is_empty() {
             items = items.push(
-                row(
-                    headers
-                        .iter()
-                        .map(|header| {
-                            text(header.as_str())
-                                .font(display_font())
-                                .size(14)
-                                .style(text_color(self.theme.palette.foreground))
-                                .width(Length::FillPortion(1))
-                                .into()
-                        })
-                        .collect::<Vec<Element<'_, Message>>>(),
-                )
+                row(headers
+                    .iter()
+                    .map(|header| {
+                        text(header.as_str())
+                            .font(display_font())
+                            .size(14)
+                            .style(text_color(self.theme.palette.foreground))
+                            .width(Length::FillPortion(1))
+                            .into()
+                    })
+                    .collect::<Vec<Element<'_, Message>>>())
                 .spacing(12),
             );
         }
         for row_values in rows {
             items = items.push(
-                row(
-                    row_values
-                        .iter()
-                        .map(|value| {
-                            text(value.as_str())
-                                .font(body_font())
-                                .size(14)
-                                .style(text_color(self.theme.palette.primary))
-                                .width(Length::FillPortion(1))
-                                .into()
-                        })
-                        .collect::<Vec<Element<'_, Message>>>(),
-                )
+                row(row_values
+                    .iter()
+                    .map(|value| {
+                        text(value.as_str())
+                            .font(body_font())
+                            .size(14)
+                            .style(text_color(self.theme.palette.primary))
+                            .width(Length::FillPortion(1))
+                            .into()
+                    })
+                    .collect::<Vec<Element<'_, Message>>>())
                 .spacing(12),
             );
         }
@@ -695,21 +697,20 @@ impl WasmDemoApp {
             .and_then(|value| items.iter().find(|item| item.value == value))
             .unwrap_or_else(|| items.first().expect("tabs must contain at least one item"));
 
-        let labels = row(
-            items.iter()
-                .map(|item| {
-                    text(item.label.as_str())
-                        .font(display_font())
-                        .size(16)
-                        .style(text_color(if item.value == active.value {
-                            self.theme.palette.foreground
-                        } else {
-                            self.theme.palette.muted_foreground
-                        }))
-                        .into()
-                })
-                .collect::<Vec<Element<'_, Message>>>(),
-        )
+        let labels = row(items
+            .iter()
+            .map(|item| {
+                text(item.label.as_str())
+                    .font(display_font())
+                    .size(16)
+                    .style(text_color(if item.value == active.value {
+                        self.theme.palette.foreground
+                    } else {
+                        self.theme.palette.muted_foreground
+                    }))
+                    .into()
+            })
+            .collect::<Vec<Element<'_, Message>>>())
         .spacing(20);
 
         let blocks = active
@@ -718,7 +719,9 @@ impl WasmDemoApp {
             .map(|block| self.render_body_block(block))
             .collect::<Vec<_>>();
 
-        iced::widget::column![labels, column(blocks).spacing(16)].spacing(14).into()
+        iced::widget::column![labels, column(blocks).spacing(16)]
+            .spacing(14)
+            .into()
     }
 
     fn render_steps_block<'a>(
@@ -757,4 +760,3 @@ impl WasmDemoApp {
         column(steps).spacing(14).into()
     }
 }
-

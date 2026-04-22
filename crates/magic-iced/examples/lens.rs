@@ -1,18 +1,14 @@
-use iced::widget::{column, text, container};
-use iced::{Element, Length, Task, Size};
+use iced::widget::{column, container, text};
+use iced::{Element, Length, Size, Task};
 
 pub fn main() -> iced::Result {
-    iced::application(
-        LensExample::new,
-        LensExample::update,
-        LensExample::view,
-    )
-    .title("Lens Example")
-    .window(iced::window::Settings {
-        size: Size::new(800.0, 600.0),
-        ..Default::default()
-    })
-    .run()
+    iced::application(LensExample::new, LensExample::update, LensExample::view)
+        .title("Lens Example")
+        .window(iced::window::Settings {
+            size: Size::new(800.0, 600.0),
+            ..Default::default()
+        })
+        .run()
 }
 
 #[derive(Default)]
@@ -31,15 +27,11 @@ impl LensExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        container(
-            column![
-                text("Lens Example").size(24)
-            ]
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .into()
+        container(column![text("Lens Example").size(24)])
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .into()
     }
 }

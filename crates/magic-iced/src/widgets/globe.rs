@@ -192,6 +192,7 @@ impl<Message> EffectProgram<Message> for GlobeProgram<'_> {
         _viewport: &Rectangle,
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
+        let local_bounds = Rectangle::with_size(bounds.size());
         let center = Point::new(bounds.width * 0.5, bounds.height * 0.5);
         let base = self
             .props
@@ -241,7 +242,7 @@ impl<Message> EffectProgram<Message> for GlobeProgram<'_> {
 
             dots.push(project_sphere_point(
                 rotated,
-                bounds,
+                local_bounds,
                 self.props.camera_distance,
             ));
         }
@@ -266,7 +267,8 @@ impl<Message> EffectProgram<Message> for GlobeProgram<'_> {
                     lat_lng_to_sphere(marker_data.lat, marker_data.lng, self.props.radius * 0.98);
                 let rotated =
                     rotate_sphere_point(sphere, self.state.rotation_x, self.state.rotation_y);
-                let projected = project_sphere_point(rotated, bounds, self.props.camera_distance);
+                let projected =
+                    project_sphere_point(rotated, local_bounds, self.props.camera_distance);
                 (rotated.z, projected, marker_data.size)
             })
             .collect::<Vec<_>>();

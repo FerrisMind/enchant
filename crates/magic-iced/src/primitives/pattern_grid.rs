@@ -49,14 +49,22 @@ pub struct GridCellIndex {
 }
 
 pub fn grid_dimensions(bounds: Size, spec: GridPatternSpec) -> (usize, usize) {
-    let columns = ((bounds.width - spec.offset_x).max(0.0) / spec.cell_width)
-        .ceil()
-        .max(0.0) as usize;
-    let rows = ((bounds.height - spec.offset_y).max(0.0) / spec.cell_height)
-        .ceil()
-        .max(0.0) as usize;
+    let columns = if bounds.width <= 0.0 {
+        0
+    } else {
+        ((bounds.width - spec.offset_x).max(0.0) / spec.cell_width)
+            .ceil()
+            .max(0.0) as usize
+    };
+    let rows = if bounds.height <= 0.0 {
+        0
+    } else {
+        ((bounds.height - spec.offset_y).max(0.0) / spec.cell_height)
+            .ceil()
+            .max(0.0) as usize
+    };
 
-    (columns.max(1), rows.max(1))
+    (columns, rows)
 }
 
 pub fn grid_cell_origin(index: GridCellIndex, spec: GridPatternSpec) -> Point {
@@ -84,8 +92,8 @@ pub fn stable_grid_cell(
         .fork(slot as u64)
         .fork(iteration as u64);
     GridCellIndex {
-        x: rng.range_usize(0, columns.max(1)) as i32,
-        y: rng.range_usize(0, rows.max(1)) as i32,
+        x: rng.range_usize(0, columns) as i32,
+        y: rng.range_usize(0, rows) as i32,
     }
 }
 
@@ -94,11 +102,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn grid_dimensions_never_return_zero() {
+    fn grid_dimensions_return_zero_for_zero_bounds() {
         let (columns, rows) = grid_dimensions(Size::new(0.0, 0.0), GridPatternSpec::new());
 
-        assert_eq!(columns, 1);
-        assert_eq!(rows, 1);
+        assert_eq!(columns, 0);
+        assert_eq!(rows, 0);
     }
 
     #[test]

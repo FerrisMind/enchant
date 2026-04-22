@@ -52,6 +52,7 @@ pub struct GridCell {
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct MockupFrameProps {
     pub chrome_label: Option<String>,
+    pub safari_simple: bool,
 }
 
 impl MockupFrameProps {
@@ -61,6 +62,11 @@ impl MockupFrameProps {
 
     pub fn chrome_label(mut self, chrome_label: impl Into<String>) -> Self {
         self.chrome_label = Some(chrome_label.into());
+        self
+    }
+
+    pub fn safari_simple(mut self, safari_simple: bool) -> Self {
+        self.safari_simple = safari_simple;
         self
     }
 }
@@ -116,10 +122,6 @@ pub fn mockup_frame_with_props<'a, Message: Clone + 'a + 'static>(
 ) -> Element<'a, Message> {
     let metrics = mockup_metrics(kind);
     let content = content.into();
-    let chrome_label = props
-        .chrome_label
-        .clone()
-        .unwrap_or_else(|| "Preview".to_string());
     let slot = container(content)
         .width(Length::Fill)
         .height(Length::Fill)
@@ -129,34 +131,65 @@ pub fn mockup_frame_with_props<'a, Message: Clone + 'a + 'static>(
         .width(Length::Fill)
         .height(Length::Fill);
     let chrome_text_color = theme.palette.muted_foreground;
+    let chrome_label = if props.safari_simple {
+        props.chrome_label.clone().unwrap_or_default()
+    } else {
+        props
+            .chrome_label
+            .clone()
+            .unwrap_or_else(|| "Preview".to_string())
+    };
 
     let frame_body: Element<'a, Message> = match kind {
         MockupFrameKind::Safari => {
-            let chrome = row![
-                traffic_light(light_color(theme, 0.0)),
-                traffic_light(light_color(theme, 0.2)),
-                traffic_light(light_color(theme, 0.4)),
-                space().width(Length::Fill),
-                text(chrome_label)
-                    .size(12)
-                    .style(move |_| iced::widget::text::Style {
-                        color: Some(chrome_text_color),
+            let chrome: Element<'a, Message> = if props.safari_simple {
+                row![
+                    space().width(Length::Fill),
+                    text(chrome_label).size(12).style({
+                        let color = chrome_text_color;
+                        move |_| iced::widget::text::Style { color: Some(color) }
                     })
-            ]
-            .align_y(Alignment::Center)
-            .spacing(8)
-            .padding(Padding {
-                top: 0.0,
-                right: 16.0,
-                bottom: 0.0,
-                left: 16.0,
-            });
-
-            column![container(chrome).height(metrics.chrome_height), slot]
-                .spacing(0)
-                .width(Length::Fill)
-                .height(Length::Fill)
+                ]
+                .align_y(Alignment::Center)
+                .padding(Padding {
+                    top: 0.0,
+                    right: 16.0,
+                    bottom: 0.0,
+                    left: 16.0,
+                })
                 .into()
+            } else {
+                row![
+                    traffic_light(light_color(theme, 0.0)),
+                    traffic_light(light_color(theme, 0.2)),
+                    traffic_light(light_color(theme, 0.4)),
+                    space().width(Length::Fill),
+                    text(chrome_label).size(12).style({
+                        let color = chrome_text_color;
+                        move |_| iced::widget::text::Style { color: Some(color) }
+                    })
+                ]
+                .align_y(Alignment::Center)
+                .spacing(8)
+                .padding(Padding {
+                    top: 0.0,
+                    right: 16.0,
+                    bottom: 0.0,
+                    left: 16.0,
+                })
+                .into()
+            };
+
+            column![
+                container(chrome)
+                    .width(Length::Fill)
+                    .height(metrics.chrome_height),
+                slot,
+            ]
+            .spacing(0)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
         }
         MockupFrameKind::Iphone => {
             let notch = container(
@@ -275,6 +308,15 @@ mod tests {
         assert_eq!(iphone.screen_radius, 55.75);
         assert_eq!(android.inset_left, 9.0);
         assert_eq!(android.screen_radius, 33.0);
+    }
+
+    #[test]
+    fn mockup_frame_props_can_toggle_safari_simple_mode() {
+        let props = MockupFrameProps::new();
+        let simple = MockupFrameProps::new().safari_simple(true);
+
+        assert!(!props.safari_simple);
+        assert!(simple.safari_simple);
     }
 
     #[test]

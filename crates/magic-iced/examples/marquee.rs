@@ -1,9 +1,9 @@
 use iced::Background;
 use iced::Color;
-use iced::widget::{column, container, row, text, button};
-use iced::{Element, Length, Subscription, Task, Size};
+use iced::widget::{button, column, container, row, text};
+use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::Theme;
-use magic_iced::widgets::{marquee, MarqueeItem, MarqueeOrientation, MarqueeProps};
+use magic_iced::widgets::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee};
 use std::time::Instant;
 
 pub fn main() -> iced::Result {
@@ -109,9 +109,9 @@ impl MarqueeExample {
 
             let content = column![
                 text(item.title.clone()).size(16),
-                text(item.subtitle.clone()).size(12).style(move |_| {
-                    iced::widget::text::Style { color: Some(muted) }
-                }),
+                text(item.subtitle.clone())
+                    .size(12)
+                    .style(move |_| { iced::widget::text::Style { color: Some(muted) } }),
                 text(item.body.clone()).size(13),
             ]
             .spacing(6);
@@ -120,18 +120,20 @@ impl MarqueeExample {
                 .padding([14.0, 16.0])
                 .width(Length::Fixed(260.0))
                 .height(Length::Fixed(112.0))
-                .on_press(Message::Tick(Instant::now())) 
+                .on_press(Message::Tick(Instant::now()))
                 .style(move |_theme, status| {
                     let base_bg = Color { a: 0.08, ..accent };
                     let hover_bg = Color { a: 0.15, ..accent };
-                    
+
                     let bg = match status {
-                        iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed => hover_bg,
+                        iced::widget::button::Status::Hovered
+                        | iced::widget::button::Status::Pressed => hover_bg,
                         _ => base_bg,
                     };
 
                     let border_alpha = match status {
-                        iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed => 0.8,
+                        iced::widget::button::Status::Hovered
+                        | iced::widget::button::Status::Pressed => 0.8,
                         _ => 0.4,
                     };
 
@@ -139,7 +141,10 @@ impl MarqueeExample {
                         background: Some(Background::Color(bg)),
                         text_color: foreground,
                         border: iced::Border {
-                            color: Color { a: border_alpha, ..accent },
+                            color: Color {
+                                a: border_alpha,
+                                ..accent
+                            },
                             width: 1.0,
                             radius: radius.into(),
                         },

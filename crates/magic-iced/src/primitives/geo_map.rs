@@ -78,8 +78,11 @@ const WORLD_REGIONS: [GeoRegion; 10] = [
 ];
 
 pub fn world_point_cloud(map_samples: usize) -> Vec<GeoPoint> {
-    let map_samples = map_samples.max(64);
-    let per_region = (map_samples / WORLD_REGIONS.len()).max(8);
+    if map_samples == 0 {
+        return Vec::new();
+    }
+
+    let per_region = ((map_samples + WORLD_REGIONS.len() - 1) / WORLD_REGIONS.len()).max(1);
     let lat_steps = (per_region as f32).sqrt().ceil() as usize;
     let lng_steps = lat_steps.max(2) * 2;
     let mut points = Vec::with_capacity(WORLD_REGIONS.len() * lat_steps * lng_steps);
@@ -109,8 +112,9 @@ pub fn world_point_cloud(map_samples: usize) -> Vec<GeoPoint> {
 }
 
 pub fn project_equirectangular(lat: f32, lng: f32, width: f32, height: f32) -> Point {
-    let width = width.max(1.0);
-    let height = height.max(1.0);
+    if width <= 0.0 || height <= 0.0 {
+        return Point::ORIGIN;
+    }
 
     Point::new(
         ((lng + 180.0) / 360.0).clamp(0.0, 1.0) * width,
@@ -137,7 +141,10 @@ fn should_keep_region_point(
     lat_index: usize,
     lng_index: usize,
 ) -> bool {
-    let edge = lat_index == 0 || lng_index == 0 || lat_index.is_multiple_of(3) || lng_index.is_multiple_of(3);
+    let edge = lat_index == 0
+        || lng_index == 0
+        || lat_index.is_multiple_of(3)
+        || lng_index.is_multiple_of(3);
     if edge {
         return true;
     }
@@ -176,10 +183,26 @@ mod tests {
     }
 
     #[test]
+    fn world_point_cloud_returns_empty_for_zero_samples() {
+        assert!(world_point_cloud(0).is_empty());
+    }
+
+    #[test]
+    fn world_point_cloud_respects_low_sample_counts() {
+        assert!(world_point_cloud(8).len() < world_point_cloud(64).len());
+    }
+
+    #[test]
     fn project_equirectangular_maps_equator_center() {
         let point = project_equirectangular(0.0, 0.0, 200.0, 100.0);
 
         assert!((point.x - 100.0).abs() < 0.001);
         assert!((point.y - 50.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn project_equirectangular_returns_origin_for_zero_bounds() {
+        assert_eq!(project_equirectangular(0.0, 0.0, 0.0, 100.0), Point::ORIGIN);
+        assert_eq!(project_equirectangular(0.0, 0.0, 200.0, 0.0), Point::ORIGIN);
     }
 }

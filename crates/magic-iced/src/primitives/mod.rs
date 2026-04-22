@@ -26,6 +26,7 @@ pub use media_frames::{
     mockup_frame, mockup_frame_with_props,
 };
 pub use media_timeline::FrameSequence;
+pub(crate) use particle_field::ambient_particle_out_of_bounds;
 pub use particle_field::{
     AmbientParticle, ConfettiParticle, ParticleShape, SampledConfettiParticle, SampledParticle,
     ambient_particles, confetti_particles, sample_ambient_particle, sample_confetti_particle,
@@ -34,17 +35,16 @@ pub use pattern_grid::{
     GridCellIndex, GridPatternSpec, grid_cell_origin, grid_cell_rect, grid_dimensions,
     stable_grid_cell,
 };
-pub use pointer_motion::{
-    PointerMotion, PointerSample, pointer_angle_deg, pointer_distance, pointer_speed,
-    pointer_strength, pointer_velocity,
-};
+pub(crate) use pointer_motion::POINTER_SPEED_THRESHOLD_PX_PER_SEC;
+pub use pointer_motion::{PointerMotion, PointerSample};
+pub(crate) use pointer_motion::{pointer_distance, pointer_strength};
 pub use scroll_motion::{FrameDriver, ScrollSample, TimeDriver, marquee_offset, segment_progress};
 pub use sphere_projection::{
     ProjectedSpherePoint, SpherePoint, fibonacci_sphere, focus_rotation, lat_lng_to_sphere,
     project_sphere_point, rotate_sphere_point,
 };
 pub use stable_random::{StableRng, stable_noise};
+pub(crate) use text_runner::segment_text;
 pub use text_runner::{
     TextLoopMode, TextRunAdvance, TextRunPhase, TextRunSpec, TextRunner, TextSegmentMode, TextUnit,
-    segment_text, segment_text_ranges,
 };

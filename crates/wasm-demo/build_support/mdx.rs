@@ -5,7 +5,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-pub fn parse_doc_page(path: &Path, sidebar: &[SidebarSection], sources: &BTreeMap<String, String>) -> DocPage {
+pub fn parse_doc_page(
+    path: &Path,
+    sidebar: &[SidebarSection],
+    sources: &BTreeMap<String, String>,
+) -> DocPage {
     let raw = fs::read_to_string(path).unwrap();
     let (frontmatter, body) = split_frontmatter(&raw).unwrap_or(("", raw.as_str()));
     let title = frontmatter_value(frontmatter, "title").unwrap_or_else(|| {
@@ -15,7 +19,11 @@ pub fn parse_doc_page(path: &Path, sidebar: &[SidebarSection], sources: &BTreeMa
             .to_owned()
     });
     let description = frontmatter_value(frontmatter, "description").unwrap_or_default();
-    let slug = path.file_stem().and_then(|value| value.to_str()).unwrap().to_owned();
+    let slug = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap()
+        .to_owned();
     let mut toc = Vec::new();
     let lines = body.lines().map(ToOwned::to_owned).collect::<Vec<_>>();
     let mut index = 0;
@@ -195,7 +203,11 @@ fn parse_tabs(
                 *index += 1;
             }
             let label = labels.get(&value).cloned().unwrap_or_else(|| value.clone());
-            items.push(TabItem { value, label, blocks });
+            items.push(TabItem {
+                value,
+                label,
+                blocks,
+            });
             continue;
         }
         *index += 1;

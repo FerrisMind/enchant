@@ -24,7 +24,7 @@ pub struct MotionSpec {
 impl Default for MotionSpec {
     fn default() -> Self {
         Self {
-            duration: TransitionDuration::Ms300,
+            duration: TransitionDuration::Ms150,
             delay: TransitionDuration::Ms0,
             easing: Easing::InOut,
             repeat: RepeatMode::Never,
@@ -66,10 +66,7 @@ pub struct AnimatedValue {
 
 impl AnimatedValue {
     pub fn new(initial: f32) -> Self {
-        Self {
-            spec: MotionSpec::default(),
-            animation: Animation::new(initial),
-        }
+        Self::with_spec(initial, MotionSpec::default())
     }
 
     pub fn with_spec(initial: f32, spec: MotionSpec) -> Self {
@@ -188,5 +185,15 @@ mod tests {
             eased_half < 5.0,
             "expected ease-in midpoint below linear midpoint"
         );
+    }
+
+    #[test]
+    fn motion_spec_defaults_match_twill_tokens() {
+        let spec = MotionSpec::default();
+
+        assert_eq!(spec.duration, TransitionDuration::Ms150);
+        assert_eq!(spec.delay, TransitionDuration::Ms0);
+        assert_eq!(spec.easing, Easing::InOut);
+        assert_eq!(spec.repeat, RepeatMode::Never);
     }
 }

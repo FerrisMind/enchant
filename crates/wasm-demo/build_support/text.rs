@@ -22,7 +22,10 @@ pub fn split_frontmatter(input: &str) -> Option<(&str, &str)> {
 
 pub fn parse_key_value(line: &str) -> Option<(String, String)> {
     let (key, value) = line.split_once(':')?;
-    Some((key.trim().to_owned(), clean_ts_value(value.trim().trim_end_matches(','))))
+    Some((
+        key.trim().to_owned(),
+        clean_ts_value(value.trim().trim_end_matches(',')),
+    ))
 }
 
 fn clean_ts_value(value: &str) -> String {
@@ -86,7 +89,10 @@ pub fn normalize_jsx_text(input: &str) -> String {
     let expr_re = Regex::new(r#"\{[^}]+\}"#).unwrap();
     let without_tags = tag_re.replace_all(input, " ");
     let without_expr = expr_re.replace_all(&without_tags, " ");
-    without_expr.split_whitespace().collect::<Vec<_>>().join(" ")
+    without_expr
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub fn capture_tech_stack(input: &str) -> Vec<String> {
