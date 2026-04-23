@@ -23,16 +23,16 @@ pub fn main() -> iced::Result {
 struct MarqueeDemo {
     theme: Theme,
     started_at: Instant,
-    elapsed: Duration,
-    paused_total: Duration,
-    pause_started_at: Option<Instant>,
-    hover_depth: usize,
+    elapsed: [Duration; 2],
+    paused_total: [Duration; 2],
+    pause_started_at: [Option<Instant>; 2],
+    hover_depth: [usize; 2],
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Tick(Instant),
-    Hover(bool),
+    Hover(usize, bool),
 }
 
 impl Default for MarqueeDemo {
@@ -40,10 +40,10 @@ impl Default for MarqueeDemo {
         Self {
             theme: MagicTheme::light(),
             started_at: Instant::now(),
-            elapsed: Duration::ZERO,
-            paused_total: Duration::ZERO,
-            pause_started_at: None,
-            hover_depth: 0,
+            elapsed: [Duration::ZERO; 2],
+            paused_total: [Duration::ZERO; 2],
+            pause_started_at: [None, None],
+            hover_depth: [0; 2],
         }
     }
 }
@@ -55,40 +55,8 @@ impl MarqueeDemo {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Tick(now) => {
-                self.elapsed = if self.hover_depth > 0 {
-                    self.pause_started_at
-                        .map(|pause_started_at| {
-                            pause_started_at
-                                .saturating_duration_since(self.started_at)
-                                .saturating_sub(self.paused_total)
-                        })
-                        .unwrap_or(self.elapsed)
-                } else {
-                    now.saturating_duration_since(self.started_at)
-                        .saturating_sub(self.paused_total)
-                };
-            }
-            Message::Hover(entered) => {
-                if entered {
-                    self.hover_depth = self.hover_depth.saturating_add(1);
-                    if self.hover_depth == 1 {
-                        let now = Instant::now();
-                        self.pause_started_at = Some(now);
-                        self.elapsed = now
-                            .saturating_duration_since(self.started_at)
-                            .saturating_sub(self.paused_total);
-                    }
-                } else if self.hover_depth > 0 {
-                    self.hover_depth -= 1;
-                    if self.hover_depth == 0
-                        && let Some(pause_started_at) = self.pause_started_at.take()
-                    {
-                        self.paused_total +=
-                            Instant::now().saturating_duration_since(pause_started_at);
-                    }
-                }
-            }
+            Message::Tick(now) => self.tick_at(now),
+            Message::Hover(row, entered) => self.set_hover(row, entered, Instant::now()),
         }
 
         Task::none()
@@ -105,33 +73,39 @@ impl MarqueeDemo {
         let content = container(
             stack(vec![
                 column![
-                    self.marquee_row(first_row, false),
-                    self.marquee_row(second_row, true),
+                    self.marquee_row(first_row, false, 0),
+                    self.marquee_row(second_row, true, 1),
                 ]
-                .spacing(16)
+                .spacing(0)
                 .width(Length::Fill)
                 .align_x(Alignment::Center)
                 .into(),
-                horizontal_fade_overlay(&self.theme),
+                horizontal_edge_fade_overlay(),
             ])
         )
         .width(Length::Fixed(780.0))
-        .height(Length::Fixed(360.0))
         .padding(24)
         .center_x(Length::Fill)
-        .center_y(Length::Fill)
         .style(preview_frame_style());
 
-        container(content)
+        container(
+            column![content]
+                .width(Length::Fill)
+                .align_x(Alignment::Center)
+                .padding([40.0, 0.0]),
+        )
             .width(Length::Fill)
             .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
             .style(page_style(&self.theme))
             .into()
     }
 
-    fn marquee_row<'a>(&'a self, items: &'a [MarqueeItem], reverse: bool) -> Element<'a, Message> {
+    fn marquee_row<'a>(
+        &'a self,
+        items: &'a [MarqueeItem],
+        reverse: bool,
+        row_index: usize,
+    ) -> Element<'a, Message> {
         let render_item = |item: &MarqueeItem| -> Element<'a, Message> {
             let avatar = container(image(avatar_handle(item.title.as_str())))
                 .width(Length::Fixed(32.0))
@@ -151,10 +125,14 @@ impl MarqueeDemo {
                     row![
                         avatar,
                         column![
-                            text(item.title.clone()).size(14),
+                            text(item.title.clone()).size(14).style(|_| {
+                                iced::widget::text::Style {
+                                    color: Some(Color::from_rgba8(0x11, 0x11, 0x11, 0.92)),
+                                }
+                            }),
                             text(item.subtitle.clone()).size(12).style(|_| {
                                 iced::widget::text::Style {
-                                    color: Some(Color::from_rgba8(0x00, 0x00, 0x00, 0.40)),
+                                    color: Some(Color::from_rgba8(0x11, 0x11, 0x11, 0.55)),
                                 }
                             }),
                         ]
@@ -162,7 +140,11 @@ impl MarqueeDemo {
                     ]
                     .spacing(10)
                     .align_y(Alignment::Center),
-                    text(item.body.clone()).size(14),
+                    text(item.body.clone()).size(14).style(|_| {
+                        iced::widget::text::Style {
+                            color: Some(Color::from_rgba8(0x22, 0x22, 0x22, 0.82)),
+                        }
+                    }),
                 ]
                 .spacing(8),
             )
@@ -184,11 +166,51 @@ impl MarqueeDemo {
         marquee(
             items,
             render_item,
-            self.elapsed,
+            self.elapsed[row_index],
             marquee_props(reverse),
             &self.theme,
-            Message::Hover,
+            move |entered| Message::Hover(row_index, entered),
         )
+    }
+
+    fn tick_at(&mut self, now: Instant) {
+        for row in 0..self.elapsed.len() {
+            self.elapsed[row] = if self.hover_depth[row] > 0 {
+                self.pause_started_at[row]
+                    .map(|pause_started_at| {
+                        pause_started_at
+                            .saturating_duration_since(self.started_at)
+                            .saturating_sub(self.paused_total[row])
+                    })
+                    .unwrap_or(self.elapsed[row])
+            } else {
+                now.saturating_duration_since(self.started_at)
+                    .saturating_sub(self.paused_total[row])
+            };
+        }
+    }
+
+    fn set_hover(&mut self, row: usize, entered: bool, now: Instant) {
+        if row >= self.elapsed.len() {
+            return;
+        }
+
+        if entered {
+            self.hover_depth[row] = self.hover_depth[row].saturating_add(1);
+            if self.hover_depth[row] == 1 {
+                self.pause_started_at[row] = Some(now);
+                self.elapsed[row] = now
+                    .saturating_duration_since(self.started_at)
+                    .saturating_sub(self.paused_total[row]);
+            }
+        } else if self.hover_depth[row] > 0 {
+            self.hover_depth[row] -= 1;
+            if self.hover_depth[row] == 0
+                && let Some(pause_started_at) = self.pause_started_at[row].take()
+            {
+                self.paused_total[row] += now.saturating_duration_since(pause_started_at);
+            }
+        }
     }
 }
 
@@ -199,7 +221,7 @@ fn marquee_props(reverse: bool) -> MarqueeProps {
             pause_on_hover: true,
             repeat: 4,
             gap: 16.0,
-            speed_px_per_sec: 40.0,
+            speed_px_per_sec: 40.8,
             item_extent: 256.0,
             item_cross: 112.0,
             padding: 8.0,
@@ -228,8 +250,8 @@ fn preview_frame_style() -> impl Fn(&iced::Theme) -> iced::widget::container::St
     }
 }
 
-fn horizontal_fade_overlay<'a>(theme: &'a Theme) -> Element<'a, Message> {
-    let background = theme.palette.background;
+fn horizontal_edge_fade_overlay<'a>() -> Element<'a, Message> {
+    let background = Color::WHITE;
     let left = container(Space::new())
         .width(Length::FillPortion(1))
         .height(Length::Fill)
@@ -356,5 +378,26 @@ mod tests {
         let reviews = reviews();
         assert_eq!(reviews[..3].len(), 3);
         assert_eq!(reviews[3..].len(), 3);
+    }
+
+    #[test]
+    fn hover_pauses_only_target_row_clock() {
+        let mut demo = MarqueeDemo::default();
+        let start = Instant::now();
+        demo.started_at = start;
+
+        demo.tick_at(start + Duration::from_secs(5));
+        assert_eq!(demo.elapsed[0], Duration::from_secs(5));
+        assert_eq!(demo.elapsed[1], Duration::from_secs(5));
+
+        demo.set_hover(0, true, start + Duration::from_secs(5));
+        demo.tick_at(start + Duration::from_secs(7));
+        assert_eq!(demo.elapsed[0], Duration::from_secs(5));
+        assert_eq!(demo.elapsed[1], Duration::from_secs(7));
+
+        demo.set_hover(0, false, start + Duration::from_secs(7));
+        demo.tick_at(start + Duration::from_secs(9));
+        assert_eq!(demo.elapsed[0], Duration::from_secs(7));
+        assert_eq!(demo.elapsed[1], Duration::from_secs(9));
     }
 }

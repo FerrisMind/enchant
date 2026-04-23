@@ -190,6 +190,7 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(0.0))
                         .add_stop(0.0, background)
+                        .add_stop(0.45, background)
                         .add_stop(
                             1.0,
                             Color {
@@ -205,6 +206,7 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(std::f32::consts::PI))
                         .add_stop(0.0, background)
+                        .add_stop(0.45, background)
                         .add_stop(
                             1.0,
                             Color {
@@ -231,6 +233,7 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(std::f32::consts::FRAC_PI_2))
                         .add_stop(0.0, background)
+                        .add_stop(0.45, background)
                         .add_stop(
                             1.0,
                             Color {
@@ -246,6 +249,7 @@ fn edge_fades<'a, Message: 'a>(props: MarqueeProps, theme: &Theme) -> Element<'a
                 .style(move |_| {
                     gradient::Linear::new(Radians(-std::f32::consts::FRAC_PI_2))
                         .add_stop(0.0, background)
+                        .add_stop(0.45, background)
                         .add_stop(
                             1.0,
                             Color {
