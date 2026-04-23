@@ -519,6 +519,13 @@ mod tests {
     }
 
     #[test]
+    fn segment_text_word_mode_empty_input_matches_react_text_animate() {
+        let segments = segment_text("", TextSegmentMode::Word);
+
+        assert_eq!(segments, vec![""]);
+    }
+
+    #[test]
     fn segment_text_character_mode_splits_emoji_sequences_into_codepoints() {
         let segments = segment_text("A👨‍👩‍👧‍👦B", TextSegmentMode::Character);
 
@@ -530,5 +537,12 @@ mod tests {
         let segments = segment_text("Alpha\nBeta\n", TextSegmentMode::Line);
 
         assert_eq!(segments, vec!["Alpha", "Beta", ""]);
+    }
+
+    #[test]
+    fn segment_text_line_mode_preserves_crlf_terminators() {
+        let segments = segment_text("Alpha\r\nBeta\r\n", TextSegmentMode::Line);
+
+        assert_eq!(segments, vec!["Alpha\r", "Beta\r", ""]);
     }
 }

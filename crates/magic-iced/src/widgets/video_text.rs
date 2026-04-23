@@ -90,6 +90,12 @@ struct VideoTextProgram<'a> {
     props: &'a VideoTextProps,
 }
 
+impl VideoTextProgram<'_> {
+    fn selected_frame(&self) -> Option<image::Handle> {
+        self.props.source.frame_at(self.elapsed_ms)
+    }
+}
+
 impl<Message> EffectProgram<Message> for VideoTextProgram<'_> {
     type State = ();
 
@@ -102,11 +108,7 @@ impl<Message> EffectProgram<Message> for VideoTextProgram<'_> {
         _viewport: &Rectangle,
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let Some(handle) = self
-            .props
-            .source
-            .frame_at(self.elapsed_ms.max(self.props.frame_duration_ms))
-        else {
+        let Some(handle) = self.selected_frame() else {
             return vec![frame.into_geometry()];
         };
 
@@ -193,8 +195,34 @@ mod tests {
             100,
         ));
 
-        assert!(source.frame_at(0).is_some());
-        assert!(source.frame_at(100).is_some());
+        let frame_0 = source.frame_at(0).expect("first frame");
+        let frame_100 = source.frame_at(100).expect("second frame");
+        let frame_200 = source.frame_at(200).expect("cycled first frame");
+
+        assert_ne!(frame_0.id(), frame_100.id());
+        assert_eq!(frame_0.id(), frame_200.id());
+    }
+
+    #[test]
+    fn video_text_program_uses_elapsed_zero_for_first_frame() {
+        let props = VideoTextProps::new(
+            VideoTextSource::Frames(FrameSequence::new(
+                vec![handle([255, 0, 0, 255]), handle([0, 255, 0, 255])],
+                100,
+            )),
+            "MAGIC",
+        );
+        let first_id = props.source.frame_at(0).expect("first frame").id();
+        let second_id = props.source.frame_at(100).expect("second frame").id();
+        let program = VideoTextProgram {
+            elapsed_ms: 0,
+            props: &props,
+        };
+
+        let selected_id = program.selected_frame().expect("selected frame").id();
+
+        assert_eq!(selected_id, first_id);
+        assert_ne!(selected_id, second_id);
     }
 
     #[test]

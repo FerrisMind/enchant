@@ -46,14 +46,14 @@ mod tests {
 
     #[test]
     fn frame_sequence_cycles_by_duration() {
-        let sequence = FrameSequence::new(
-            vec![handle([255, 0, 0, 255]), handle([0, 255, 0, 255])],
-            100,
-        );
+        let first = handle([255, 0, 0, 255]);
+        let second = handle([0, 255, 0, 255]);
+        let sequence = FrameSequence::new(vec![first.clone(), second.clone()], 100);
 
         assert_eq!(sequence.len(), 2);
-        assert!(sequence.frame_at(0).is_some());
-        assert!(sequence.frame_at(100).is_some());
+        assert_eq!(sequence.frame_at(0), Some(&first));
+        assert_eq!(sequence.frame_at(100), Some(&second));
+        assert_eq!(sequence.frame_at(200), Some(&first));
         assert_eq!(sequence.frame_duration_ms(), 100);
     }
 }
