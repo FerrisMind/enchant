@@ -445,9 +445,9 @@ mod tests {
         let items = ["one", "two", "three"];
         let props = MarqueeProps::new();
 
-        let _ = render_copy(
+        let _: iced::Element<'_, ()> = render_copy(
             &items,
-            &|_item, copy_index, item_index| {
+            &|_item, copy_index, item_index| -> iced::Element<'_, ()> {
                 seen.borrow_mut().push((copy_index, item_index));
                 iced::widget::Space::new().into()
             },
