@@ -115,7 +115,7 @@ pub fn segment_text_ranges(source: &str, mode: TextSegmentMode) -> Vec<Range<usi
         TextSegmentMode::Text => std::iter::once(0..source.len()).collect(),
         TextSegmentMode::Word => {
             if source.is_empty() {
-                vec![0..0]
+                std::iter::once(0..0).collect()
             } else {
                 split_whitespace_ranges(source, true)
             }

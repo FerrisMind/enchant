@@ -82,7 +82,7 @@ pub fn world_point_cloud(map_samples: usize) -> Vec<GeoPoint> {
         return Vec::new();
     }
 
-    let per_region = ((map_samples + WORLD_REGIONS.len() - 1) / WORLD_REGIONS.len()).max(1);
+    let per_region = map_samples.div_ceil(WORLD_REGIONS.len()).max(1);
     let lat_steps = (per_region as f32).sqrt().ceil() as usize;
     let lng_steps = lat_steps.max(2) * 2;
     let mut points = Vec::with_capacity(WORLD_REGIONS.len() * lat_steps * lng_steps);
