@@ -27,6 +27,7 @@ pub mod hexagon_pattern;
 pub mod highlighter;
 pub mod hyper_text;
 pub mod icon_cloud;
+pub mod interactive_hover_button;
 pub mod interactive_grid_pattern;
 pub mod lens;
 pub mod light_rays;
@@ -42,7 +43,9 @@ pub mod orbiting_circles;
 pub mod particles;
 pub mod pixel_image;
 pub mod pointer;
+pub mod pulsating_button;
 pub mod progressive_blur;
+pub mod rainbow_button;
 pub mod retro_grid;
 pub mod scroll_based_velocity;
 pub mod scroll_progress;
@@ -53,6 +56,8 @@ pub mod smooth_cursor;
 pub mod sparkles_text;
 pub mod spinning_text;
 pub mod striped_pattern;
+pub mod ripple;
+pub mod ripple_button;
 pub mod terminal;
 pub mod text_3d_flip;
 pub mod text_animate;
@@ -63,6 +68,7 @@ pub mod typing_animation;
 pub mod video_text;
 pub mod warp_background;
 pub mod word_rotate;
+pub mod code_comparison;
 
 pub use animated_beam::{AnimatedBeamProps, animated_beam};
 pub use animated_circular_progress_bar::{
@@ -83,6 +89,7 @@ pub use backlight::{BacklightProps, backlight};
 pub use blur_fade::{BlurFadeDirection, BlurFadeProps, BlurFadeState, blur_fade};
 pub use border_beam::{BorderBeamProps, border_beam};
 pub use comic_text::{ComicTextProps, ComicTextState, comic_text};
+pub use code_comparison::{CodeComparisonProps, code_comparison};
 pub use confetti::{
     ConfettiAction, ConfettiBurst, ConfettiProps, ConfettiState, confetti, confetti_button,
 };
@@ -107,6 +114,7 @@ pub use hexagon_pattern::{HexagonDirection, HexagonPatternProps, hexagon_pattern
 pub use highlighter::{HighlighterAction, HighlighterProps, HighlighterState, highlighter};
 pub use hyper_text::{HyperTextAction, HyperTextProps, HyperTextState, hyper_text};
 pub use icon_cloud::{IconCloudAction, IconCloudItem, IconCloudProps, IconCloudState, icon_cloud};
+pub use interactive_hover_button::{InteractiveHoverButtonProps, interactive_hover_button};
 pub use interactive_grid_pattern::{
     InteractiveGridPatternAction, InteractiveGridPatternProps, InteractiveGridPatternState,
     interactive_grid_pattern,
@@ -127,7 +135,11 @@ pub use orbiting_circles::{OrbitingCirclesProps, orbiting_circles};
 pub use particles::{ParticlesAction, ParticlesProps, ParticlesState, particles};
 pub use pixel_image::{PixelGrid, PixelGridPreset, PixelImageProps, PixelImageState, pixel_image};
 pub use pointer::{PointerAction, PointerProps, PointerState, pointer};
+pub use pulsating_button::{
+    PulsatingButtonProps, PulsatingButtonVariant, pulsating_button,
+};
 pub use progressive_blur::{ProgressiveBlurPosition, ProgressiveBlurProps, progressive_blur};
+pub use rainbow_button::{RainbowButtonProps, RainbowButtonSize, RainbowButtonVariant, rainbow_button};
 pub use retro_grid::{RetroGridProps, retro_grid};
 pub use scroll_based_velocity::{
     ScrollVelocityContainerProps, ScrollVelocityDirection, ScrollVelocityItem,
@@ -138,6 +150,8 @@ pub use scroll_progress::{ScrollProgressProps, scroll_progress};
 pub use shimmer_button::{ShimmerButtonProps, shimmer_button};
 pub use shine_border::{ShineBorderProps, shine_border};
 pub use shiny_button::{ShinyButtonProps, shiny_button};
+pub use ripple::{RippleProps, ripple};
+pub use ripple_button::{RippleButtonAction, RippleButtonProps, RippleButtonState, ripple_button};
 pub use smooth_cursor::{
     SmoothCursorAction, SmoothCursorProps, SmoothCursorSpringConfig, SmoothCursorState,
     smooth_cursor,
