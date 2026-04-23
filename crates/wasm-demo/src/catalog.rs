@@ -41,7 +41,17 @@ let items = vec![
     MarqueeItem::new("Design engineering").subtitle("motion systems"),
 ];
 
-marquee(&items, elapsed, MarqueeProps::new(), theme)"#,
+marquee(
+    &items,
+    |item| {
+        /* render the item */
+        iced::widget::text(&item.title).into()
+    },
+    elapsed,
+    MarqueeProps::new(),
+    theme,
+    |_| Message::Noop,
+)"#,
     },
     ComponentDoc {
         slug: ComponentSlug::Terminal,

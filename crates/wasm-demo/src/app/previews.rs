@@ -50,8 +50,34 @@ impl WasmDemoApp {
     }
 
     pub(crate) fn preview_marquee(&self) -> Element<'_, Message> {
+        let render_item = |item: &MarqueeItem| {
+            container(
+                iced::widget::column![
+                    text(item.title.clone())
+                        .font(display_font())
+                        .size(16)
+                        .style(text_color(self.theme.palette.foreground)),
+                    text(item.subtitle.clone())
+                        .font(body_font())
+                        .size(12)
+                        .style(text_color(self.theme.palette.muted_foreground)),
+                ]
+                .spacing(4),
+            )
+            .width(Length::Fixed(260.0))
+            .height(Length::Fixed(112.0))
+            .padding([14.0, 16.0])
+            .style(card_shell_style(
+                self.theme.palette.card,
+                self.theme.palette.border,
+                self.theme.radius.lg,
+            ))
+            .into()
+        };
+
         marquee(
             &self.showcase_items,
+            render_item,
             self.elapsed,
             MarqueeProps {
                 item_extent: 260.0,
@@ -59,12 +85,39 @@ impl WasmDemoApp {
                 ..MarqueeProps::new()
             },
             &self.theme,
+            |_| Message::Noop,
         )
     }
 
     pub(crate) fn preview_marquee_vertical(&self) -> Element<'_, Message> {
+        let render_item = |item: &MarqueeItem| {
+            container(
+                iced::widget::column![
+                    text(item.title.clone())
+                        .font(display_font())
+                        .size(16)
+                        .style(text_color(self.theme.palette.foreground)),
+                    text(item.subtitle.clone())
+                        .font(body_font())
+                        .size(12)
+                        .style(text_color(self.theme.palette.muted_foreground)),
+                ]
+                .spacing(4),
+            )
+            .width(Length::Fixed(260.0))
+            .height(Length::Fixed(112.0))
+            .padding([14.0, 16.0])
+            .style(card_shell_style(
+                self.theme.palette.card,
+                self.theme.palette.border,
+                self.theme.radius.lg,
+            ))
+            .into()
+        };
+
         marquee(
             &self.showcase_items,
+            render_item,
             self.elapsed,
             MarqueeProps {
                 orientation: MarqueeOrientation::Vertical,
@@ -74,6 +127,7 @@ impl WasmDemoApp {
                 ..MarqueeProps::new()
             },
             &self.theme,
+            |_| Message::Noop,
         )
     }
 
