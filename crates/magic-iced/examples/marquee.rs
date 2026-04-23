@@ -1,13 +1,31 @@
-use iced::widget::canvas;
-use iced::widget::{column, container, image, mouse_area, row, stack, text};
-use iced::{Alignment, Background, Border, Color, Element, Length, Point, Rectangle, Renderer, Size, Subscription, Task};
-use iced_shadcn::Theme;
-use magic_iced::{marquee_indexed, MagicTheme, MarqueeItem, MarqueeOrientation, MarqueeProps};
+use iced::advanced::Clipboard;
+use iced::advanced::Renderer as _;
+use iced::advanced::Shell;
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{Operation, Tree, Widget};
+use iced::gradient;
+use iced::widget::{column, container, image, mouse_area, row, text};
+use iced::{
+    Alignment, Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Subscription,
+    Task,
+};
+use iced_shadcn::{CardProps, CardSize, DecorativeSurfaceProps, Theme, card, decorative_surface};
+use magic_iced::{MagicTheme, MarqueeItem, MarqueeOrientation, MarqueeProps, marquee_indexed};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
+use twill::backends::iced::styled_container_with_semantic_theme;
+use twill::prelude::{BackgroundColor, SemanticColor, SemanticThemeVars, Style as TwillStyle};
 
 static REVIEWS: LazyLock<Vec<MarqueeItem>> = LazyLock::new(reviews);
+const PREVIEW_WIDTH: f32 = 780.0;
+const PREVIEW_PADDING: f32 = 24.0;
+const REVIEW_CARD_WIDTH: f32 = 256.0;
+const REVIEW_CARD_GAP: f32 = 16.0;
+const REVIEW_ROW_PADDING: f32 = 8.0;
+const REVIEW_ROW_CROSS: f32 = 112.0;
+const FADE_WIDTH_RATIO: f32 = 0.25;
 
 pub fn main() -> iced::Result {
     iced::application(MarqueeDemo::new, MarqueeDemo::update, MarqueeDemo::view)
@@ -73,38 +91,46 @@ impl MarqueeDemo {
     fn view(&self) -> Element<'_, Message> {
         let first_row = &REVIEWS[..3];
         let second_row = &REVIEWS[3..];
+        let rows = column![
+            self.marquee_row(first_row, false, 0),
+            self.marquee_row(second_row, true, 1),
+        ]
+        .spacing(0)
+        .width(Length::Fill)
+        .align_x(Alignment::Center);
 
-        let content = container(
-            stack(vec![
-                column![
-                    self.marquee_row(first_row, false, 0),
-                    self.marquee_row(second_row, true, 1),
-                ]
-                .spacing(0)
-                .width(Length::Fill)
-                .align_x(Alignment::Center)
-                .into(),
-                canvas::Canvas::new(HorizontalFadeOverlay)
+        let preview = decorative_surface(
+            HorizontalFadeMask::new(rows.into(), self.theme.palette.background, FADE_WIDTH_RATIO),
+            Vec::new(),
+            Vec::new(),
+            DecorativeSurfaceProps::new()
+                .width(Length::Fixed(PREVIEW_WIDTH))
+                .padding(PREVIEW_PADDING)
+                .radius(16.0)
+                .clip(true)
+                .background(self.theme.palette.background)
+                .border_color(self.theme.palette.border)
+                .border_width(1.0),
+            &self.theme,
+        );
+
+        styled_container_with_semantic_theme(
+            column![
+                container(preview)
                     .width(Length::Fill)
-                    .height(Length::Fill)
-                    .into(),
-            ])
-        )
-        .width(Length::Fixed(780.0))
-        .padding(24)
-        .center_x(Length::Fill)
-        .style(preview_frame_style(&self.theme));
-
-        container(
-            column![content]
-                .width(Length::Fill)
-                .align_x(Alignment::Center)
-                .padding([40.0, 0.0]),
-        )
+                    .center_x(Length::Fill)
+            ]
             .width(Length::Fill)
-            .height(Length::Fill)
-            .style(page_style(&self.theme))
-            .into()
+            .align_x(Alignment::Center)
+            .padding([40.0, 0.0])
+            .into(),
+            &page_shell_style(),
+            SemanticThemeVars::shadcn_neutral(),
+            self.theme.variant(),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 
     fn marquee_row<'a>(
@@ -127,7 +153,7 @@ impl MarqueeDemo {
             ..self.theme.palette.foreground
         };
         let card_border = Color {
-            a: 0.10,
+            a: 0.14,
             ..self.theme.palette.foreground
         };
         let hovered_background = Color {
@@ -135,80 +161,82 @@ impl MarqueeDemo {
             ..self.theme.palette.foreground
         };
         let hovered_border = Color {
-            a: 0.16,
+            a: 0.20,
             ..self.theme.palette.foreground
         };
         let hovered_card = self.hovered_card[row_index];
 
-        let render_item = |item: &MarqueeItem, copy_index: usize, item_index: usize| -> Element<'a, Message> {
-            let is_hovered = hovered_card == Some((copy_index, item_index));
-            let avatar = container(image(avatar_handle(item.title.as_str())))
-                .width(Length::Fixed(32.0))
-                .height(Length::Fixed(32.0))
-                .clip(true)
-                .style(|_| iced::widget::container::Style {
-                    border: Border {
-                        color: Color::TRANSPARENT,
-                        width: 0.0,
-                        radius: 16.0.into(),
-                    },
-                    ..iced::widget::container::Style::default()
-                });
-
-            mouse_area(
-                container(
-                    column![
-                        row![
-                            avatar,
-                            column![
-                                text(item.title.clone()).size(14).style(move |_| {
-                                    iced::widget::text::Style {
-                                        color: Some(title_color),
-                                    }
-                                }),
-                                text(item.subtitle.clone()).size(12).style(move |_| {
-                                    iced::widget::text::Style {
-                                        color: Some(subtitle_color),
-                                    }
-                                }),
-                            ]
-                            .spacing(2),
-                        ]
-                        .spacing(10)
-                        .align_y(Alignment::Center),
-                        text(item.body.clone()).size(14).style(move |_| {
-                            iced::widget::text::Style {
-                                color: Some(body_color),
-                            }
-                        }),
-                    ]
-                    .spacing(8),
-                )
-                .width(Length::Fixed(256.0))
-                .height(Length::Fill)
-                .padding(16)
-                .style(move |_| iced::widget::container::Style {
-                    background: Some(Background::Color(if is_hovered {
-                        hovered_background
-                    } else {
-                        card_background
-                    })),
-                    border: Border {
-                        color: if is_hovered {
-                            hovered_border
-                        } else {
-                            card_border
+        let render_item =
+            |item: &MarqueeItem, copy_index: usize, item_index: usize| -> Element<'a, Message> {
+                let is_hovered = hovered_card == Some((copy_index, item_index));
+                let avatar = container(image(avatar_handle(item.title.as_str())))
+                    .width(Length::Fixed(32.0))
+                    .height(Length::Fixed(32.0))
+                    .clip(true)
+                    .style(|_| iced::widget::container::Style {
+                        border: Border {
+                            color: Color::TRANSPARENT,
+                            width: 0.0,
+                            radius: 16.0.into(),
                         },
-                        width: 1.0,
-                        radius: 12.0.into(),
-                    },
-                    ..iced::widget::container::Style::default()
-                }),
-            )
-            .on_enter(Message::CardHover(row_index, Some((copy_index, item_index))))
-            .on_exit(Message::CardHover(row_index, None))
-            .into()
-        };
+                        ..iced::widget::container::Style::default()
+                    });
+
+                container(
+                    mouse_area(
+                        card(
+                            column![
+                                row![
+                                    avatar,
+                                    column![
+                                        text(item.title.clone()).size(14).style(move |_| {
+                                            iced::widget::text::Style {
+                                                color: Some(title_color),
+                                            }
+                                        }),
+                                        text(item.subtitle.clone()).size(12).style(move |_| {
+                                            iced::widget::text::Style {
+                                                color: Some(subtitle_color),
+                                            }
+                                        }),
+                                    ]
+                                    .spacing(2)
+                                    .width(Length::Fill),
+                                ]
+                                .spacing(10)
+                                .align_y(Alignment::Center)
+                                .width(Length::Fill),
+                                text(item.body.clone()).size(14).width(Length::Fill).style(
+                                    move |_| iced::widget::text::Style {
+                                        color: Some(body_color),
+                                    }
+                                ),
+                            ]
+                            .spacing(8)
+                            .width(Length::Fill),
+                            review_card_props(
+                                &self.theme,
+                                is_hovered,
+                                card_background,
+                                card_border,
+                                hovered_background,
+                                hovered_border,
+                            ),
+                            &self.theme,
+                        )
+                        .width(Length::Fill)
+                        .height(Length::Fill),
+                    )
+                    .on_enter(Message::CardHover(
+                        row_index,
+                        Some((copy_index, item_index)),
+                    ))
+                    .on_exit(Message::CardHover(row_index, None)),
+                )
+                .width(Length::Fixed(REVIEW_CARD_WIDTH))
+                .height(Length::Fill)
+                .into()
+            };
 
         marquee_indexed(
             items,
@@ -270,89 +298,253 @@ impl MarqueeDemo {
 }
 
 fn marquee_props(reverse: bool) -> MarqueeProps {
-        MarqueeProps {
-            orientation: MarqueeOrientation::Horizontal,
-            reverse,
-            pause_on_hover: true,
-            repeat: 4,
-            gap: 16.0,
-            speed_px_per_sec: 40.8,
-            item_extent: 256.0,
-            item_cross: 112.0,
-            padding: 8.0,
-            edge_fade: false,
+    MarqueeProps {
+        orientation: MarqueeOrientation::Horizontal,
+        reverse,
+        pause_on_hover: true,
+        repeat: 4,
+        gap: REVIEW_CARD_GAP,
+        speed_px_per_sec: 40.8,
+        item_extent: REVIEW_CARD_WIDTH,
+        item_cross: REVIEW_ROW_CROSS,
+        padding: REVIEW_ROW_PADDING,
+        edge_fade: false,
+    }
+}
+
+fn page_shell_style() -> TwillStyle {
+    TwillStyle::new().background_token(BackgroundColor::semantic(SemanticColor::Background))
+}
+
+fn review_card_props(
+    theme: &Theme,
+    is_hovered: bool,
+    card_background: Color,
+    card_border: Color,
+    hovered_background: Color,
+    hovered_border: Color,
+) -> CardProps {
+    CardProps::new()
+        .size(CardSize::Size2)
+        .show_shadow(false)
+        .padding(16.0)
+        .radius(12.0)
+        .background(if is_hovered {
+            hovered_background
+        } else {
+            card_background
+        })
+        .border_color(if is_hovered {
+            hovered_border
+        } else {
+            card_border
+        })
+        .text_color(theme.palette.foreground)
+}
+
+struct HorizontalFadeMask<'a, Message> {
+    content: Element<'a, Message>,
+    background: Color,
+    fade_width_ratio: f32,
+}
+
+impl<'a, Message> HorizontalFadeMask<'a, Message> {
+    fn new(content: Element<'a, Message>, background: Color, fade_width_ratio: f32) -> Self {
+        Self {
+            content,
+            background,
+            fade_width_ratio,
         }
     }
-
-fn page_style(theme: &Theme) -> impl Fn(&iced::Theme) -> iced::widget::container::Style + '_ {
-    let background = theme.palette.background;
-
-    move |_| iced::widget::container::Style {
-        background: Some(Background::Color(background)),
-        ..iced::widget::container::Style::default()
-    }
 }
 
-fn preview_frame_style(theme: &Theme) -> impl Fn(&iced::Theme) -> iced::widget::container::Style + '_ {
-    let background = theme.palette.background;
-    let border = theme.palette.border;
-
-    move |_| iced::widget::container::Style {
-        background: Some(Background::Color(background)),
-        border: Border {
-            color: border,
-            width: 1.0,
-            radius: 16.0.into(),
-        },
-        ..iced::widget::container::Style::default()
+impl<Message> Widget<Message, iced::Theme, Renderer> for HorizontalFadeMask<'_, Message>
+where
+    Message: Clone,
+{
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
     }
-}
 
-#[derive(Debug, Clone, Copy)]
-struct HorizontalFadeOverlay;
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(&[self.content.as_widget()]);
+    }
 
-impl canvas::Program<Message, iced::Theme, Renderer> for HorizontalFadeOverlay {
-    type State = ();
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> iced::mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
 
     fn draw(
         &self,
-        _state: &Self::State,
-        renderer: &Renderer,
-        _theme: &iced::Theme,
-        bounds: Rectangle,
-        _cursor: iced::mouse::Cursor,
-    ) -> Vec<canvas::Geometry<Renderer>> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let fade_width = (bounds.width * 0.25).max(1.0);
-        let fade_color = Color {
-            a: 1.0,
-            ..MagicTheme::dark().palette.background
-        };
-        let transparent = Color {
-            a: 0.0,
-            ..fade_color
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &iced::Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        let bounds = layout.bounds();
+        let Some(clipped_viewport) = bounds.intersection(viewport) else {
+            return;
         };
 
-        frame.fill_rectangle(
-            Point::ORIGIN,
-            iced::Size::new(fade_width, bounds.height),
-            canvas::gradient::Linear::new(Point::ORIGIN, Point::new(fade_width, 0.0))
-                .add_stop(0.0, fade_color)
-                .add_stop(1.0, transparent),
+        let fade_width = (bounds.width * self.fade_width_ratio).max(1.0);
+
+        renderer.with_layer(clipped_viewport, |renderer| {
+            self.content.as_widget().draw(
+                &tree.children[0],
+                renderer,
+                theme,
+                style,
+                layout,
+                cursor,
+                &clipped_viewport,
+            );
+        });
+
+        let quad = |bounds| renderer::Quad {
+            bounds,
+            border: Border::default(),
+            shadow: iced::Shadow::default(),
+            snap: true,
+        };
+
+        renderer.fill_quad(
+            quad(Rectangle {
+                x: bounds.x,
+                y: bounds.y,
+                width: fade_width,
+                height: bounds.height,
+            }),
+            gradient::Linear::new(iced::Radians(0.0))
+                .add_stop(0.0, self.background)
+                .add_stop(
+                    0.18,
+                    Color {
+                        a: 0.95,
+                        ..self.background
+                    },
+                )
+                .add_stop(
+                    0.55,
+                    Color {
+                        a: 0.55,
+                        ..self.background
+                    },
+                )
+                .add_stop(
+                    1.0,
+                    Color {
+                        a: 0.0,
+                        ..self.background
+                    },
+                ),
         );
 
-        frame.fill_rectangle(
-            Point::new(bounds.width - fade_width, 0.0),
-            iced::Size::new(fade_width, bounds.height),
-            canvas::gradient::Linear::new(
-                Point::new(bounds.width, 0.0),
-                Point::new(bounds.width - fade_width, 0.0),
-            )
-            .add_stop(0.0, fade_color)
-            .add_stop(1.0, transparent),
+        renderer.fill_quad(
+            quad(Rectangle {
+                x: bounds.x + bounds.width - fade_width,
+                y: bounds.y,
+                width: fade_width,
+                height: bounds.height,
+            }),
+            gradient::Linear::new(iced::Radians(std::f32::consts::PI))
+                .add_stop(0.0, self.background)
+                .add_stop(
+                    0.18,
+                    Color {
+                        a: 0.95,
+                        ..self.background
+                    },
+                )
+                .add_stop(
+                    0.55,
+                    Color {
+                        a: 0.55,
+                        ..self.background
+                    },
+                )
+                .add_stop(
+                    1.0,
+                    Color {
+                        a: 0.0,
+                        ..self.background
+                    },
+                ),
         );
+    }
+}
 
-        vec![frame.into_geometry()]
+impl<'a, Message> From<HorizontalFadeMask<'a, Message>> for Element<'a, Message>
+where
+    Message: Clone + 'a,
+{
+    fn from(widget: HorizontalFadeMask<'a, Message>) -> Self {
+        Element::new(widget)
     }
 }
 
@@ -474,5 +666,13 @@ mod tests {
 
         demo.set_card_hover(1, None);
         assert_eq!(demo.hovered_card[1], None);
+    }
+
+    #[test]
+    fn page_shell_uses_twill_semantic_background() {
+        assert_eq!(
+            page_shell_style().background_color_value(),
+            Some(BackgroundColor::semantic(SemanticColor::Background))
+        );
     }
 }

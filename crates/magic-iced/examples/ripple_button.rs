@@ -54,7 +54,8 @@ impl RippleButtonExample {
                 self.state.tick(now, &RippleButtonProps::new());
             }
             Message::Action(action) => {
-                self.state.apply_action(&action, self.now, &RippleButtonProps::new());
+                self.state
+                    .apply_action(&action, self.now, &RippleButtonProps::new());
             }
         }
         Task::none()

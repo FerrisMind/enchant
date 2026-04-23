@@ -6,14 +6,18 @@ use iced_shadcn::Theme;
 use magic_iced::{AndroidProps, android};
 
 pub fn main() -> iced::Result {
-    iced::application(AndroidExample::new, AndroidExample::update, AndroidExample::view)
-        .title("Android Example")
-        .window(iced::window::Settings {
-            size: Size::new(1200.0, 900.0),
-            ..Default::default()
-        })
-        .subscription(AndroidExample::subscription)
-        .run()
+    iced::application(
+        AndroidExample::new,
+        AndroidExample::update,
+        AndroidExample::view,
+    )
+    .title("Android Example")
+    .window(iced::window::Settings {
+        size: Size::new(1200.0, 900.0),
+        ..Default::default()
+    })
+    .subscription(AndroidExample::subscription)
+    .run()
 }
 
 struct AndroidExample {
@@ -76,7 +80,11 @@ impl AndroidExample {
 
         _shared::shell(
             "Android",
-            column![_shared::tabs(&labels, self.active, Message::Select), content].spacing(20),
+            column![
+                _shared::tabs(&labels, self.active, Message::Select),
+                content
+            ]
+            .spacing(20),
         )
     }
 }
@@ -91,15 +99,9 @@ fn android_screen<'a>(
     let body = column![
         text(title).size(24),
         text(subtitle).size(14),
-        container(
-            column![
-                text(metric).size(38),
-                text(footer).size(14),
-            ]
-            .spacing(8),
-        )
-        .padding(24)
-        .width(Length::Fill)
+        container(column![text(metric).size(38), text(footer).size(14),].spacing(8),)
+            .padding(24)
+            .width(Length::Fill)
     ]
     .spacing(16);
 

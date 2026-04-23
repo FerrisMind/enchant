@@ -31,8 +31,7 @@ impl RippleButtonState {
 
     pub fn tick(&mut self, now: Instant, props: &RippleButtonProps) {
         self.bursts.retain(|burst| {
-            now.saturating_duration_since(burst.started_at).as_millis() as u64
-                <= props.duration_ms
+            now.saturating_duration_since(burst.started_at).as_millis() as u64 <= props.duration_ms
         });
     }
 
@@ -171,9 +170,10 @@ impl<Message> EffectProgram<Message> for RippleButtonProgram<'_> {
 
             frame.stroke(
                 &canvas::Path::circle(origin, size),
-                canvas::Stroke::default()
-                    .with_width(2.0)
-                    .with_color(Color { a: alpha, ..self.color }),
+                canvas::Stroke::default().with_width(2.0).with_color(Color {
+                    a: alpha,
+                    ..self.color
+                }),
             );
         }
 
@@ -200,7 +200,11 @@ mod tests {
         let now = Instant::now();
         let mut state = RippleButtonState::new();
 
-        state.apply_action(&RippleButtonAction::Move(Point::new(0.25, 0.75)), now, &props);
+        state.apply_action(
+            &RippleButtonAction::Move(Point::new(0.25, 0.75)),
+            now,
+            &props,
+        );
         state.apply_action(&RippleButtonAction::Press, now, &props);
 
         assert_eq!(state.bursts.len(), 1);

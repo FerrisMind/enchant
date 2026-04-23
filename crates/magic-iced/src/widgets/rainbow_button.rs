@@ -106,17 +106,16 @@ impl<Message> EffectProgram<Message> for RainbowButtonProgram {
         let phase = (self.elapsed.as_secs_f32() / duration).rem_euclid(1.0);
         let stroke = bounds.height.min(bounds.width).max(1.0) * 0.06;
         let colors = rainbow_colors(phase);
-        let rect = canvas::Path::rounded_rectangle(
-            iced::Point::new(0.0, 0.0),
-            bounds.size(),
-            6.0.into(),
-        );
+        let rect =
+            canvas::Path::rounded_rectangle(iced::Point::new(0.0, 0.0), bounds.size(), 6.0.into());
 
         match self.variant {
             RainbowButtonVariant::Default => {
                 frame.stroke(
                     &rect,
-                    canvas::Stroke::default().with_width(stroke).with_color(colors[0]),
+                    canvas::Stroke::default()
+                        .with_width(stroke)
+                        .with_color(colors[0]),
                 );
                 frame.fill_rectangle(
                     iced::Point::new(0.0, 0.0),

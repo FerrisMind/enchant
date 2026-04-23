@@ -129,21 +129,25 @@ impl VideoTextExample {
 }
 
 fn frame(color: [u8; 4]) -> image::Handle {
-    image::Handle::from_rgba(4, 4, vec![
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-        color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
-    ])
+    image::Handle::from_rgba(
+        4,
+        4,
+        vec![
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+            color[0], color[1], color[2], color[3], color[0], color[1], color[2], color[3],
+        ],
+    )
 }

@@ -112,22 +112,58 @@ impl AnimatedListExample {
     fn items_for(active: usize) -> Vec<Element<'static, Message>> {
         match active {
             0 => vec![
-                container(text("Inbox sync")).padding(16).width(Length::Fill).into(),
-                container(text("Theme update")).padding(16).width(Length::Fill).into(),
-                container(text("Motion review")).padding(16).width(Length::Fill).into(),
-                container(text("Release prep")).padding(16).width(Length::Fill).into(),
+                container(text("Inbox sync"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Theme update"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Motion review"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Release prep"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
             ],
             1 => vec![
-                container(text("Write tests")).padding(16).width(Length::Fill).into(),
-                container(text("Open PR")).padding(16).width(Length::Fill).into(),
-                container(text("Merge queue")).padding(16).width(Length::Fill).into(),
+                container(text("Write tests"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Open PR"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Merge queue"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
             ],
             _ => vec![
-                container(text("Monday")).padding(16).width(Length::Fill).into(),
-                container(text("Tuesday")).padding(16).width(Length::Fill).into(),
-                container(text("Wednesday")).padding(16).width(Length::Fill).into(),
-                container(text("Thursday")).padding(16).width(Length::Fill).into(),
-                container(text("Friday")).padding(16).width(Length::Fill).into(),
+                container(text("Monday"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Tuesday"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Wednesday"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Thursday"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
+                container(text("Friday"))
+                    .padding(16)
+                    .width(Length::Fill)
+                    .into(),
             ],
         }
     }

@@ -57,7 +57,12 @@ impl ClientTweetCardExample {
 
         _shared::shell(
             "Client Tweet Card",
-            column![_shared::tabs(&labels, self.active, Message::Select), card, text("Client surface state demo.")].spacing(20),
+            column![
+                _shared::tabs(&labels, self.active, Message::Select),
+                card,
+                text("Client surface state demo.")
+            ]
+            .spacing(20),
         )
     }
 }

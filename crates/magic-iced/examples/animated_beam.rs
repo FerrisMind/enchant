@@ -63,89 +63,84 @@ impl AnimatedBeamExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let labels = [
-            "Demo",
-            "Unidirectional",
-            "Bidirectional",
-            "Multiple Inputs",
-        ];
+        let labels = ["Demo", "Unidirectional", "Bidirectional", "Multiple Inputs"];
         let scene = match self.active {
             0 => beam_scene(vec![beam_pair(
                 self.elapsed,
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(120.0, 220.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(820.0, 200.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnimatedBeamProps::new(),
-                )]),
+                AnchorBounds::from_bounds(Rectangle::new(
+                    Point::new(120.0, 220.0),
+                    iced::Size::new(180.0, 88.0),
+                )),
+                AnchorBounds::from_bounds(Rectangle::new(
+                    Point::new(820.0, 200.0),
+                    iced::Size::new(180.0, 88.0),
+                )),
+                AnimatedBeamProps::new(),
+            )]),
             1 => beam_scene(vec![beam_pair(
                 self.elapsed,
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(100.0, 160.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(860.0, 120.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnimatedBeamProps::new().reverse(false),
-                )]),
+                AnchorBounds::from_bounds(Rectangle::new(
+                    Point::new(100.0, 160.0),
+                    iced::Size::new(180.0, 88.0),
+                )),
+                AnchorBounds::from_bounds(Rectangle::new(
+                    Point::new(860.0, 120.0),
+                    iced::Size::new(180.0, 88.0),
+                )),
+                AnimatedBeamProps::new().reverse(false),
+            )]),
             2 => beam_scene(vec![beam_pair(
                 self.elapsed,
+                AnchorBounds::from_bounds(Rectangle::new(
+                    Point::new(120.0, 420.0),
+                    iced::Size::new(180.0, 88.0),
+                )),
+                AnchorBounds::from_bounds(Rectangle::new(
+                    Point::new(840.0, 160.0),
+                    iced::Size::new(180.0, 88.0),
+                )),
+                AnimatedBeamProps {
+                    curvature: -42.0,
+                    reverse: true,
+                    delay_secs: 0.6,
+                    ..AnimatedBeamProps::new()
+                },
+            )]),
+            _ => beam_scene(vec![
+                beam_pair(
+                    self.elapsed,
                     AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(120.0, 420.0),
+                        Point::new(110.0, 180.0),
                         iced::Size::new(180.0, 88.0),
                     )),
                     AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(840.0, 160.0),
+                        Point::new(700.0, 120.0),
                         iced::Size::new(180.0, 88.0),
                     )),
                     AnimatedBeamProps {
-                        curvature: -42.0,
-                        reverse: true,
-                        delay_secs: 0.6,
+                        curvature: 28.0,
                         ..AnimatedBeamProps::new()
                     },
-                )]),
-            _ => beam_scene(vec![
-                    beam_pair(
-                        self.elapsed,
-                        AnchorBounds::from_bounds(Rectangle::new(
-                            Point::new(110.0, 180.0),
-                            iced::Size::new(180.0, 88.0),
-                        )),
-                        AnchorBounds::from_bounds(Rectangle::new(
-                            Point::new(700.0, 120.0),
-                            iced::Size::new(180.0, 88.0),
-                        )),
-                        AnimatedBeamProps {
-                            curvature: 28.0,
-                            ..AnimatedBeamProps::new()
-                        },
-                    ),
-                    beam_pair(
-                        self.elapsed,
-                        AnchorBounds::from_bounds(Rectangle::new(
-                            Point::new(110.0, 180.0),
-                            iced::Size::new(180.0, 88.0),
-                        )),
-                        AnchorBounds::from_bounds(Rectangle::new(
-                            Point::new(700.0, 360.0),
-                            iced::Size::new(180.0, 88.0),
-                        )),
-                        AnimatedBeamProps {
-                            curvature: -8.0,
-                            delay_secs: 0.3,
-                            gradient_start_color: iced::Color::from_rgb8(0x6B, 0xC9, 0xFF),
-                            gradient_stop_color: iced::Color::from_rgb8(0xFF, 0x8A, 0xC2),
-                            ..AnimatedBeamProps::new()
-                        },
-                    ),
-                ]),
+                ),
+                beam_pair(
+                    self.elapsed,
+                    AnchorBounds::from_bounds(Rectangle::new(
+                        Point::new(110.0, 180.0),
+                        iced::Size::new(180.0, 88.0),
+                    )),
+                    AnchorBounds::from_bounds(Rectangle::new(
+                        Point::new(700.0, 360.0),
+                        iced::Size::new(180.0, 88.0),
+                    )),
+                    AnimatedBeamProps {
+                        curvature: -8.0,
+                        delay_secs: 0.3,
+                        gradient_start_color: iced::Color::from_rgb8(0x6B, 0xC9, 0xFF),
+                        gradient_stop_color: iced::Color::from_rgb8(0xFF, 0x8A, 0xC2),
+                        ..AnimatedBeamProps::new()
+                    },
+                ),
+            ]),
         };
 
         _shared::shell(

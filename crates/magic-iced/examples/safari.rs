@@ -6,14 +6,18 @@ use iced_shadcn::Theme;
 use magic_iced::{SafariMode, SafariProps, safari};
 
 pub fn main() -> iced::Result {
-    iced::application(SafariExample::new, SafariExample::update, SafariExample::view)
-        .title("Safari Example")
-        .window(iced::window::Settings {
-            size: Size::new(1200.0, 900.0),
-            ..Default::default()
-        })
-        .subscription(SafariExample::subscription)
-        .run()
+    iced::application(
+        SafariExample::new,
+        SafariExample::update,
+        SafariExample::view,
+    )
+    .title("Safari Example")
+    .window(iced::window::Settings {
+        size: Size::new(1200.0, 900.0),
+        ..Default::default()
+    })
+    .subscription(SafariExample::subscription)
+    .run()
 }
 
 struct SafariExample {
@@ -49,17 +53,50 @@ impl SafariExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let labels = ["Safari Demo", "Safari Demo 2", "Safari Demo 3", "Safari Demo 4"];
+        let labels = [
+            "Safari Demo",
+            "Safari Demo 2",
+            "Safari Demo 3",
+            "Safari Demo 4",
+        ];
         let content = match self.active {
-            0 => safari_screen("Docs", "Browser chrome with hero preview.", "magicui.design", SafariMode::Default, &self.theme),
-            1 => safari_screen("Dashboard", "Simple mode for cleaner framing.", "Analytics", SafariMode::Simple, &self.theme),
-            2 => safari_screen("Landing", "Wide screen with polished meta bar.", "Launch page", SafariMode::Default, &self.theme),
-            _ => safari_screen("Composer", "Tall browser frame with content stack.", "Product copy", SafariMode::Simple, &self.theme),
+            0 => safari_screen(
+                "Docs",
+                "Browser chrome with hero preview.",
+                "magicui.design",
+                SafariMode::Default,
+                &self.theme,
+            ),
+            1 => safari_screen(
+                "Dashboard",
+                "Simple mode for cleaner framing.",
+                "Analytics",
+                SafariMode::Simple,
+                &self.theme,
+            ),
+            2 => safari_screen(
+                "Landing",
+                "Wide screen with polished meta bar.",
+                "Launch page",
+                SafariMode::Default,
+                &self.theme,
+            ),
+            _ => safari_screen(
+                "Composer",
+                "Tall browser frame with content stack.",
+                "Product copy",
+                SafariMode::Simple,
+                &self.theme,
+            ),
         };
 
         _shared::shell(
             "Safari",
-            column![_shared::tabs(&labels, self.active, Message::Select), content].spacing(20),
+            column![
+                _shared::tabs(&labels, self.active, Message::Select),
+                content
+            ]
+            .spacing(20),
         )
     }
 }
@@ -74,9 +111,12 @@ fn safari_screen<'a>(
     let body = column![
         text(title).size(24),
         text(subtitle).size(14),
-        container(column![text(footer).size(34), text("Preview in browser frame").size(14)])
-            .padding(24)
-            .width(Length::Fill),
+        container(column![
+            text(footer).size(34),
+            text("Preview in browser frame").size(14)
+        ])
+        .padding(24)
+        .width(Length::Fill),
     ]
     .spacing(16);
 

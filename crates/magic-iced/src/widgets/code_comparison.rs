@@ -55,8 +55,7 @@ fn render_pane<'a, Message: 'a>(
 ) -> Element<'a, Message> {
     let lines: Vec<&str> = code.lines().collect();
     let pane = column![
-        container(row![text("▣").size(16), text(label).size(12)].spacing(8))
-        .padding([8.0, 10.0]),
+        container(row![text("▣").size(16), text(label).size(12)].spacing(8)).padding([8.0, 10.0]),
         container(
             column(
                 lines
@@ -77,7 +76,9 @@ fn render_pane<'a, Message: 'a>(
                                 move |_| iced::widget::text::Style { color: Some(color) }
                             }),
                             text(line.to_owned()).size(12).style(move |_| {
-                                iced::widget::text::Style { color: Some(accent) }
+                                iced::widget::text::Style {
+                                    color: Some(accent),
+                                }
                             })
                         ]
                         .spacing(10)
@@ -91,9 +92,7 @@ fn render_pane<'a, Message: 'a>(
     ]
     .spacing(8);
 
-    container(scrollable(pane))
-        .width(Length::Fill)
-        .into()
+    container(scrollable(pane)).width(Length::Fill).into()
 }
 
 #[cfg(test)]

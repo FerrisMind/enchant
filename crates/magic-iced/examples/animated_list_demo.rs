@@ -62,10 +62,22 @@ impl AnimatedListDemoExample {
 
     fn view(&self) -> Element<'_, Message> {
         let items = vec![
-            container(text("Inbox sync")).padding(16).width(Length::Fill).into(),
-            container(text("Automations")).padding(16).width(Length::Fill).into(),
-            container(text("Release notes")).padding(16).width(Length::Fill).into(),
-            container(text("Design review")).padding(16).width(Length::Fill).into(),
+            container(text("Inbox sync"))
+                .padding(16)
+                .width(Length::Fill)
+                .into(),
+            container(text("Automations"))
+                .padding(16)
+                .width(Length::Fill)
+                .into(),
+            container(text("Release notes"))
+                .padding(16)
+                .width(Length::Fill)
+                .into(),
+            container(text("Design review"))
+                .padding(16)
+                .width(Length::Fill)
+                .into(),
         ];
 
         _shared::shell(

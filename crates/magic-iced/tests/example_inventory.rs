@@ -111,7 +111,8 @@ fn official_inventory() -> BTreeMap<String, Vec<OfficialScenario>> {
     }
 
     for scenarios in inventory.values_mut() {
-        scenarios.sort_by(|left, right| left.name.cmp(&right.name).then(left.path.cmp(&right.path)));
+        scenarios
+            .sort_by(|left, right| left.name.cmp(&right.name).then(left.path.cmp(&right.path)));
     }
 
     inventory
@@ -202,7 +203,12 @@ fn lowercase_tokens(source: &str) -> BTreeSet<String> {
     source
         .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
         .filter(|token| !token.is_empty())
-        .filter(|token| token.chars().next().is_some_and(|ch| ch.is_ascii_lowercase()))
+        .filter(|token| {
+            token
+                .chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_lowercase())
+        })
         .map(str::to_string)
         .collect()
 }

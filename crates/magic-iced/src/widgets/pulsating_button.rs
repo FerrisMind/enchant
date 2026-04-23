@@ -117,7 +117,10 @@ impl<Message> EffectProgram<Message> for PulsatingButtonProgram {
                 let alpha = (1.0 - phase).powf(1.8) * 0.22;
                 frame.fill(
                     &canvas::Path::circle(center, radius * scale),
-                    Color { a: alpha, ..self.color },
+                    Color {
+                        a: alpha,
+                        ..self.color
+                    },
                 );
             }
             PulsatingButtonVariant::Ripple => {
@@ -126,9 +129,10 @@ impl<Message> EffectProgram<Message> for PulsatingButtonProgram {
                     let alpha = (1.0 - local).powf(1.7) * 0.22;
                     frame.stroke(
                         &canvas::Path::circle(center, radius * (0.7 + local * 1.2)),
-                        canvas::Stroke::default()
-                            .with_width(2.0)
-                            .with_color(Color { a: alpha, ..self.color }),
+                        canvas::Stroke::default().with_width(2.0).with_color(Color {
+                            a: alpha,
+                            ..self.color
+                        }),
                     );
                 }
             }

@@ -6,13 +6,17 @@ use iced_shadcn::Theme;
 use magic_iced::{TweetAsset, TweetAuthor, TweetCardData, TweetCardProps, TweetMedia, tweet_card};
 
 pub fn main() -> iced::Result {
-    iced::application(TweetCardExample::new, TweetCardExample::update, TweetCardExample::view)
-        .title("Tweet Card Example")
-        .window(iced::window::Settings {
-            size: Size::new(1200.0, 900.0),
-            ..Default::default()
-        })
-        .run()
+    iced::application(
+        TweetCardExample::new,
+        TweetCardExample::update,
+        TweetCardExample::view,
+    )
+    .title("Tweet Card Example")
+    .window(iced::window::Settings {
+        size: Size::new(1200.0, 900.0),
+        ..Default::default()
+    })
+    .run()
 }
 
 struct TweetCardExample {
@@ -45,11 +49,20 @@ impl TweetCardExample {
 
     fn view(&self) -> Element<'_, Message> {
         let labels = ["Tweet Demo", "Tweet Images", "Tweet Meta"];
-        let card = tweet_card(&tweet_data(self.active), &TweetCardProps::new(), &self.theme);
+        let card = tweet_card(
+            &tweet_data(self.active),
+            &TweetCardProps::new(),
+            &self.theme,
+        );
 
         _shared::shell(
             "Tweet Card",
-            column![_shared::tabs(&labels, self.active, Message::Select), card, text("Server-side card surface.")].spacing(20),
+            column![
+                _shared::tabs(&labels, self.active, Message::Select),
+                card,
+                text("Server-side card surface.")
+            ]
+            .spacing(20),
         )
     }
 }

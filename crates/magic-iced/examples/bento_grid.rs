@@ -6,13 +6,17 @@ use iced_shadcn::Theme;
 use magic_iced::{BentoCardProps, BentoGridProps, bento_grid};
 
 pub fn main() -> iced::Result {
-    iced::application(BentoGridExample::new, BentoGridExample::update, BentoGridExample::view)
-        .title("Bento Grid Example")
-        .window(iced::window::Settings {
-            size: Size::new(1400.0, 900.0),
-            ..Default::default()
-        })
-        .run()
+    iced::application(
+        BentoGridExample::new,
+        BentoGridExample::update,
+        BentoGridExample::view,
+    )
+    .title("Bento Grid Example")
+    .window(iced::window::Settings {
+        size: Size::new(1400.0, 900.0),
+        ..Default::default()
+    })
+    .run()
 }
 
 struct BentoGridExample {
@@ -93,32 +97,26 @@ impl BentoGridExample {
 }
 
 fn card_bg<'a>(title: &'a str, metric: &'a str, theme: &'a Theme) -> Element<'a, Message> {
-    container(
-        column![
-            text(title).size(22),
-            text(metric).size(34),
-        ]
-        .spacing(8),
-    )
-    .padding(20)
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .center_x(Length::Fill)
-    .center_y(Length::Fill)
-    .style(move |_| iced::widget::container::Style {
-        background: Some(iced::Background::Color(iced::Color {
-            a: 0.08,
-            ..theme.palette.primary
-        })),
-        border: iced::Border {
-            color: iced::Color {
-                a: 0.18,
+    container(column![text(title).size(22), text(metric).size(34),].spacing(8))
+        .padding(20)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .style(move |_| iced::widget::container::Style {
+            background: Some(iced::Background::Color(iced::Color {
+                a: 0.08,
                 ..theme.palette.primary
+            })),
+            border: iced::Border {
+                color: iced::Color {
+                    a: 0.18,
+                    ..theme.palette.primary
+                },
+                width: 1.0,
+                radius: theme.radius.md.into(),
             },
-            width: 1.0,
-            radius: theme.radius.md.into(),
-        },
-        ..iced::widget::container::Style::default()
-    })
-    .into()
+            ..iced::widget::container::Style::default()
+        })
+        .into()
 }

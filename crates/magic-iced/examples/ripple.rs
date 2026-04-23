@@ -8,14 +8,18 @@ use magic_iced::{RippleProps, ripple};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {
-    iced::application(RippleExample::new, RippleExample::update, RippleExample::view)
-        .title("Ripple")
-        .window(iced::window::Settings {
-            size: Size::new(1000.0, 760.0),
-            ..Default::default()
-        })
-        .subscription(RippleExample::subscription)
-        .run()
+    iced::application(
+        RippleExample::new,
+        RippleExample::update,
+        RippleExample::view,
+    )
+    .title("Ripple")
+    .window(iced::window::Settings {
+        size: Size::new(1000.0, 760.0),
+        ..Default::default()
+    })
+    .subscription(RippleExample::subscription)
+    .run()
 }
 
 struct RippleExample {

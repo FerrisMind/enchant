@@ -80,7 +80,13 @@ impl RainbowButtonExample {
             "Rainbow Button",
             column![
                 _shared::tabs(&labels, self.active, Message::Select),
-                rainbow_button(text("Rainbow"), Some(Message::Pressed), self.elapsed, props, &self.theme),
+                rainbow_button(
+                    text("Rainbow"),
+                    Some(Message::Pressed),
+                    self.elapsed,
+                    props,
+                    &self.theme
+                ),
             ]
             .spacing(20),
         )
