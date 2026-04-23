@@ -1,8 +1,8 @@
-use iced::gradient;
-use iced::widget::{column, container, image, row, stack, text, Space};
-use iced::{Alignment, Background, Border, Color, Element, Length, Radians, Size, Subscription, Task};
+use iced::widget::canvas;
+use iced::widget::{column, container, image, mouse_area, row, stack, text};
+use iced::{Alignment, Background, Border, Color, Element, Length, Point, Rectangle, Renderer, Size, Subscription, Task};
 use iced_shadcn::Theme;
-use magic_iced::{marquee, MagicTheme, MarqueeItem, MarqueeOrientation, MarqueeProps};
+use magic_iced::{marquee_indexed, MagicTheme, MarqueeItem, MarqueeOrientation, MarqueeProps};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
@@ -27,23 +27,26 @@ struct MarqueeDemo {
     paused_total: [Duration; 2],
     pause_started_at: [Option<Instant>; 2],
     hover_depth: [usize; 2],
+    hovered_card: [Option<(usize, usize)>; 2],
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Tick(Instant),
     Hover(usize, bool),
+    CardHover(usize, Option<(usize, usize)>),
 }
 
 impl Default for MarqueeDemo {
     fn default() -> Self {
         Self {
-            theme: MagicTheme::light(),
+            theme: MagicTheme::dark(),
             started_at: Instant::now(),
             elapsed: [Duration::ZERO; 2],
             paused_total: [Duration::ZERO; 2],
             pause_started_at: [None, None],
             hover_depth: [0; 2],
+            hovered_card: [None, None],
         }
     }
 }
@@ -57,6 +60,7 @@ impl MarqueeDemo {
         match message {
             Message::Tick(now) => self.tick_at(now),
             Message::Hover(row, entered) => self.set_hover(row, entered, Instant::now()),
+            Message::CardHover(row, card) => self.set_card_hover(row, card),
         }
 
         Task::none()
@@ -80,13 +84,16 @@ impl MarqueeDemo {
                 .width(Length::Fill)
                 .align_x(Alignment::Center)
                 .into(),
-                horizontal_edge_fade_overlay(),
+                canvas::Canvas::new(HorizontalFadeOverlay)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .into(),
             ])
         )
         .width(Length::Fixed(780.0))
         .padding(24)
         .center_x(Length::Fill)
-        .style(preview_frame_style());
+        .style(preview_frame_style(&self.theme));
 
         container(
             column![content]
@@ -106,7 +113,35 @@ impl MarqueeDemo {
         reverse: bool,
         row_index: usize,
     ) -> Element<'a, Message> {
-        let render_item = |item: &MarqueeItem| -> Element<'a, Message> {
+        let title_color = self.theme.palette.foreground;
+        let subtitle_color = Color {
+            a: 0.40,
+            ..self.theme.palette.foreground
+        };
+        let body_color = Color {
+            a: 0.82,
+            ..self.theme.palette.foreground
+        };
+        let card_background = Color {
+            a: 0.10,
+            ..self.theme.palette.foreground
+        };
+        let card_border = Color {
+            a: 0.10,
+            ..self.theme.palette.foreground
+        };
+        let hovered_background = Color {
+            a: 0.15,
+            ..self.theme.palette.foreground
+        };
+        let hovered_border = Color {
+            a: 0.16,
+            ..self.theme.palette.foreground
+        };
+        let hovered_card = self.hovered_card[row_index];
+
+        let render_item = |item: &MarqueeItem, copy_index: usize, item_index: usize| -> Element<'a, Message> {
+            let is_hovered = hovered_card == Some((copy_index, item_index));
             let avatar = container(image(avatar_handle(item.title.as_str())))
                 .width(Length::Fixed(32.0))
                 .height(Length::Fixed(32.0))
@@ -120,50 +155,62 @@ impl MarqueeDemo {
                     ..iced::widget::container::Style::default()
                 });
 
-            container(
-                column![
-                    row![
-                        avatar,
-                        column![
-                            text(item.title.clone()).size(14).style(|_| {
-                                iced::widget::text::Style {
-                                    color: Some(Color::from_rgba8(0x11, 0x11, 0x11, 0.92)),
-                                }
-                            }),
-                            text(item.subtitle.clone()).size(12).style(|_| {
-                                iced::widget::text::Style {
-                                    color: Some(Color::from_rgba8(0x11, 0x11, 0x11, 0.55)),
-                                }
-                            }),
+            mouse_area(
+                container(
+                    column![
+                        row![
+                            avatar,
+                            column![
+                                text(item.title.clone()).size(14).style(move |_| {
+                                    iced::widget::text::Style {
+                                        color: Some(title_color),
+                                    }
+                                }),
+                                text(item.subtitle.clone()).size(12).style(move |_| {
+                                    iced::widget::text::Style {
+                                        color: Some(subtitle_color),
+                                    }
+                                }),
+                            ]
+                            .spacing(2),
                         ]
-                        .spacing(2),
+                        .spacing(10)
+                        .align_y(Alignment::Center),
+                        text(item.body.clone()).size(14).style(move |_| {
+                            iced::widget::text::Style {
+                                color: Some(body_color),
+                            }
+                        }),
                     ]
-                    .spacing(10)
-                    .align_y(Alignment::Center),
-                    text(item.body.clone()).size(14).style(|_| {
-                        iced::widget::text::Style {
-                            color: Some(Color::from_rgba8(0x22, 0x22, 0x22, 0.82)),
-                        }
-                    }),
-                ]
-                .spacing(8),
+                    .spacing(8),
+                )
+                .width(Length::Fixed(256.0))
+                .height(Length::Fill)
+                .padding(16)
+                .style(move |_| iced::widget::container::Style {
+                    background: Some(Background::Color(if is_hovered {
+                        hovered_background
+                    } else {
+                        card_background
+                    })),
+                    border: Border {
+                        color: if is_hovered {
+                            hovered_border
+                        } else {
+                            card_border
+                        },
+                        width: 1.0,
+                        radius: 12.0.into(),
+                    },
+                    ..iced::widget::container::Style::default()
+                }),
             )
-            .width(Length::Fixed(256.0))
-            .height(Length::Fill)
-            .padding(16)
-            .style(|_| iced::widget::container::Style {
-                background: Some(Background::Color(Color::from_rgba8(0x00, 0x00, 0x00, 0.01))),
-                border: Border {
-                    color: Color::from_rgba8(0x00, 0x00, 0x00, 0.10),
-                    width: 1.0,
-                    radius: 12.0.into(),
-                },
-                ..iced::widget::container::Style::default()
-            })
+            .on_enter(Message::CardHover(row_index, Some((copy_index, item_index))))
+            .on_exit(Message::CardHover(row_index, None))
             .into()
         };
 
-        marquee(
+        marquee_indexed(
             items,
             render_item,
             self.elapsed[row_index],
@@ -212,6 +259,14 @@ impl MarqueeDemo {
             }
         }
     }
+
+    fn set_card_hover(&mut self, row: usize, card: Option<(usize, usize)>) {
+        if row >= self.hovered_card.len() {
+            return;
+        }
+
+        self.hovered_card[row] = card;
+    }
 }
 
 fn marquee_props(reverse: bool) -> MarqueeProps {
@@ -238,11 +293,14 @@ fn page_style(theme: &Theme) -> impl Fn(&iced::Theme) -> iced::widget::container
     }
 }
 
-fn preview_frame_style() -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
+fn preview_frame_style(theme: &Theme) -> impl Fn(&iced::Theme) -> iced::widget::container::Style + '_ {
+    let background = theme.palette.background;
+    let border = theme.palette.border;
+
     move |_| iced::widget::container::Style {
-        background: Some(Background::Color(Color::WHITE)),
+        background: Some(Background::Color(background)),
         border: Border {
-            color: Color::from_rgba8(0x00, 0x00, 0x00, 0.10),
+            color: border,
             width: 1.0,
             radius: 16.0.into(),
         },
@@ -250,47 +308,52 @@ fn preview_frame_style() -> impl Fn(&iced::Theme) -> iced::widget::container::St
     }
 }
 
-fn horizontal_edge_fade_overlay<'a>() -> Element<'a, Message> {
-    let background = Color::WHITE;
-    let left = container(Space::new())
-        .width(Length::FillPortion(1))
-        .height(Length::Fill)
-        .style(move |_| {
-            gradient::Linear::new(Radians(0.0))
-                .add_stop(0.0, background)
-                .add_stop(
-                    1.0,
-                    Color {
-                        a: 0.0,
-                        ..background
-                    },
-                )
-                .into()
-        });
-    let right = container(Space::new())
-        .width(Length::FillPortion(1))
-        .height(Length::Fill)
-        .style(move |_| {
-            gradient::Linear::new(Radians(std::f32::consts::PI))
-                .add_stop(0.0, background)
-                .add_stop(
-                    1.0,
-                    Color {
-                        a: 0.0,
-                        ..background
-                    },
-                )
-                .into()
-        });
+#[derive(Debug, Clone, Copy)]
+struct HorizontalFadeOverlay;
 
-    row![
-        left,
-        Space::new().width(Length::FillPortion(2)),
-        right,
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+impl canvas::Program<Message, iced::Theme, Renderer> for HorizontalFadeOverlay {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &Self::State,
+        renderer: &Renderer,
+        _theme: &iced::Theme,
+        bounds: Rectangle,
+        _cursor: iced::mouse::Cursor,
+    ) -> Vec<canvas::Geometry<Renderer>> {
+        let mut frame = canvas::Frame::new(renderer, bounds.size());
+        let fade_width = (bounds.width * 0.25).max(1.0);
+        let fade_color = Color {
+            a: 1.0,
+            ..MagicTheme::dark().palette.background
+        };
+        let transparent = Color {
+            a: 0.0,
+            ..fade_color
+        };
+
+        frame.fill_rectangle(
+            Point::ORIGIN,
+            iced::Size::new(fade_width, bounds.height),
+            canvas::gradient::Linear::new(Point::ORIGIN, Point::new(fade_width, 0.0))
+                .add_stop(0.0, fade_color)
+                .add_stop(1.0, transparent),
+        );
+
+        frame.fill_rectangle(
+            Point::new(bounds.width - fade_width, 0.0),
+            iced::Size::new(fade_width, bounds.height),
+            canvas::gradient::Linear::new(
+                Point::new(bounds.width, 0.0),
+                Point::new(bounds.width - fade_width, 0.0),
+            )
+            .add_stop(0.0, fade_color)
+            .add_stop(1.0, transparent),
+        );
+
+        vec![frame.into_geometry()]
+    }
 }
 
 fn reviews() -> Vec<MarqueeItem> {
@@ -399,5 +462,17 @@ mod tests {
         demo.tick_at(start + Duration::from_secs(9));
         assert_eq!(demo.elapsed[0], Duration::from_secs(7));
         assert_eq!(demo.elapsed[1], Duration::from_secs(9));
+    }
+
+    #[test]
+    fn card_hover_tracks_per_row() {
+        let mut demo = MarqueeDemo::default();
+
+        demo.set_card_hover(1, Some((3, 2)));
+        assert_eq!(demo.hovered_card[0], None);
+        assert_eq!(demo.hovered_card[1], Some((3, 2)));
+
+        demo.set_card_hover(1, None);
+        assert_eq!(demo.hovered_card[1], None);
     }
 }

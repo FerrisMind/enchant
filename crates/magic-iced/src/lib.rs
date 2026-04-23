@@ -66,7 +66,7 @@ pub use widgets::{
     code_comparison, cool_mode, dock, dock_icon, dot_pattern, dotted_map, file_tree, flickering_grid, glare_hover,
     globe, grid_pattern, hero_video_dialog, hexagon_pattern, highlighter, hyper_text, icon_cloud,
     interactive_grid_pattern, interactive_hover_button, iphone, lens, light_rays, line_shadow_text,
-    magic_card, marquee, meteors, morphing_text, neon_gradient_card, number_ticker,
+    magic_card, marquee, marquee_indexed, meteors, morphing_text, neon_gradient_card, number_ticker,
     orbiting_circles, particles, pixel_image, pointer, progressive_blur, pulsating_button,
     rainbow_button, retro_grid, ripple, ripple_button, safari, scroll_progress,
     scroll_velocity_container, scroll_velocity_row, shimmer_button, shine_border, shiny_button,

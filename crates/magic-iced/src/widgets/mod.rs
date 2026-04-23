@@ -123,7 +123,7 @@ pub use lens::{LensAction, LensProps, LensState, lens};
 pub use light_rays::{LightRaysProps, light_rays};
 pub use line_shadow_text::{LineShadowTextProps, line_shadow_text};
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
-pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee};
+pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee, marquee_indexed};
 pub use meteors::{MeteorsProps, meteors};
 pub use mockups::{AndroidProps, IphoneProps, SafariMode, SafariProps, android, iphone, safari};
 pub use morphing_text::{MorphingTextProps, morphing_text};

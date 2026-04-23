@@ -98,6 +98,24 @@ pub fn marquee<'a, Message: 'a + Clone, T>(
     theme: &Theme,
     on_hover: impl Fn(bool) -> Message + 'a,
 ) -> Element<'a, Message> {
+    marquee_indexed(
+        items,
+        move |item, _copy_index, _item_index| render_item(item),
+        elapsed,
+        props,
+        theme,
+        on_hover,
+    )
+}
+
+pub fn marquee_indexed<'a, Message: 'a + Clone, T>(
+    items: &'a [T],
+    render_item: impl Fn(&T, usize, usize) -> Element<'a, Message>,
+    elapsed: Duration,
+    props: MarqueeProps,
+    theme: &Theme,
+    on_hover: impl Fn(bool) -> Message + 'a,
+) -> Element<'a, Message> {
     let track_extent = marquee_track_extent(items.len(), props);
     let repeats = props.repeat.max(2);
 
@@ -121,7 +139,7 @@ pub fn marquee<'a, Message: 'a + Clone, T>(
     );
 
     for index in 0..repeats {
-        let copy = render_copy(items, &render_item, props);
+        let copy = render_copy(items, &render_item, index, props);
         layers.push(
             float(copy)
                 .translate(move |bounds, _viewport| {
@@ -160,10 +178,15 @@ pub fn marquee<'a, Message: 'a + Clone, T>(
 
 fn render_copy<'a, Message: 'a, T>(
     items: &'a [T],
-    render_item: &impl Fn(&T) -> Element<'a, Message>,
+    render_item: &impl Fn(&T, usize, usize) -> Element<'a, Message>,
+    copy_index: usize,
     props: MarqueeProps,
 ) -> Element<'a, Message> {
-    let children = items.iter().map(render_item).collect::<Vec<_>>();
+    let children = items
+        .iter()
+        .enumerate()
+        .map(|(item_index, item)| render_item(item, copy_index, item_index))
+        .collect::<Vec<_>>();
 
     match props.orientation {
         MarqueeOrientation::Horizontal => row(children)
@@ -338,6 +361,7 @@ fn marquee_copy_position(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
     use std::time::Duration;
 
     #[test]
@@ -413,5 +437,27 @@ mod tests {
         assert!((second.x - first.x - cycle).abs() < 0.001);
         assert_eq!(first.y, 0.0);
         assert_eq!(second.y, 0.0);
+    }
+
+    #[test]
+    fn render_copy_passes_distinct_instance_indices() {
+        let seen = RefCell::new(Vec::new());
+        let items = ["one", "two", "three"];
+        let props = MarqueeProps::new();
+
+        let _ = render_copy(
+            &items,
+            &|_item, copy_index, item_index| {
+                seen.borrow_mut().push((copy_index, item_index));
+                iced::widget::Space::new().into()
+            },
+            2,
+            props,
+        );
+
+        assert_eq!(
+            *seen.borrow(),
+            vec![(2, 0), (2, 1), (2, 2)]
+        );
     }
 }
