@@ -64,11 +64,11 @@ pub fn morphing_text<'a, Message: 'a>(
     };
     let base = props.color.unwrap_or(theme.palette.foreground);
     let current_color = Color {
-        a: (1.0 - fraction).powf(0.45),
+        a: (1.0 - fraction).powf(0.4),
         ..base
     };
     let next_color = Color {
-        a: fraction.powf(0.45),
+        a: fraction.powf(0.4),
         ..base
     };
 
