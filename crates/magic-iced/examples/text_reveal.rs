@@ -1,5 +1,11 @@
-use iced::widget::{column, container, text};
-use iced::{Element, Length, Size, Task};
+mod _shared;
+
+use iced::time::Instant;
+use iced::widget::column;
+use iced::{Element, Size, Subscription, Task};
+use iced_shadcn::Theme;
+use magic_iced::{TextRevealProps, text_reveal};
+use std::time::Duration;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -7,35 +13,58 @@ pub fn main() -> iced::Result {
         TextRevealExample::update,
         TextRevealExample::view,
     )
-    .title("TextReveal Example")
+    .title("Text Reveal")
     .window(iced::window::Settings {
-        size: Size::new(800.0, 600.0),
+        size: Size::new(1000.0, 420.0),
         ..Default::default()
     })
+    .subscription(TextRevealExample::subscription)
     .run()
 }
 
-#[derive(Default)]
-struct TextRevealExample {}
+struct TextRevealExample {
+    theme: Theme,
+    start: Instant,
+    elapsed: Duration,
+}
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    Tick(Instant),
+}
 
 impl TextRevealExample {
     fn new() -> (Self, Task<Message>) {
-        (Self::default(), Task::none())
+        let start = Instant::now();
+        (
+            Self {
+                theme: Theme::default(),
+                start,
+                elapsed: Duration::ZERO,
+            },
+            Task::none(),
+        )
     }
 
-    fn update(&mut self, _message: Message) -> Task<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
+        if let Message::Tick(now) = message {
+            self.elapsed = now.duration_since(self.start);
+        }
         Task::none()
     }
 
+    fn subscription(&self) -> Subscription<Message> {
+        iced::time::every(Duration::from_millis(16)).map(Message::Tick)
+    }
+
     fn view(&self) -> Element<'_, Message> {
-        container(column![text("TextReveal Example").size(24)])
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into()
+        let progress = (self.elapsed.as_secs_f32() * 0.18).rem_euclid(1.0);
+        let body = text_reveal(
+            "Magic UI will change the way you design.",
+            TextRevealProps::new().progress(progress).font_size(36),
+            &self.theme,
+        );
+
+        _shared::shell("Text Reveal", column![body].spacing(24))
     }
 }

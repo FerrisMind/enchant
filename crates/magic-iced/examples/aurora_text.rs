@@ -1,7 +1,7 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{column, text};
+use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
 use magic_iced::{AuroraTextProps, aurora_text};
 use std::time::Duration;
@@ -61,12 +61,9 @@ impl AuroraTextExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = column![
-            aurora_text::<Message>("beautiful", self.elapsed, &self.props),
-            text("Matches the reference: Ship + aurora gradient on “beautiful”."),
-        ]
-        .spacing(24)
-        .align_x(iced::Alignment::Center);
+        let body = column![aurora_text::<Message>("beautiful", self.elapsed, &self.props)]
+            .spacing(24)
+            .align_x(iced::Alignment::Center);
 
         _shared::shell("Aurora Text", body)
     }
