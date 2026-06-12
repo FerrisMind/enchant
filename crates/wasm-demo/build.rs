@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 fn main() {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let ref_root = manifest_dir.join("../../../refs/react/magicui/apps/www");
+    let ref_root = manifest_dir.join("../../../magic-iced_refs/magicui/apps/www");
     let assets_dir = manifest_dir.join("generated/reference-assets");
     println!("cargo:rerun-if-changed={}", ref_root.display());
     let _ = fs::create_dir_all(&assets_dir);

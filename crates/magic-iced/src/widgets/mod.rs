@@ -1,4 +1,5 @@
 pub mod animated_beam;
+pub mod animated_subscribe_button;
 pub mod animated_circular_progress_bar;
 pub mod animated_gradient_text;
 pub mod animated_grid_pattern;
@@ -15,6 +16,7 @@ pub mod code_comparison;
 pub mod comic_text;
 pub mod confetti;
 pub mod cool_mode;
+pub mod dia_text_reveal;
 pub mod dock;
 pub mod dot_pattern;
 pub mod dotted_map;
@@ -30,6 +32,7 @@ pub mod hyper_text;
 pub mod icon_cloud;
 pub mod interactive_grid_pattern;
 pub mod interactive_hover_button;
+pub mod kinetic_text;
 pub mod lens;
 pub mod light_rays;
 pub mod line_shadow_text;
@@ -39,6 +42,7 @@ pub mod meteors;
 pub mod mockups;
 pub mod morphing_text;
 pub mod neon_gradient_card;
+pub mod noise_texture;
 pub mod number_ticker;
 pub mod orbiting_circles;
 pub mod particles;
@@ -71,6 +75,9 @@ pub mod warp_background;
 pub mod word_rotate;
 
 pub use animated_beam::{AnimatedBeamProps, animated_beam};
+pub use animated_subscribe_button::{
+    AnimatedSubscribeButtonProps, AnimatedSubscribeButtonState, animated_subscribe_button,
+};
 pub use animated_circular_progress_bar::{
     AnimatedCircularProgressBarProps, AnimatedCircularProgressBarState,
     animated_circular_progress_bar,
@@ -94,6 +101,10 @@ pub use confetti::{
     ConfettiAction, ConfettiBurst, ConfettiProps, ConfettiState, confetti, confetti_button,
 };
 pub use cool_mode::{CoolModeAction, CoolModeProps, CoolModeState, CoolParticleVisual, cool_mode};
+pub use dia_text_reveal::{
+    DEFAULT_DIA_COLORS, DiaTextRevealProps, DiaTextRevealState, dia_text_reveal,
+    dia_text_reveal_companion,
+};
 pub use dock::{DockAction, DockDirection, DockIcon, DockProps, DockState, dock, dock_icon};
 pub use dot_pattern::{DotPatternProps, dot_pattern};
 pub use dotted_map::{
@@ -119,6 +130,7 @@ pub use interactive_grid_pattern::{
     interactive_grid_pattern,
 };
 pub use interactive_hover_button::{InteractiveHoverButtonProps, interactive_hover_button};
+pub use kinetic_text::{KineticTextProps, KineticTextRole, KineticTextState, kinetic_text};
 pub use lens::{LensAction, LensProps, LensState, lens};
 pub use light_rays::{LightRaysProps, light_rays};
 pub use line_shadow_text::{LineShadowTextProps, line_shadow_text};
@@ -128,6 +140,7 @@ pub use meteors::{MeteorsProps, meteors};
 pub use mockups::{AndroidProps, IphoneProps, SafariMode, SafariProps, android, iphone, safari};
 pub use morphing_text::{MorphingTextProps, morphing_text};
 pub use neon_gradient_card::{NeonColors, NeonGradientCardProps, neon_gradient_card};
+pub use noise_texture::{NoiseTextureProps, noise_texture, noise_texture_layer};
 pub use number_ticker::{
     NumberTickerDirection, NumberTickerProps, NumberTickerState, number_ticker,
 };

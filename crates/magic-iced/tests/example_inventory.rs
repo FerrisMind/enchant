@@ -2,10 +2,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
+const INTERNAL_HELPER_EXAMPLES: &[&str] = &["animated_subscribe_button", "border_track"];
+
 const HELPER_EXPORTS: &[&str] = &[
+    "animated_subscribe_button",
     "animated_theme_toggler_with_controller",
     "confetti_button",
+    "dia_text_reveal_companion",
     "dock_icon",
+    "marquee_indexed",
+    "noise_texture_layer",
     "scroll_velocity_container",
     "scroll_velocity_row",
 ];
@@ -76,14 +82,20 @@ fn example_inventory_matches_official_registry() {
         ));
     }
 
-    if !internal_examples.is_empty() {
-        if internal_examples == ["border_track"] {
-            eprintln!("internal helper example kept out of public inventory: border_track");
-        } else {
-            problems.push(format!(
-                "unexpected example binaries outside public inventory:\n  {}",
-                internal_examples.join("\n  ")
-            ));
+    let unexpected_internal_examples = internal_examples
+        .iter()
+        .filter(|name| !INTERNAL_HELPER_EXAMPLES.contains(&name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if !unexpected_internal_examples.is_empty() {
+        problems.push(format!(
+            "unexpected example binaries outside public inventory:\n  {}",
+            unexpected_internal_examples.join("\n  ")
+        ));
+    } else {
+        for name in internal_examples {
+            eprintln!("internal helper example kept out of public inventory: {name}");
         }
     }
 
@@ -96,7 +108,7 @@ fn example_inventory_matches_official_registry() {
 
 fn official_inventory() -> BTreeMap<String, Vec<OfficialScenario>> {
     let registry_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../refs/react/magicui/apps/www/registry/registry-examples.ts");
+        .join("../../../magic-iced_refs/magicui/apps/www/registry/registry-examples.ts");
     let registry = fs::read_to_string(&registry_path)
         .unwrap_or_else(|err| panic!("read {}: {}", registry_path.display(), err));
 

@@ -8,11 +8,11 @@ authors = ["FerrisMind"]
 [dependencies]
 magic-iced = { path = "../magic-iced" }
 iced = { version = "0.14", features = ["advanced", "canvas", "image", "svg", "webgl", "wgpu", "fira-sans"] }
-iced-shadcn = { path = "../../../shadcn-rs/crates/iced-shadcn" }
+iced-shadcn = { git = "https://github.com/FerrisMind/shadcn-rs", rev = "f782973e492f7bc6a54f2cb0d39dd712b60d48f6", default-features = false }
 lucide-icons = "0.575.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-twill = { path = "../../../twill", features = ["iced"] }
+twill = { git = "https://github.com/FerrisMind/twill.git", rev = "8c384341992e51fe7c15e77901096903cc1139f4", features = ["iced"] }
 wasm-bindgen = "0.2.114"
 web-sys = { version = "0.3.91", features = ["Window", "History", "Location", "UrlSearchParams"] }
 
@@ -21,7 +21,7 @@ regex = "1.12"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-twill = { path = "../../../twill" }
+twill = { git = "https://github.com/FerrisMind/twill.git", rev = "8c384341992e51fe7c15e77901096903cc1139f4" }
 walkdir = "2.5"
 
 [dev-dependencies]
