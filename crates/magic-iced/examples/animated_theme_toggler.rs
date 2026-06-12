@@ -1,5 +1,13 @@
-use iced::widget::{column, container, text};
-use iced::{Element, Length, Size, Task};
+mod _shared;
+
+use iced::time::{Duration, Instant};
+use iced::widget::column;
+use iced::{Element, Size, Subscription, Task};
+use iced_shadcn::Theme;
+use magic_iced::{
+    AnimatedThemeTogglerController, AnimatedThemeTogglerProps,
+    animated_theme_toggler_with_controller,
+};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -7,35 +15,71 @@ pub fn main() -> iced::Result {
         AnimatedThemeTogglerExample::update,
         AnimatedThemeTogglerExample::view,
     )
-    .title("AnimatedThemeToggler Example")
+    .title("Animated Theme Toggler")
     .window(iced::window::Settings {
-        size: Size::new(800.0, 600.0),
+        size: Size::new(900.0, 320.0),
         ..Default::default()
     })
+    .subscription(AnimatedThemeTogglerExample::subscription)
     .run()
 }
 
-#[derive(Default)]
-struct AnimatedThemeTogglerExample {}
+struct AnimatedThemeTogglerExample {
+    theme: Theme,
+    dark_mode: bool,
+    props: AnimatedThemeTogglerProps,
+    controller: AnimatedThemeTogglerController,
+    now: Instant,
+}
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    ToggleTheme,
+    Tick(Instant),
+}
 
 impl AnimatedThemeTogglerExample {
     fn new() -> (Self, Task<Message>) {
-        (Self::default(), Task::none())
+        let props = AnimatedThemeTogglerProps::new();
+        let controller = AnimatedThemeTogglerController::new(true, &props);
+        (
+            Self {
+                theme: Theme::default(),
+                dark_mode: true,
+                props,
+                controller,
+                now: Instant::now(),
+            },
+            Task::none(),
+        )
     }
 
-    fn update(&mut self, _message: Message) -> Task<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::ToggleTheme => {
+                self.controller.toggle(self.now, &self.props);
+                self.dark_mode = self.controller.dark_mode();
+            }
+            Message::Tick(now) => {
+                self.now = now;
+                self.controller.tick(now, &self.props);
+            }
+        }
         Task::none()
     }
 
+    fn subscription(&self) -> Subscription<Message> {
+        iced::time::every(Duration::from_millis(16)).map(Message::Tick)
+    }
+
     fn view(&self) -> Element<'_, Message> {
-        container(column![text("AnimatedThemeToggler Example").size(24)])
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into()
+        let body = animated_theme_toggler_with_controller(
+            &self.controller,
+            self.now,
+            Message::ToggleTheme,
+            self.props,
+            &self.theme,
+        );
+        _shared::shell("Animated Theme Toggler", column![body].spacing(24))
     }
 }

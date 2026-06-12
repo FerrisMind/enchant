@@ -1,37 +1,71 @@
-use iced::widget::{column, container, text};
-use iced::{Element, Length, Size, Task};
+mod _shared;
+
+use iced::widget::{column, text};
+use iced::{Element, Size, Task};
+use iced_shadcn::Theme;
+use magic_iced::{DockAction, DockDirection, DockProps, DockState, dock, dock_icon};
 
 pub fn main() -> iced::Result {
     iced::application(DockExample::new, DockExample::update, DockExample::view)
-        .title("Dock Example")
+        .title("Dock")
         .window(iced::window::Settings {
-            size: Size::new(800.0, 600.0),
+            size: Size::new(900.0, 420.0),
             ..Default::default()
         })
         .run()
 }
 
-#[derive(Default)]
-struct DockExample {}
+struct DockExample {
+    theme: Theme,
+    dock_state: DockState,
+}
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    Dock(DockAction),
+}
 
 impl DockExample {
     fn new() -> (Self, Task<Message>) {
-        (Self::default(), Task::none())
+        (
+            Self {
+                theme: Theme::default(),
+                dock_state: DockState::new(),
+            },
+            Task::none(),
+        )
     }
 
-    fn update(&mut self, _message: Message) -> Task<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
+        if let Message::Dock(action) = message {
+            self.dock_state.apply_action(&action);
+        }
         Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
-        container(column![text("Dock Example").size(24)])
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into()
+        let items = vec![
+            dock_icon(text("⌂").size(16)),
+            dock_icon(text("✎").size(16)),
+            dock_icon(text("◎").size(16)),
+            dock_icon(text("✦").size(16)),
+        ];
+
+        let body = column![
+            text("Dock").size(56),
+            dock(
+                items,
+                &self.dock_state,
+                DockProps {
+                    direction: DockDirection::Middle,
+                    ..DockProps::new()
+                },
+                Message::Dock,
+                &self.theme,
+            ),
+        ]
+        .spacing(32);
+
+        _shared::shell("Dock", body)
     }
 }
