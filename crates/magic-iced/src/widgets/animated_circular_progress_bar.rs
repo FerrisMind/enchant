@@ -3,6 +3,7 @@ use crate::primitives::{
 };
 use iced::time::Instant;
 use iced::widget::{canvas, container, stack, text};
+use iced::widget::canvas::{LineCap, LineJoin};
 use iced::{Color, Element, Length, Point, Radians, Rectangle, Renderer};
 use iced_shadcn::Theme;
 use std::f32::consts::PI;
@@ -211,9 +212,7 @@ impl<Message> EffectProgram<Message> for CircularProgressProgram {
 
         frame.stroke(
             &canvas::Path::circle(center, radius),
-            canvas::Stroke::default()
-                .with_width(self.stroke_width)
-                .with_color(self.track_color),
+            progress_stroke(self.stroke_width, self.track_color),
         );
 
         if self.progress > 0.0 {
@@ -228,9 +227,7 @@ impl<Message> EffectProgram<Message> for CircularProgressProgram {
 
             frame.stroke(
                 &path,
-                canvas::Stroke::default()
-                    .with_width(self.stroke_width)
-                    .with_color(self.fill_color),
+                progress_stroke(self.stroke_width, self.fill_color),
             );
         }
 
@@ -241,6 +238,14 @@ impl<Message> EffectProgram<Message> for CircularProgressProgram {
 fn normalized_progress(min: f32, max: f32, value: f32) -> f32 {
     let span = (max - min).max(f32::EPSILON);
     ((value - min) / span).clamp(0.0, 1.0)
+}
+
+fn progress_stroke(width: f32, color: Color) -> canvas::Stroke<'static> {
+    canvas::Stroke::default()
+        .with_width(width)
+        .with_line_cap(LineCap::Round)
+        .with_line_join(LineJoin::Round)
+        .with_color(color)
 }
 
 #[cfg(test)]

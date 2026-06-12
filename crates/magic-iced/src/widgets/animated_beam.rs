@@ -1,10 +1,19 @@
 use crate::primitives::{
-    AnchorBounds, BeamPathSpec, EffectCanvasProps, EffectProgram, beam_path, effect_canvas,
-    point_at,
+    AnchorBounds, BeamPath, BeamPathSpec, EffectCanvasProps, EffectProgram, beam_path,
+    effect_canvas, point_at,
 };
-use iced::widget::canvas::{self, Stroke};
-use iced::{Color, Element, Length, Rectangle, Renderer};
+use iced::widget::canvas::{self, LineCap, Stroke};
+use iced::{Color, Element, Length, Point, Rectangle, Renderer};
 use std::time::Duration;
+
+/// Matches `animated-beam.tsx` transition ease: cubic-bezier(0.16, 1, 0.3, 1).
+const BEAM_EASE_X1: f32 = 0.16;
+const BEAM_EASE_Y1: f32 = 1.0;
+const BEAM_EASE_X2: f32 = 0.3;
+const BEAM_EASE_Y2: f32 = 1.0;
+/// Second gradient stop offset from the reference SVG.
+const BEAM_GRADIENT_STOP_MID: f32 = 0.325;
+const BEAM_PATH_SEGMENTS: usize = 128;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AnimatedBeamProps {
@@ -32,7 +41,7 @@ impl Default for AnimatedBeamProps {
             duration_secs: 5.0,
             delay_secs: 0.0,
             repeat_delay_secs: 0.0,
-            path_color: Color::from_rgba(0.6, 0.6, 0.6, 0.2),
+            path_color: Color::from_rgb8(0x80, 0x80, 0x80),
             path_width: 2.0,
             path_opacity: 0.2,
             gradient_start_color: Color::from_rgb8(0xFF, 0xAA, 0x40),
@@ -111,40 +120,67 @@ impl<Message> EffectProgram<Message> for AnimatedBeamProgram {
             &path_shape,
             Stroke::default()
                 .with_width(self.props.path_width)
+                .with_line_cap(LineCap::Round)
                 .with_color(Color {
                     a: self.props.path_opacity,
                     ..self.props.path_color
                 }),
         );
 
-        if let Some(progress) = beam_motion_phase(self.elapsed, &self.props) {
-            let (head, head_grows) = beam_head_progress(progress, self.props.reverse, from, to);
-
-            for index in (0..12).rev() {
-                let factor = index as f32 / 11.0;
-                let path_progress = if head_grows {
-                    (head - factor * 0.12).clamp(0.0, 1.0)
-                } else {
-                    (head + factor * 0.12).clamp(0.0, 1.0)
-                };
-                let sample = point_at(path, path_progress);
-                let color = mix_color(
-                    self.props.gradient_start_color,
-                    self.props.gradient_stop_color,
-                    1.0 - factor,
-                );
-
-                frame.fill(
-                    &canvas::Path::circle(sample, 2.0 + (1.0 - factor) * 3.0),
-                    Color {
-                        a: 0.12 + (1.0 - factor) * 0.75,
-                        ..color
-                    },
-                );
-            }
+        if let Some(eased) = beam_eased_progress(self.elapsed, &self.props) {
+            draw_gradient_beam_stroke(&mut frame, path, bounds.width, eased, &self.props);
         }
 
         vec![frame.into_geometry()]
+    }
+}
+
+fn draw_gradient_beam_stroke(
+    frame: &mut canvas::Frame,
+    path: BeamPath,
+    container_width: f32,
+    eased: f32,
+    props: &AnimatedBeamProps,
+) {
+    let (grad_x1, grad_x2) = gradient_endpoints(props.reverse, eased, container_width);
+    let last_segment = BEAM_PATH_SEGMENTS.saturating_sub(1);
+
+    for index in 0..BEAM_PATH_SEGMENTS {
+        let t0 = index as f32 / BEAM_PATH_SEGMENTS as f32;
+        let t1 = (index + 1) as f32 / BEAM_PATH_SEGMENTS as f32;
+        let p0 = point_at(path, t0);
+        let p1 = point_at(path, t1);
+        let mid = point_at(path, (t0 + t1) * 0.5);
+        let color = sample_beam_gradient(
+            mid.x,
+            grad_x1,
+            grad_x2,
+            props.gradient_start_color,
+            props.gradient_stop_color,
+        );
+
+        if color.a <= 0.01 {
+            continue;
+        }
+
+        let segment = canvas::Path::new(|builder| {
+            builder.move_to(p0);
+            builder.line_to(p1);
+        });
+
+        let line_cap = if index == 0 || index == last_segment {
+            LineCap::Round
+        } else {
+            LineCap::Butt
+        };
+
+        frame.stroke(
+            &segment,
+            Stroke::default()
+                .with_width(props.path_width)
+                .with_line_cap(line_cap)
+                .with_color(color),
+        );
     }
 }
 
@@ -169,26 +205,91 @@ fn beam_motion_phase(elapsed: Duration, props: &AnimatedBeamProps) -> Option<f32
     Some(progress)
 }
 
-fn scene_local_anchor(anchor: AnchorBounds) -> AnchorBounds {
-    anchor
+fn beam_eased_progress(elapsed: Duration, props: &AnimatedBeamProps) -> Option<f32> {
+    beam_motion_phase(elapsed, props)
+        .map(|linear| cubic_bezier_ease(linear, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2))
 }
 
-/// Maps timeline progress to path head position, matching `animated-beam.tsx` gradient sweep.
-///
-/// `reverse` flips the gradient direction. On left→right paths that inverts travel
-/// (bidirectional lower arc). On right→left paths `reverse` aligns sweep with from→to
-/// (main demo right-side beams into center).
-fn beam_head_progress(
-    progress: f32,
-    reverse: bool,
-    from: AnchorBounds,
-    to: AnchorBounds,
-) -> (f32, bool) {
-    let path_left_to_right = to.center.x > from.center.x;
-    let invert = reverse && path_left_to_right;
-    let head = if invert { 1.0 - progress } else { progress };
-    let head_grows_over_time = !invert;
-    (head, head_grows_over_time)
+/// `userSpaceOnUse` gradient endpoints from `animated-beam.tsx`.
+fn gradient_endpoints(reverse: bool, eased: f32, width: f32) -> (f32, f32) {
+    if reverse {
+        (width * (0.90 - eased), width * (1.0 - eased))
+    } else {
+        (width * (0.10 + eased), width * eased)
+    }
+}
+
+/// Samples the animated beam gradient at a container-space X coordinate.
+fn sample_beam_gradient(
+    x: f32,
+    grad_x1: f32,
+    grad_x2: f32,
+    start: Color,
+    stop: Color,
+) -> Color {
+    let span = grad_x2 - grad_x1;
+    if span.abs() < f32::EPSILON {
+        return Color::TRANSPARENT;
+    }
+
+    let t = (x - grad_x1) / span;
+
+    if t < 0.0 {
+        return Color::TRANSPARENT;
+    }
+
+    if t <= BEAM_GRADIENT_STOP_MID {
+        let local = (t / BEAM_GRADIENT_STOP_MID).clamp(0.0, 1.0);
+        return mix_color(start, stop, local);
+    }
+
+    if t < 1.0 {
+        let fade = 1.0 - ((t - BEAM_GRADIENT_STOP_MID) / (1.0 - BEAM_GRADIENT_STOP_MID));
+        return Color {
+            a: fade,
+            ..stop
+        };
+    }
+
+    Color::TRANSPARENT
+}
+
+fn cubic_bezier_ease(t: f32, x1: f32, y1: f32, x2: f32, y2: f32) -> f32 {
+    if t <= 0.0 {
+        return 0.0;
+    }
+    if t >= 1.0 {
+        return 1.0;
+    }
+
+    let sample = |t: f32, p1: f32, p2: f32| {
+        let c = 3.0 * p1;
+        let b = 3.0 * (p2 - p1) - c;
+        let a = 1.0 - c - b;
+        ((a * t + b) * t + c) * t
+    };
+    let derivative = |t: f32, p1: f32, p2: f32| {
+        let c = 3.0 * p1;
+        let b = 3.0 * (p2 - p1) - c;
+        let a = 1.0 - c - b;
+        (3.0 * a * t * t) + (2.0 * b * t) + c
+    };
+
+    let mut u = t;
+    for _ in 0..6 {
+        let x = sample(u, x1, x2);
+        let dx = derivative(u, x1, x2);
+        if dx.abs() < 1e-6 {
+            break;
+        }
+        u = (u - (x - t) / dx).clamp(0.0, 1.0);
+    }
+
+    sample(u, y1, y2)
+}
+
+fn scene_local_anchor(anchor: AnchorBounds) -> AnchorBounds {
+    anchor
 }
 
 fn mix_color(from: Color, to: Color, progress: f32) -> Color {
@@ -231,37 +332,57 @@ mod tests {
     }
 
     #[test]
-    fn reverse_inverts_only_on_left_to_right_paths() {
-        let left = AnchorBounds::from_bounds(Rectangle::new(
-            iced::Point::new(0.0, 0.0),
-            iced::Size::new(48.0, 48.0),
-        ));
-        let right = AnchorBounds::from_bounds(Rectangle::new(
-            iced::Point::new(200.0, 0.0),
-            iced::Size::new(48.0, 48.0),
-        ));
-        let center = AnchorBounds::from_bounds(Rectangle::new(
-            iced::Point::new(100.0, 0.0),
-            iced::Size::new(64.0, 64.0),
-        ));
+    fn beam_easing_matches_reference_curve() {
+        assert!((cubic_bezier_ease(0.0, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2))
+            .abs()
+            < f32::EPSILON);
+        assert!(
+            (cubic_bezier_ease(1.0, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2) - 1.0)
+                .abs()
+                < f32::EPSILON
+        );
+        let mid = cubic_bezier_ease(0.5, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2);
+        assert!(mid > 0.5, "ease-out curve should pass 0.5 early");
+    }
 
-        let (main_left, grows) = beam_head_progress(0.25, false, left, center);
-        assert!((main_left - 0.25).abs() < f32::EPSILON);
-        assert!(grows);
+    #[test]
+    fn gradient_endpoints_match_reference_sweep() {
+        let forward_start = gradient_endpoints(false, 0.0, 100.0);
+        let forward_end = gradient_endpoints(false, 1.0, 100.0);
+        assert!((forward_start.0 - 10.0).abs() < f32::EPSILON);
+        assert!(forward_start.1.abs() < f32::EPSILON);
+        assert!((forward_end.0 - 110.0).abs() < f32::EPSILON);
+        assert!((forward_end.1 - 100.0).abs() < f32::EPSILON);
 
-        let (main_right, grows) = beam_head_progress(0.25, true, right, center);
-        assert!((main_right - 0.25).abs() < f32::EPSILON);
-        assert!(grows);
+        let reverse_start = gradient_endpoints(true, 0.0, 100.0);
+        let reverse_end = gradient_endpoints(true, 1.0, 100.0);
+        assert!((reverse_start.0 - 90.0).abs() < 1e-3);
+        assert!((reverse_start.1 - 100.0).abs() < 1e-3);
+        assert!((reverse_end.0 + 10.0).abs() < 1e-3);
+        assert!(reverse_end.1.abs() < 1e-3);
+    }
 
-        let (bidirectional, grows) = beam_head_progress(0.25, true, left, right);
-        assert!((bidirectional - 0.75).abs() < f32::EPSILON);
-        assert!(!grows);
+    #[test]
+    fn gradient_samples_reference_stop_layout() {
+        let start = Color::from_rgb8(0xFF, 0xAA, 0x40);
+        let stop = Color::from_rgb8(0x9C, 0x40, 0xFF);
+
+        assert_eq!(
+            sample_beam_gradient(0.0, 0.0, 100.0, start, stop),
+            start
+        );
+        assert!(sample_beam_gradient(-1.0, 0.0, 100.0, start, stop).a < f32::EPSILON);
+        assert_eq!(
+            sample_beam_gradient(32.5, 0.0, 100.0, start, stop),
+            stop
+        );
+        assert!(sample_beam_gradient(100.0, 0.0, 100.0, start, stop).a < f32::EPSILON);
     }
 
     #[test]
     fn scene_local_anchor_preserves_scene_coordinates() {
         let anchor = AnchorBounds::from_bounds(Rectangle::new(
-            iced::Point::new(120.0, 80.0),
+            Point::new(120.0, 80.0),
             iced::Size::new(40.0, 20.0),
         ));
         let translated = scene_local_anchor(anchor);

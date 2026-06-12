@@ -26,6 +26,14 @@ const ROW3_Y: f32 = 236.0;
 
 const MULTI_SCENE_HEIGHT: f32 = 500.0;
 const MULTI_COL_GAP: f32 = 8.0;
+const MULTI_OUTPUT_BEAM_DURATION: f32 = 3.0;
+
+fn multi_output_beam_props() -> AnimatedBeamProps {
+    AnimatedBeamProps {
+        duration_secs: MULTI_OUTPUT_BEAM_DURATION,
+        ..AnimatedBeamProps::new()
+    }
+}
 
 pub fn anchor_at(x: f32, y: f32, size: f32) -> AnchorBounds {
     AnchorBounds::from_bounds(Rectangle::new(
@@ -56,7 +64,15 @@ fn measured_anchor(
 }
 
 pub fn beam_circle<'a, Message: 'a>(icon: svg::Handle, size: f32) -> Element<'a, Message> {
-    let inner = size - ICON_PAD * 2.0;
+    beam_avatar(icon, size, ICON_PAD)
+}
+
+pub fn beam_avatar<'a, Message: 'a>(
+    icon: svg::Handle,
+    size: f32,
+    padding: f32,
+) -> Element<'a, Message> {
+    let inner = (size - padding * 2.0).max(0.0);
     container(
         svg(icon)
             .width(Length::Fixed(inner))
@@ -64,7 +80,7 @@ pub fn beam_circle<'a, Message: 'a>(icon: svg::Handle, size: f32) -> Element<'a,
     )
     .width(Length::Fixed(size))
     .height(Length::Fixed(size))
-    .padding(ICON_PAD)
+    .padding(padding)
     .style(move |_| iced::widget::container::Style {
         background: Some(Background::Color(Color::WHITE)),
         border: Border {
@@ -388,7 +404,7 @@ fn multi_io_layout<Message: 'static>(
     .into()
 }
 
-/// Five left inputs → center OpenAI → right user.
+/// Five left inputs → center OpenAI → right user (all beams in sync, like the reference).
 pub fn multiple_inputs_scene<Message: 'static>(
     elapsed: Duration,
     measurements: Option<&AnchorMeasurements>,
@@ -431,14 +447,19 @@ pub fn multiple_inputs_scene<Message: 'static>(
                 )
             })
             .collect::<Vec<_>>();
-        beams.push(beam(elapsed, center, user, AnimatedBeamProps::new()));
+        beams.push(beam(
+            elapsed,
+            center,
+            user,
+            AnimatedBeamProps::new(),
+        ));
         beams
     };
 
     scene(layout, beams, MULTI_SCENE_HEIGHT).into()
 }
 
-/// User left, center OpenAI, five right outputs — beams: outputs → center → user.
+/// User left, center OpenAI, five right outputs — all beams in sync (`duration=3` in reference).
 pub fn multiple_outputs_scene<Message: 'static>(
     elapsed: Duration,
     measurements: Option<&AnchorMeasurements>,
@@ -484,6 +505,7 @@ pub fn multiple_outputs_scene<Message: 'static>(
         let center = measured_anchor(measurements, 0, 2)
             .unwrap_or_else(|| anchor_at(CENTER_X, MULTI_SCENE_HEIGHT / 2.0, NODE_LG));
         let right_ys = left_column_ys(5, MULTI_SCENE_HEIGHT);
+        let props = multi_output_beam_props();
         let mut beams = (0..5)
             .map(|index| {
                 beam(
@@ -492,22 +514,11 @@ pub fn multiple_outputs_scene<Message: 'static>(
                         anchor_at(RIGHT_X, right_ys[index], NODE)
                     }),
                     center,
-                    AnimatedBeamProps {
-                        duration_secs: 3.0,
-                        ..AnimatedBeamProps::new()
-                    },
+                    props,
                 )
             })
             .collect::<Vec<_>>();
-        beams.push(beam(
-            elapsed,
-            center,
-            user,
-            AnimatedBeamProps {
-                duration_secs: 3.0,
-                ..AnimatedBeamProps::new()
-            },
-        ));
+        beams.push(beam(elapsed, center, user, props));
         beams
     };
 

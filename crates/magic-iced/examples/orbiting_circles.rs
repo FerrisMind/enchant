@@ -1,17 +1,14 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{column, container, stack, text};
-use iced::{Alignment, Background, Border, Color, Element, Length, Size, Subscription, Task};
+use iced::widget::{column, container, stack};
+use iced::{Alignment, Element, Length, Size, Subscription, Task};
 use magic_iced::{OrbitingCirclesProps, orbiting_circles};
 use std::time::Duration;
 
-const ICON_COLORS: [Color; 4] = [
-    Color::from_rgb8(0x25, 0xD3, 0x66),
-    Color::from_rgb8(0x3B, 0x82, 0xF6),
-    Color::from_rgb8(0xA8, 0x55, 0xF7),
-    Color::from_rgb8(0xF9, 0x73, 0x16),
-];
+const OUTER_ICON_SIZE: f32 = 30.0;
+const INNER_ICON_SIZE: f32 = 40.0;
+const AVATAR_PAD_RATIO: f32 = 12.0 / 48.0;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -61,53 +58,54 @@ impl OrbitingCirclesExample {
         iced::time::every(Duration::from_millis(16)).map(Message::Tick)
     }
 
-    fn orbit_icon(&self, color: Color, size: f32) -> Element<'_, Message> {
-        container(text(" "))
-            .width(Length::Fixed(size))
-            .height(Length::Fixed(size))
-            .style(move |_| container::Style {
-                background: Some(Background::Color(color)),
-                border: Border {
-                    radius: (size / 2.0).into(),
-                    ..Border::default()
-                },
-                ..container::Style::default()
-            })
-            .into()
+    fn orbit_avatar(&self, icon: iced::widget::svg::Handle, size: f32) -> Element<'_, Message> {
+        _shared::beam_demo::beam_avatar(icon, size, size * AVATAR_PAD_RATIO)
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let outer: Vec<Element<'_, Message>> = ICON_COLORS
-            .iter()
-            .map(|&color| self.orbit_icon(color, 30.0))
-            .collect();
-        let inner: Vec<Element<'_, Message>> = ICON_COLORS
-            .iter()
-            .map(|&color| self.orbit_icon(color, 40.0))
-            .collect();
+        let outer: Vec<Element<'_, Message>> = [
+            _shared::beam_icons::whatsapp(),
+            _shared::beam_icons::notion(),
+            _shared::beam_icons::openai(),
+            _shared::beam_icons::google_drive(),
+        ]
+        .into_iter()
+        .map(|icon| self.orbit_avatar(icon, OUTER_ICON_SIZE))
+        .collect();
+
+        let inner: Vec<Element<'_, Message>> = [
+            _shared::beam_icons::whatsapp(),
+            _shared::beam_icons::notion(),
+            _shared::beam_icons::openai(),
+            _shared::beam_icons::google_drive(),
+            _shared::beam_icons::whatsapp(),
+        ]
+        .into_iter()
+        .map(|icon| self.orbit_avatar(icon, INNER_ICON_SIZE))
+        .collect();
 
         let stage = container(stack(vec![
-            orbiting_circles(
-                outer,
-                self.elapsed,
-                OrbitingCirclesProps {
-                    width: Length::Fill,
-                    height: Length::Fill,
-                    icon_size: 30.0,
-                    radius: 100.0,
-                    reverse: true,
-                    speed: 2.0,
-                    ..OrbitingCirclesProps::new()
-                },
-            ),
             orbiting_circles(
                 inner,
                 self.elapsed,
                 OrbitingCirclesProps {
                     width: Length::Fill,
                     height: Length::Fill,
-                    icon_size: 40.0,
+                    icon_size: INNER_ICON_SIZE,
                     radius: 160.0,
+                    ..OrbitingCirclesProps::new()
+                },
+            ),
+            orbiting_circles(
+                outer,
+                self.elapsed,
+                OrbitingCirclesProps {
+                    width: Length::Fill,
+                    height: Length::Fill,
+                    icon_size: OUTER_ICON_SIZE,
+                    radius: 100.0,
+                    reverse: true,
+                    speed: 2.0,
                     ..OrbitingCirclesProps::new()
                 },
             ),
