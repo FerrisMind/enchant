@@ -17,6 +17,10 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.venv/
+
+# Example launcher state (local only)
+logs/
 
 # Build artifacts
 *.o
