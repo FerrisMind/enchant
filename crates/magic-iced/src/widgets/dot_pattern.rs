@@ -98,7 +98,7 @@ impl<Message> EffectProgram<Message> for DotPatternProgram {
                     let phase = stable_noise(self.props.seed, index * 17);
                     let speed = 0.8 + stable_noise(self.props.seed + 1, index * 31) * 1.6;
                     let pulse = ((time * speed + phase * std::f32::consts::TAU).sin() + 1.0) * 0.5;
-                    (base_radius * (1.0 + pulse * 0.8), 0.25 + pulse * 0.75)
+                    (base_radius * (1.0 + pulse * 0.5), 0.4 + pulse * 0.6)
                 } else {
                     (base_radius, 1.0)
                 };

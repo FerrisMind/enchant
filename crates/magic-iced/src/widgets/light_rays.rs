@@ -91,7 +91,7 @@ impl<Message> EffectProgram<Message> for LightRaysProgram {
             let delay = rng.next_f32() * cycle;
             let duration = cycle * (0.75 + rng.next_f32() * 0.5);
             let rotate = -28.0 + rng.next_f32() * 56.0;
-            let intensity = 0.55 + rng.next_f32() * 0.45;
+            let intensity = 0.6 + rng.next_f32() * 0.5;
 
             let local = ((self.elapsed.as_secs_f32() + delay) / duration.max(0.1)).fract();
             let opacity = ((local * std::f32::consts::TAU).sin() * 0.5 + 0.5) * intensity;
