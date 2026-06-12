@@ -26,7 +26,7 @@ impl Default for ScrollProgressProps {
             segment_start: 0.0,
             segment_end: 1.0,
             width: Length::Fill,
-            height: 2.0,
+            height: 1.0,
             background: None,
             color_from: None,
             color_via: None,
@@ -126,7 +126,7 @@ mod tests {
         let props = ScrollProgressProps::new(1.7);
 
         assert!(props.progress > 1.0);
-        assert_eq!(props.height, 2.0);
+        assert_eq!(props.height, 1.0);
     }
 
     #[test]
