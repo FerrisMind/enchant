@@ -37,8 +37,8 @@ impl DockExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Dock(action) = message {
-            self.dock_state.apply_action(&action);
+        match message {
+            Message::Dock(action) => self.dock_state.apply_action(&action),
         }
         Task::none()
     }
@@ -47,12 +47,14 @@ impl DockExample {
         let items = vec![
             dock_icon(text("⌂").size(16)),
             dock_icon(text("✎").size(16)),
-            dock_icon(text("◎").size(16)),
-            dock_icon(text("✦").size(16)),
+            dock_icon(text("GH").size(11)),
+            dock_icon(text("in").size(11)),
+            dock_icon(text("X").size(12)),
+            dock_icon(text("✉").size(16)),
         ];
 
         let body = column![
-            text("Dock").size(56),
+            text("Dock").size(72),
             dock(
                 items,
                 &self.dock_state,

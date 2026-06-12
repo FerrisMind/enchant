@@ -1,8 +1,8 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{button, column, container, stack, text};
-use iced::{Background, Border, Element, Length, Size, Subscription, Task};
+use iced::widget::{column, container, stack};
+use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::Theme;
 use magic_iced::{ShineBorderProps, shine_border};
 use std::time::Duration;
@@ -26,11 +26,16 @@ struct ShineBorderExample {
     theme: Theme,
     start: Instant,
     elapsed: Duration,
+    email: String,
+    password: String,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Tick(Instant),
+    EmailChanged(String),
+    PasswordChanged(String),
+    SignIn,
 }
 
 impl ShineBorderExample {
@@ -41,6 +46,8 @@ impl ShineBorderExample {
                 theme: Theme::default(),
                 start,
                 elapsed: Duration::ZERO,
+                email: String::new(),
+                password: String::new(),
             },
             Task::none(),
         )
@@ -49,6 +56,9 @@ impl ShineBorderExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tick(now) => self.elapsed = now.duration_since(self.start),
+            Message::EmailChanged(value) => self.email = value,
+            Message::PasswordChanged(value) => self.password = value,
+            Message::SignIn => {}
         }
         Task::none()
     }
@@ -57,49 +67,25 @@ impl ShineBorderExample {
         iced::time::every(Duration::from_millis(16)).map(Message::Tick)
     }
 
-    fn login_card(&self) -> Element<'_, Message> {
-        container(
-            column![
-                text("Login").size(22),
-                text("Enter your credentials to access your account").size(14),
-                column![
-                    text("Email").size(13),
-                    text("name@example.com").size(14),
-                    text("Password").size(13),
-                    text("••••••••").size(14),
-                ]
-                .spacing(8),
-                button(text("Sign In")).width(Length::Fill),
-            ]
-            .spacing(16)
-            .padding(24),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style({
-            let card = self.theme.palette.card;
-            move |_| container::Style {
-                background: Some(Background::Color(card)),
-                border: Border {
-                    radius: 20.0.into(),
-                    ..Border::default()
-                },
-                ..container::Style::default()
-            }
-        })
-        .into()
-    }
-
     fn view(&self) -> Element<'_, Message> {
+        let login = _shared::shadcn_forms::login_card_sign_in(
+            &self.email,
+            &self.password,
+            Some(Message::EmailChanged),
+            Some(Message::PasswordChanged),
+            Some(Message::SignIn),
+            &self.theme,
+        );
+
         let card = container(stack(vec![
-            self.login_card(),
+            login,
             container(shine_border(self.elapsed, &ShineBorderProps::new()))
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .into(),
         ]))
         .width(Length::Fixed(350.0))
-        .height(Length::Fixed(320.0));
+        .height(Length::Fixed(360.0));
 
         _shared::shell("Shine Border", column![card].spacing(24))
     }

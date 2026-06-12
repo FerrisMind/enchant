@@ -1,23 +1,18 @@
 mod _shared;
 
 use iced::time::{Duration, Instant};
-use iced::widget::{button, column, container, image, text};
-use iced::{Background, Border, Element, Length, Size, Subscription, Task};
-use iced_shadcn::Theme;
+use iced::widget::{column, container, image};
+use iced::{Element, Length, Size, Subscription, Task};
+use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, Theme, button_content};
+use iced::widget::text;
 use magic_iced::{HeroVideoDialogProps, HeroVideoDialogState, hero_video_dialog};
 
-fn thumbnail_handle() -> image::Handle {
-    let mut pixels = vec![0_u8; 320 * 180 * 4];
-    for y in 0..180 {
-        for x in 0..320 {
-            let i = (y * 320 + x) * 4;
-            pixels[i] = 30 + (x / 4) as u8;
-            pixels[i + 1] = 40 + (y / 3) as u8;
-            pixels[i + 2] = 120 + ((x + y) / 6) as u8;
-            pixels[i + 3] = 255;
-        }
-    }
-    image::Handle::from_rgba(320, 180, pixels)
+fn hero_light_handle() -> image::Handle {
+    image::Handle::from_bytes(include_bytes!("assets/hero-light.png").as_slice())
+}
+
+fn hero_dark_handle() -> image::Handle {
+    image::Handle::from_bytes(include_bytes!("assets/hero-dark.png").as_slice())
 }
 
 pub fn main() -> iced::Result {
@@ -78,54 +73,43 @@ impl HeroVideoDialogExample {
         iced::time::every(Duration::from_millis(16)).map(Message::Tick)
     }
 
-    fn thumbnail(&self) -> Element<'_, Message> {
-        button(
-            container(image(thumbnail_handle()).width(Length::Fill).height(Length::Fill))
+    fn thumbnail(&self, handle: image::Handle) -> Element<'_, Message> {
+        button_content(
+            container(image(handle).width(Length::Fill).height(Length::Fill))
                 .width(Length::Fixed(480.0))
-                .height(Length::Fixed(270.0))
-                .style(|_| container::Style {
-                    border: Border {
-                        radius: 20.0.into(),
-                        ..Border::default()
-                    },
-                    ..container::Style::default()
-                }),
+                .height(Length::Fixed(270.0)),
+            Some(Message::Open),
+            ButtonProps::new()
+                .variant(ButtonVariant::Ghost)
+                .size(ButtonSize::Size2),
+            &self.theme,
         )
-        .on_press(Message::Open)
         .into()
     }
 
     fn video_content(&self) -> Element<'_, Message> {
-        container(
-            column![
-                text("Hero Video").size(24),
-                text("Embedded product walkthrough").size(14),
-                button(text("Close")).on_press(Message::Close),
-            ]
-            .spacing(12)
-            .padding(24),
-        )
-        .width(Length::Fill)
-        .height(Length::Fixed(320.0))
-        .style({
-            let card = self.theme.palette.card;
-            move |_| container::Style {
-                background: Some(Background::Color(card)),
-                border: Border {
-                    radius: 16.0.into(),
-                    ..Border::default()
-                },
-                ..container::Style::default()
-            }
-        })
+        column![
+            text("Hero Video").size(24),
+            text("Embedded product walkthrough").size(14),
+            button_content(
+                text("Close"),
+                Some(Message::Close),
+                ButtonProps::new()
+                    .variant(ButtonVariant::Outline)
+                    .size(ButtonSize::Size2),
+                &self.theme,
+            ),
+        ]
+        .spacing(12)
+        .padding(24)
         .into()
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = hero_video_dialog(
+        let light = hero_video_dialog(
             &self.state,
             self.now,
-            self.thumbnail(),
+            self.thumbnail(hero_light_handle()),
             self.video_content(),
             Message::Open,
             Message::Close,
@@ -133,6 +117,20 @@ impl HeroVideoDialogExample {
             &self.theme,
         );
 
-        _shared::shell("Hero Video Dialog", column![body].spacing(24))
+        let dark = hero_video_dialog(
+            &self.state,
+            self.now,
+            self.thumbnail(hero_dark_handle()),
+            self.video_content(),
+            Message::Open,
+            Message::Close,
+            self.props,
+            &self.theme,
+        );
+
+        _shared::shell(
+            "Hero Video Dialog",
+            column![light, dark].spacing(16),
+        )
     }
 }

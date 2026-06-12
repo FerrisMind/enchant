@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod shadcn_forms;
+
 use iced::widget::{button, column, container, row, text};
 use iced::{Alignment, Element, Length};
 

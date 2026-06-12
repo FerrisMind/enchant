@@ -40,18 +40,33 @@ fn reference_lines() -> Vec<TerminalLine> {
     let muted = Color::from_rgb8(0xA1, 0xA1, 0xAA);
 
     vec![
-        TerminalLine::typing(vec![TerminalSegment::new("pnpm dlx shadcn@latest init")]),
+        TerminalLine::typing(vec![TerminalSegment::new("> pnpm dlx shadcn@latest init")]),
         TerminalLine::instant(vec![
-            TerminalSegment::new("✔ Preflight checks").color(green),
+            TerminalSegment::new("✔ Preflight checks.").color(green),
         ]),
         TerminalLine::instant(vec![
-            TerminalSegment::new("✔ Verifying framework (Next.js)").color(green),
+            TerminalSegment::new("✔ Verifying framework. Found Next.js.").color(green),
         ]),
         TerminalLine::instant(vec![
-            TerminalSegment::new("✔ Validating Tailwind CSS").color(green),
+            TerminalSegment::new("✔ Validating Tailwind CSS.").color(green),
         ]),
         TerminalLine::instant(vec![
-            TerminalSegment::new("✔ Installing dependencies").color(green),
+            TerminalSegment::new("✔ Validating import alias.").color(green),
+        ]),
+        TerminalLine::instant(vec![
+            TerminalSegment::new("✔ Writing components.json.").color(green),
+        ]),
+        TerminalLine::instant(vec![
+            TerminalSegment::new("✔ Checking registry.").color(green),
+        ]),
+        TerminalLine::instant(vec![
+            TerminalSegment::new("✔ Updating tailwind.config.ts").color(green),
+        ]),
+        TerminalLine::instant(vec![
+            TerminalSegment::new("✔ Updating app/globals.css").color(green),
+        ]),
+        TerminalLine::instant(vec![
+            TerminalSegment::new("✔ Installing dependencies.").color(green),
         ]),
         TerminalLine::instant(vec![
             TerminalSegment::new("ℹ Updated 1 file:").color(blue),

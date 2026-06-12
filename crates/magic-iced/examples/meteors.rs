@@ -2,8 +2,8 @@ mod _shared;
 
 use iced::time::Instant;
 use iced::widget::{column, container, stack, text};
-use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
-use iced_shadcn::Theme;
+use iced::{Alignment, Element, Length, Size, Subscription, Task};
+use iced_shadcn::{CardProps, CardSize, Theme, card};
 use magic_iced::{MeteorsProps, meteors};
 use std::time::Duration;
 
@@ -58,7 +58,7 @@ impl MeteorsExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let stage = container(stack(vec![
+        let stage_body = stack(vec![
             container(meteors(
                 self.elapsed,
                 MeteorsProps {
@@ -78,17 +78,21 @@ impl MeteorsExample {
                 .center_x(Length::Fill)
                 .center_y(Length::Fill)
                 .into(),
-        ]))
+        ]);
+
+        let stage = card(
+            container(stage_body)
+                .width(Length::Fill)
+                .height(Length::Fill),
+            CardProps::new()
+                .size(CardSize::Size3)
+                .show_shadow(false)
+                .padding(0.0)
+                .radius(12.0),
+            &self.theme,
+        )
         .width(Length::Fixed(720.0))
-        .height(Length::Fixed(500.0))
-        .style(|_| container::Style {
-            border: Border {
-                width: 1.0,
-                radius: 12.0.into(),
-                ..Border::default()
-            },
-            ..container::Style::default()
-        });
+        .height(Length::Fixed(500.0));
 
         _shared::shell("Meteors", column![stage].spacing(24).align_x(Alignment::Center))
     }

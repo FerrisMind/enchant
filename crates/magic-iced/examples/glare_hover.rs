@@ -1,8 +1,8 @@
 mod _shared;
 
 use iced::time::{Duration, Instant};
-use iced::widget::{button, column, container, text};
-use iced::{Background, Border, Element, Length, Size, Subscription, Task};
+use iced::widget::{column, text};
+use iced::{Element, Size, Subscription, Task};
 use iced_shadcn::Theme;
 use magic_iced::{GlareHoverAction, GlareHoverProps, GlareHoverState, glare_hover};
 
@@ -31,6 +31,7 @@ struct GlareHoverExample {
 enum Message {
     Glare(GlareHoverAction),
     Tick(Instant),
+    GetStarted,
 }
 
 impl GlareHoverExample {
@@ -49,6 +50,7 @@ impl GlareHoverExample {
         match message {
             Message::Glare(action) => self.state.apply_action(&action, self.now),
             Message::Tick(now) => self.now = now,
+            Message::GetStarted => {}
         }
         Task::none()
     }
@@ -57,45 +59,11 @@ impl GlareHoverExample {
         iced::time::every(Duration::from_millis(16)).map(Message::Tick)
     }
 
-    fn pricing_card(&self) -> Element<'_, Message> {
-        container(
-            column![
-                column![
-                    text("Pro").size(22),
-                    text("Popular").size(12),
-                ]
-                .spacing(4),
-                text("For teams that need more.").size(14),
-                column![
-                    text("$49 /mo").size(32),
-                    text("Unlimited projects").size(14),
-                    text("Team collaboration").size(14),
-                    text("Advanced analytics").size(14),
-                ]
-                .spacing(6),
-                button(text("Get started")).width(Length::Fill),
-            ]
-            .spacing(14)
-            .padding(24),
-        )
-        .width(Length::Fixed(340.0))
-        .style({
-            let card = self.theme.palette.card;
-            move |_| container::Style {
-                background: Some(Background::Color(card)),
-                border: Border {
-                    radius: 16.0.into(),
-                    ..Border::default()
-                },
-                ..container::Style::default()
-            }
-        })
-        .into()
-    }
-
     fn view(&self) -> Element<'_, Message> {
+        let pricing = _shared::shadcn_forms::pricing_card_pro(Some(Message::GetStarted), &self.theme);
+
         let card = glare_hover(
-            self.pricing_card(),
+            pricing,
             &self.state,
             self.now,
             GlareHoverProps {
@@ -106,6 +74,9 @@ impl GlareHoverExample {
             &self.theme,
         );
 
-        _shared::shell("Glare Hover", column![card].spacing(24))
+        _shared::shell(
+            "Glare Hover",
+            column![text("Pro pricing with glare hover").size(14), card].spacing(24),
+        )
     }
 }

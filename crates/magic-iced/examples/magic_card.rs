@@ -1,6 +1,6 @@
 mod _shared;
 
-use iced::widget::{button, column, text};
+use iced::widget::column;
 use iced::{Element, Length, Size, Task};
 use iced_shadcn::Theme;
 use magic_iced::{MagicCardProps, magic_card};
@@ -21,44 +21,50 @@ pub fn main() -> iced::Result {
 
 struct MagicCardExample {
     theme: Theme,
+    email: String,
+    password: String,
 }
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    EmailChanged(String),
+    PasswordChanged(String),
+    SignIn,
+}
 
 impl MagicCardExample {
     fn new() -> (Self, Task<Message>) {
-        (Self { theme: Theme::default() }, Task::none())
+        (
+            Self {
+                theme: Theme::default(),
+                email: String::new(),
+                password: String::new(),
+            },
+            Task::none(),
+        )
     }
 
-    fn update(&mut self, _message: Message) -> Task<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::EmailChanged(value) => self.email = value,
+            Message::PasswordChanged(value) => self.password = value,
+            Message::SignIn => {}
+        }
         Task::none()
     }
 
-    fn login_card(&self) -> Element<'_, Message> {
-        column![
-            column![
-                text("Login").size(22),
-                text("Enter your credentials to access your account").size(14),
-            ]
-            .spacing(6),
-            column![
-                text("Email").size(13),
-                text("name@example.com").size(14),
-                text("Password").size(13),
-                text("••••••••").size(14),
-            ]
-            .spacing(8),
-            button(text("Sign In")).width(Length::Fill),
-        ]
-        .spacing(16)
-        .padding(20)
-        .into()
-    }
-
     fn view(&self) -> Element<'_, Message> {
+        let inner = _shared::shadcn_forms::login_form_sign_in(
+            &self.email,
+            &self.password,
+            Some(Message::EmailChanged),
+            Some(Message::PasswordChanged),
+            Some(Message::SignIn),
+            &self.theme,
+        );
+
         let card = magic_card(
-            self.login_card(),
+            inner,
             MagicCardProps::new()
                 .width(Length::Fixed(384.0))
                 .height(Length::Fixed(360.0))

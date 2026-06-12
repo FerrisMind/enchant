@@ -1,8 +1,8 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{button, column, container, row, stack, text};
-use iced::{Background, Border, Element, Length, Size, Subscription, Task};
+use iced::widget::{column, container, stack};
+use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::Theme;
 use magic_iced::{BorderBeamProps, border_beam};
 use std::time::Duration;
@@ -26,11 +26,17 @@ struct BorderBeamExample {
     theme: Theme,
     start: Instant,
     elapsed: Duration,
+    email: String,
+    password: String,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Tick(Instant),
+    EmailChanged(String),
+    PasswordChanged(String),
+    Register,
+    Login,
 }
 
 impl BorderBeamExample {
@@ -41,14 +47,19 @@ impl BorderBeamExample {
                 theme: Theme::default(),
                 start,
                 elapsed: Duration::ZERO,
+                email: String::new(),
+                password: String::new(),
             },
             Task::none(),
         )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
-            self.elapsed = now.duration_since(self.start);
+        match message {
+            Message::Tick(now) => self.elapsed = now.duration_since(self.start),
+            Message::EmailChanged(value) => self.email = value,
+            Message::PasswordChanged(value) => self.password = value,
+            Message::Register | Message::Login => {}
         }
         Task::none()
     }
@@ -57,49 +68,19 @@ impl BorderBeamExample {
         iced::time::every(Duration::from_millis(16)).map(Message::Tick)
     }
 
-    fn login_card(&self) -> Element<'_, Message> {
-        container(
-            column![
-                column![
-                    text("Login").size(22),
-                    text("Enter your credentials to access your account.").size(14),
-                ]
-                .spacing(6),
-                column![
-                    text("Email").size(13),
-                    text("Enter your email").size(14),
-                    text("Password").size(13),
-                    text("Enter your password").size(14),
-                ]
-                .spacing(8),
-                row![
-                    button(text("Register")),
-                    button(text("Login")),
-                ]
-                .spacing(12),
-            ]
-            .spacing(16)
-            .padding(24),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style({
-            let card = self.theme.palette.card;
-            move |_| container::Style {
-                background: Some(Background::Color(card)),
-                border: Border {
-                    radius: 12.0.into(),
-                    ..Border::default()
-                },
-                ..container::Style::default()
-            }
-        })
-        .into()
-    }
-
     fn view(&self) -> Element<'_, Message> {
+        let login = _shared::shadcn_forms::login_card_dual_footer(
+            &self.email,
+            &self.password,
+            Some(Message::EmailChanged),
+            Some(Message::PasswordChanged),
+            Some(Message::Register),
+            Some(Message::Login),
+            &self.theme,
+        );
+
         let card = container(stack(vec![
-            self.login_card(),
+            login,
             container(border_beam(
                 self.elapsed,
                 BorderBeamProps {
@@ -114,7 +95,7 @@ impl BorderBeamExample {
             .into(),
         ]))
         .width(Length::Fixed(350.0))
-        .height(Length::Fixed(340.0));
+        .height(Length::Fixed(380.0));
 
         _shared::shell("Border Beam", column![card].spacing(24))
     }

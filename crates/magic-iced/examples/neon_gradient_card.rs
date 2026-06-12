@@ -65,7 +65,7 @@ impl NeonGradientCardExample {
             "Neon Gradient Card",
             self.elapsed,
             AnimatedGradientTextProps::new()
-                .font_size(36)
+                .font_size(48)
                 .color_from(Color::from_rgb8(0xFF, 0x29, 0x75))
                 .color_to(Color::from_rgb8(0x00, 0xFF, 0xF1)),
         );
@@ -74,8 +74,8 @@ impl NeonGradientCardExample {
             title,
             self.elapsed,
             NeonGradientCardProps {
-                width: Length::Fixed(380.0),
-                height: Length::Fixed(180.0),
+                width: Length::Fixed(384.0),
+                height: Length::Fixed(220.0),
                 neon_colors: Some(NeonColors {
                     first_color: Color::from_rgb8(0xFF, 0x29, 0x75),
                     second_color: Color::from_rgb8(0x00, 0xFF, 0xF1),

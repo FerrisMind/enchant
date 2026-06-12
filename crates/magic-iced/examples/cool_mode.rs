@@ -1,8 +1,9 @@
 mod _shared;
 
 use iced::time::{Duration, Instant};
-use iced::widget::{button, column, text};
+use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
+use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, Theme, button_content};
 use magic_iced::{CoolModeAction, CoolModeProps, CoolModeState, cool_mode};
 
 pub fn main() -> iced::Result {
@@ -17,6 +18,7 @@ pub fn main() -> iced::Result {
 }
 
 struct CoolModeExample {
+    theme: Theme,
     state: CoolModeState,
     props: CoolModeProps,
     now: Instant,
@@ -32,6 +34,7 @@ impl CoolModeExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
+                theme: Theme::default(),
                 state: CoolModeState::new(),
                 props: CoolModeProps::new(),
                 now: Instant::now(),
@@ -58,12 +61,16 @@ impl CoolModeExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = cool_mode(
-            button(text("Click Me!")),
-            &self.state,
-            &self.props,
-            Message::CoolMode,
+        let trigger = button_content(
+            text("Click Me!"),
+            None::<Message>,
+            ButtonProps::new()
+                .variant(ButtonVariant::Default)
+                .size(ButtonSize::Size2),
+            &self.theme,
         );
+
+        let body = cool_mode(trigger, &self.state, &self.props, Message::CoolMode);
         _shared::shell("Cool Mode", column![body].spacing(24))
     }
 }
