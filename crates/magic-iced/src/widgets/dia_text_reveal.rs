@@ -678,7 +678,6 @@ mod tests {
     #[test]
     fn completed_sweep_uses_flat_text_color() {
         let text_color = Color::from_rgb8(0x11, 0x11, 0x11);
-        assert!(SWEEP_END - BAND_HALF >= 100.0);
         for pct in [0.0, 25.0, 50.0, 99.0, 100.0] {
             let color =
                 reference_sweep_color_at_pct(pct, SWEEP_END, DEFAULT_DIA_COLORS, text_color);

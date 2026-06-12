@@ -64,7 +64,7 @@ impl WasmDemoApp {
             &doc.title,
             &doc.description,
             iced::widget::column![
-                self.docs_breadcrumb(&format!("Docs / Components / {}", doc.title)),
+                self.docs_breadcrumb(format!("Docs / Components / {}", doc.title)),
                 tabs,
                 panel,
                 self.render_doc_body(doc),

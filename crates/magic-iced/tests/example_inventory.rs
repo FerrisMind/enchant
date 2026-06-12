@@ -48,8 +48,8 @@ fn example_inventory_matches_official_registry() {
 
     let internal_examples = example_binaries
         .difference(&public_components)
-        .cloned()
         .filter(|name| !official.contains_key(name.as_str()))
+        .cloned()
         .collect::<Vec<_>>();
 
     let mut problems = Vec::new();

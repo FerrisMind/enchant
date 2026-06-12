@@ -91,12 +91,11 @@ pub fn parse_docs_config(input: &str) -> (Vec<NavItem>, Vec<SidebarSection>) {
                 continue;
             }
             if !in_items && indent == 6 {
-                if let Some((key, value)) = parse_key_value(trimmed) {
-                    if key == "title" {
-                        if let Some(section) = current_section.as_mut() {
-                            section.title = value;
-                        }
-                    }
+                if let Some((key, value)) = parse_key_value(trimmed)
+                    && key == "title"
+                    && let Some(section) = current_section.as_mut()
+                {
+                    section.title = value;
                 }
                 continue;
             }
@@ -113,13 +112,12 @@ pub fn parse_docs_config(input: &str) -> (Vec<NavItem>, Vec<SidebarSection>) {
             if in_items && indent == 8 && (trimmed == "}," || trimmed == "}") {
                 if let (Some(title), Some(href)) =
                     (current_item.get("title"), current_item.get("href"))
+                    && let Some(section) = current_section.as_mut()
                 {
-                    if let Some(section) = current_section.as_mut() {
-                        section.items.push(SidebarItem {
-                            title: title.clone(),
-                            href: href.clone(),
-                        });
-                    }
+                    section.items.push(SidebarItem {
+                        title: title.clone(),
+                        href: href.clone(),
+                    });
                 }
                 current_item.clear();
                 continue;
@@ -128,10 +126,12 @@ pub fn parse_docs_config(input: &str) -> (Vec<NavItem>, Vec<SidebarSection>) {
                 in_items = false;
                 continue;
             }
-            if !in_items && indent == 4 && (trimmed == "}," || trimmed == "}") {
-                if let Some(section) = current_section.take() {
-                    sidebar_sections.push(section);
-                }
+            if !in_items
+                && indent == 4
+                && (trimmed == "}," || trimmed == "}")
+                && let Some(section) = current_section.take()
+            {
+                sidebar_sections.push(section);
             }
         }
     }
@@ -306,16 +306,15 @@ pub fn load_registry_sources(root: &Path) -> BTreeMap<String, String> {
             sources.insert(stem.clone(), content.to_owned());
         }
 
-        if let Some(name) = value.get("name").and_then(|name| name.as_str()) {
-            if let Some(content) = value
+        if let Some(name) = value.get("name").and_then(|name| name.as_str())
+            && let Some(content) = value
                 .get("files")
                 .and_then(|files| files.as_array())
                 .and_then(|files| files.first())
                 .and_then(|file| file.get("content"))
                 .and_then(|content| content.as_str())
-            {
-                sources.insert(name.to_owned(), content.to_owned());
-            }
+        {
+            sources.insert(name.to_owned(), content.to_owned());
         }
     }
 

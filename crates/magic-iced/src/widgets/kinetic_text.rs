@@ -209,11 +209,11 @@ impl<Message> EffectProgram<Message> for KineticTextProgram {
                     return Some(canvas::Action::request_redraw());
                 }
             }
-            canvas::Event::Mouse(mouse::Event::CursorLeft) => {
-                if state.hovered_index.is_some() {
-                    state.set_hovered(None, self.font_size, self.now);
-                    return Some(canvas::Action::request_redraw());
-                }
+            canvas::Event::Mouse(mouse::Event::CursorLeft)
+                if state.hovered_index.is_some() =>
+            {
+                state.set_hovered(None, self.font_size, self.now);
+                return Some(canvas::Action::request_redraw());
             }
             _ => {}
         }
