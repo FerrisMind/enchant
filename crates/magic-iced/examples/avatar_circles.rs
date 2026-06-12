@@ -1,5 +1,9 @@
-use iced::widget::{column, container, text};
-use iced::{Element, Length, Size, Task};
+mod _shared;
+
+use iced::widget::column;
+use iced::{Color, Element, Size, Task};
+use iced_shadcn::{AvatarVariant, Theme};
+use magic_iced::{AvatarCircleEntry, AvatarCirclesProps, avatar_circles};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -7,23 +11,43 @@ pub fn main() -> iced::Result {
         AvatarCirclesExample::update,
         AvatarCirclesExample::view,
     )
-    .title("AvatarCircles Example")
+    .title("Avatar Circles")
     .window(iced::window::Settings {
-        size: Size::new(800.0, 600.0),
+        size: Size::new(900.0, 320.0),
         ..Default::default()
     })
     .run()
 }
 
-#[derive(Default)]
-struct AvatarCirclesExample {}
+struct AvatarCirclesExample {
+    theme: Theme,
+    props: AvatarCirclesProps<'static>,
+}
 
 #[derive(Debug, Clone)]
 enum Message {}
 
 impl AvatarCirclesExample {
     fn new() -> (Self, Task<Message>) {
-        (Self::default(), Task::none())
+        let props = AvatarCirclesProps::new([
+            AvatarCircleEntry::new("DV").color(Color::from_rgb8(0x3B, 0x82, 0xF6)),
+            AvatarCircleEntry::new("TF").color(Color::from_rgb8(0x10, 0xB9, 0x81)),
+            AvatarCircleEntry::new("BK").color(Color::from_rgb8(0xF5, 0x9E, 0x0B)),
+            AvatarCircleEntry::new("SC").color(Color::from_rgb8(0xEF, 0x44, 0x44)),
+            AvatarCircleEntry::new("SM").color(Color::from_rgb8(0x8B, 0x5C, 0xF6)),
+            AvatarCircleEntry::new("AD")
+                .color(Color::from_rgb8(0x06, 0xB6, 0xD4))
+                .variant(AvatarVariant::Solid),
+        ])
+        .extra_count(99);
+
+        (
+            Self {
+                theme: Theme::default(),
+                props,
+            },
+            Task::none(),
+        )
     }
 
     fn update(&mut self, _message: Message) -> Task<Message> {
@@ -31,11 +55,7 @@ impl AvatarCirclesExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        container(column![text("AvatarCircles Example").size(24)])
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into()
+        let body = avatar_circles(&self.props, &self.theme);
+        _shared::shell("Avatar Circles", column![body].spacing(24))
     }
 }

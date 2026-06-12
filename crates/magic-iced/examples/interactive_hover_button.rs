@@ -20,7 +20,6 @@ pub fn main() -> iced::Result {
 }
 
 struct InteractiveHoverButtonExample {
-    clicked: bool,
     theme: Theme,
 }
 
@@ -33,7 +32,6 @@ impl InteractiveHoverButtonExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                clicked: false,
                 theme: Theme::default(),
             },
             Task::none(),
@@ -41,9 +39,7 @@ impl InteractiveHoverButtonExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        match message {
-            Message::Clicked => self.clicked = true,
-        }
+        let _ = message;
         Task::none()
     }
 
@@ -52,16 +48,11 @@ impl InteractiveHoverButtonExample {
             "Interactive Hover Button",
             column![
                 interactive_hover_button(
-                    text("Deploy"),
+                    text("Hover Me"),
                     Some(Message::Clicked),
                     InteractiveHoverButtonProps::new(),
                     &self.theme,
                 ),
-                text(if self.clicked {
-                    "Click captured."
-                } else {
-                    "Hover and press the button."
-                }),
             ]
             .spacing(20),
         )

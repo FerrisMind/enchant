@@ -4,7 +4,7 @@ use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
 use iced_shadcn::Theme;
-use magic_iced::{PulsatingButtonProps, PulsatingButtonVariant, pulsating_button};
+use magic_iced::{PulsatingButtonProps, pulsating_button};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {
@@ -15,7 +15,7 @@ pub fn main() -> iced::Result {
     )
     .title("Pulsating Button")
     .window(iced::window::Settings {
-        size: Size::new(1000.0, 760.0),
+        size: Size::new(900.0, 420.0),
         ..Default::default()
     })
     .subscription(PulsatingButtonExample::subscription)
@@ -23,27 +23,23 @@ pub fn main() -> iced::Result {
 }
 
 struct PulsatingButtonExample {
-    active: usize,
     theme: Theme,
-    started_at: Instant,
+    start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
-    Select(usize),
     Tick(Instant),
-    Pressed,
 }
 
 impl PulsatingButtonExample {
     fn new() -> (Self, Task<Message>) {
-        let started_at = Instant::now();
+        let start = Instant::now();
         (
             Self {
-                active: 0,
                 theme: Theme::default(),
-                started_at,
+                start,
                 elapsed: Duration::ZERO,
             },
             Task::none(),
@@ -52,9 +48,7 @@ impl PulsatingButtonExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Select(index) => self.active = index.min(1),
-            Message::Tick(now) => self.elapsed = now.duration_since(self.started_at),
-            Message::Pressed => {}
+            Message::Tick(now) => self.elapsed = now.duration_since(self.start),
         }
         Task::none()
     }
@@ -64,32 +58,14 @@ impl PulsatingButtonExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let labels = ["Pulse", "Ripple"];
-        let props = PulsatingButtonProps {
-            variant: if self.active == 0 {
-                PulsatingButtonVariant::Pulse
-            } else {
-                PulsatingButtonVariant::Ripple
-            },
-            duration_secs: if self.active == 0 { 1.5 } else { 2.2 },
-            distance_px: if self.active == 0 { 8.0 } else { 18.0 },
-            radius: 18.0,
-            ..PulsatingButtonProps::new()
-        };
+        let body = pulsating_button(
+            text("Join Affiliate Program").size(16),
+            None,
+            self.elapsed,
+            PulsatingButtonProps::new(),
+            &self.theme,
+        );
 
-        _shared::shell(
-            "Pulsating Button",
-            column![
-                _shared::tabs(&labels, self.active, Message::Select),
-                pulsating_button(
-                    column![text("Launch").size(16), text("Animated action").size(12)],
-                    Some(Message::Pressed),
-                    self.elapsed,
-                    props,
-                    &self.theme,
-                ),
-            ]
-            .spacing(20),
-        )
+        _shared::shell("Pulsating Button", column![body].spacing(24))
     }
 }

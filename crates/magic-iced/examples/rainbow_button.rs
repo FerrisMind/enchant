@@ -4,7 +4,7 @@ use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
 use iced_shadcn::Theme;
-use magic_iced::{RainbowButtonProps, RainbowButtonVariant, rainbow_button};
+use magic_iced::{RainbowButtonProps, rainbow_button};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {
@@ -15,7 +15,7 @@ pub fn main() -> iced::Result {
     )
     .title("Rainbow Button")
     .window(iced::window::Settings {
-        size: Size::new(1000.0, 760.0),
+        size: Size::new(900.0, 420.0),
         ..Default::default()
     })
     .subscription(RainbowButtonExample::subscription)
@@ -23,27 +23,23 @@ pub fn main() -> iced::Result {
 }
 
 struct RainbowButtonExample {
-    active: usize,
     theme: Theme,
-    started_at: Instant,
+    start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
-    Select(usize),
     Tick(Instant),
-    Pressed,
 }
 
 impl RainbowButtonExample {
     fn new() -> (Self, Task<Message>) {
-        let started_at = Instant::now();
+        let start = Instant::now();
         (
             Self {
-                active: 0,
                 theme: Theme::default(),
-                started_at,
+                start,
                 elapsed: Duration::ZERO,
             },
             Task::none(),
@@ -52,9 +48,7 @@ impl RainbowButtonExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Select(index) => self.active = index.min(1),
-            Message::Tick(now) => self.elapsed = now.duration_since(self.started_at),
-            Message::Pressed => {}
+            Message::Tick(now) => self.elapsed = now.duration_since(self.start),
         }
         Task::none()
     }
@@ -64,31 +58,14 @@ impl RainbowButtonExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let labels = ["Default", "Outline"];
-        let props = RainbowButtonProps {
-            variant: if self.active == 0 {
-                RainbowButtonVariant::Default
-            } else {
-                RainbowButtonVariant::Outline
-            },
-            duration_secs: 2.0,
-            radius: 10.0,
-            ..RainbowButtonProps::new()
-        };
+        let body = rainbow_button(
+            text("Get Unlimited Access").size(16),
+            None,
+            self.elapsed,
+            RainbowButtonProps::new(),
+            &self.theme,
+        );
 
-        _shared::shell(
-            "Rainbow Button",
-            column![
-                _shared::tabs(&labels, self.active, Message::Select),
-                rainbow_button(
-                    text("Rainbow"),
-                    Some(Message::Pressed),
-                    self.elapsed,
-                    props,
-                    &self.theme
-                ),
-            ]
-            .spacing(20),
-        )
+        _shared::shell("Rainbow Button", column![body].spacing(24))
     }
 }

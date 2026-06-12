@@ -2,7 +2,7 @@ mod _shared;
 
 use iced::time::Instant;
 use iced::widget::{column, text};
-use iced::{Element, Size, Subscription, Task};
+use iced::{Color, Element, Size, Subscription, Task};
 use iced_shadcn::Theme;
 use magic_iced::{RippleButtonAction, RippleButtonProps, RippleButtonState, ripple_button};
 use std::time::Duration;
@@ -15,7 +15,7 @@ pub fn main() -> iced::Result {
     )
     .title("Ripple Button")
     .window(iced::window::Settings {
-        size: Size::new(1000.0, 760.0),
+        size: Size::new(900.0, 420.0),
         ..Default::default()
     })
     .subscription(RippleButtonExample::subscription)
@@ -25,6 +25,7 @@ pub fn main() -> iced::Result {
 struct RippleButtonExample {
     theme: Theme,
     state: RippleButtonState,
+    props: RippleButtonProps,
     now: Instant,
 }
 
@@ -37,10 +38,15 @@ enum Message {
 impl RippleButtonExample {
     fn new() -> (Self, Task<Message>) {
         let now = Instant::now();
+        let props = RippleButtonProps {
+            ripple_color: Some(Color::from_rgb8(0xAD, 0xD8, 0xE6)),
+            ..RippleButtonProps::new()
+        };
         (
             Self {
                 theme: Theme::default(),
                 state: RippleButtonState::new(),
+                props,
                 now,
             },
             Task::none(),
@@ -51,11 +57,10 @@ impl RippleButtonExample {
         match message {
             Message::Tick(now) => {
                 self.now = now;
-                self.state.tick(now, &RippleButtonProps::new());
+                self.state.tick(now, &self.props);
             }
             Message::Action(action) => {
-                self.state
-                    .apply_action(&action, self.now, &RippleButtonProps::new());
+                self.state.apply_action(&action, self.now, &self.props);
             }
         }
         Task::none()
@@ -66,20 +71,15 @@ impl RippleButtonExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        _shared::shell(
-            "Ripple Button",
-            column![
-                ripple_button(
-                    text("Tap me"),
-                    &self.state,
-                    self.now,
-                    RippleButtonProps::new(),
-                    Message::Action,
-                    &self.theme,
-                ),
-                text("Press, move, and leave the button to see ripple bursts."),
-            ]
-            .spacing(20),
-        )
+        let body = ripple_button(
+            text("Click me"),
+            &self.state,
+            self.now,
+            self.props,
+            Message::Action,
+            &self.theme,
+        );
+
+        _shared::shell("Ripple Button", column![body].spacing(24))
     }
 }
