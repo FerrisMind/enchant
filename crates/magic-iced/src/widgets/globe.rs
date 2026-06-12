@@ -134,11 +134,16 @@ impl Default for GlobeProps {
             glow_color: None,
             graticule_color: None,
             markers: vec![
-                GlobeMarker::new(14.5995, 120.9842, 3.0),
+                GlobeMarker::new(14.5995, 120.9842, 1.5),
                 GlobeMarker::new(19.0760, 72.8777, 5.0),
-                GlobeMarker::new(30.0444, 31.2357, 3.8),
-                GlobeMarker::new(39.9042, 116.4074, 4.2),
+                GlobeMarker::new(23.8103, 90.4125, 2.5),
+                GlobeMarker::new(30.0444, 31.2357, 3.5),
+                GlobeMarker::new(39.9042, 116.4074, 4.0),
+                GlobeMarker::new(-23.5505, -46.6333, 5.0),
+                GlobeMarker::new(19.4326, -99.1332, 5.0),
                 GlobeMarker::new(40.7128, -74.0060, 5.0),
+                GlobeMarker::new(34.6937, 135.5022, 2.5),
+                GlobeMarker::new(41.0082, 28.9784, 3.0),
             ],
         }
     }
@@ -309,7 +314,7 @@ mod tests {
 
         assert_eq!(props.radius, 118.0);
         assert_eq!(props.map_samples, 640);
-        assert!(!props.markers.is_empty());
+        assert_eq!(props.markers.len(), 10);
     }
 
     #[test]

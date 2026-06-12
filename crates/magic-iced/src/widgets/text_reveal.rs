@@ -23,7 +23,7 @@ impl Default for TextRevealProps {
             segment_start: 0.0,
             segment_end: 1.0,
             font_size: 24,
-            base_opacity: 0.24,
+            base_opacity: 0.3,
         }
     }
 }

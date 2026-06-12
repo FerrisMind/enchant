@@ -29,9 +29,9 @@ impl Default for AnimatedGridPatternProps {
             height: Length::Fixed(220.0),
             pattern: GridPatternSpec::new(),
             stroke_dasharray: 0.0,
-            num_squares: 200,
+            num_squares: 50,
             max_opacity: 0.5,
-            duration_secs: 1.0,
+            duration_secs: 4.0,
             repeat_delay_secs: 0.5,
             seed: 7,
             stroke_color: None,
@@ -180,9 +180,9 @@ mod tests {
     fn animated_grid_pattern_defaults_match_docs() {
         let props = AnimatedGridPatternProps::new();
 
-        assert_eq!(props.num_squares, 200);
+        assert_eq!(props.num_squares, 50);
         assert_eq!(props.max_opacity, 0.5);
-        assert_eq!(props.duration_secs, 1.0);
+        assert_eq!(props.duration_secs, 4.0);
         assert_eq!(props.repeat_delay_secs, 0.5);
     }
 }

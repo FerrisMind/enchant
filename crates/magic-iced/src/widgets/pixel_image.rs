@@ -63,12 +63,12 @@ impl PixelImageProps {
             handle,
             width: Length::Fixed(384.0),
             height: Length::Fixed(384.0),
-            grid: PixelGridPreset::EightByEight,
+            grid: PixelGridPreset::SixByFour,
             custom_grid: None,
             grayscale_animation: true,
             pixel_fade_in_duration_ms: 1000,
             max_animation_delay_ms: 1200,
-            color_reveal_delay_ms: 1500,
+            color_reveal_delay_ms: 1300,
             seed: 37,
         }
     }
@@ -294,6 +294,16 @@ mod tests {
         };
 
         assert_eq!(props.resolved_grid(), PixelGrid::new(4, 6));
+    }
+
+    #[test]
+    fn pixel_image_defaults_match_docs() {
+        let props = PixelImageProps::new(image::Handle::from_rgba(1, 1, vec![255, 255, 255, 255]));
+
+        assert_eq!(props.resolved_grid(), PixelGrid::new(4, 6));
+        assert_eq!(props.color_reveal_delay_ms, 1300);
+        assert_eq!(props.pixel_fade_in_duration_ms, 1000);
+        assert_eq!(props.max_animation_delay_ms, 1200);
     }
 
     #[test]

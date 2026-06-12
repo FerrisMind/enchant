@@ -24,7 +24,7 @@ impl Default for ComicTextProps {
             dot_color: Color::from_rgb8(0xEF, 0x44, 0x44),
             fill_color: Color::from_rgb8(0xFA, 0xCC, 0x15),
             outline_color: Color::BLACK,
-            shadow_color: Color::from_rgb8(0xD9, 0x1C, 0x55),
+            shadow_color: Color::from_rgb8(0xEF, 0x44, 0x44),
         }
     }
 }
@@ -154,6 +154,8 @@ mod tests {
 
         assert_eq!(props.font_size, 5.0);
         assert_eq!(props.entrance_duration_ms, 600);
+        assert_eq!(props.dot_color, Color::from_rgb8(0xEF, 0x44, 0x44));
+        assert_eq!(props.shadow_color, Color::from_rgb8(0xEF, 0x44, 0x44));
     }
 
     #[test]

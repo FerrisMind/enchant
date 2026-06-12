@@ -26,7 +26,7 @@ pub struct BorderBeamProps {
 impl Default for BorderBeamProps {
     fn default() -> Self {
         Self {
-            size: 52.0,
+            size: 50.0,
             duration_secs: 6.0,
             delay_secs: 0.0,
             color_from: Color::from_rgb8(0xFF, 0xAA, 0x40),
@@ -157,6 +157,7 @@ mod tests {
     #[test]
     fn border_beam_defaults_are_stable() {
         let props = BorderBeamProps::new();
+        assert_eq!(props.size, 50.0);
         assert_eq!(props.duration_secs, 6.0);
         assert_eq!(props.border_width, 1.0);
         assert_eq!(props.radius, 20.0);

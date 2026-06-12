@@ -41,7 +41,7 @@ impl Default for HeroVideoDialogProps {
             animation_style: HeroVideoAnimationStyle::FromCenter,
             thumbnail_radius: 20.0,
             dialog_max_width: 960.0,
-            overlay_opacity: 0.7,
+            overlay_opacity: 0.5,
             content_padding: 16.0,
             motion: MotionSpec::new()
                 .duration(twill::prelude::TransitionDuration::Ms300)

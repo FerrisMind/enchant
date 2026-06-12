@@ -25,7 +25,7 @@ impl Default for FlickeringGridProps {
             grid_gap: 6.0,
             flicker_chance: 0.3,
             color: Color::from_rgb8(0, 0, 0),
-            max_opacity: 0.2,
+            max_opacity: 0.3,
             seed: 17,
         }
     }
@@ -110,6 +110,6 @@ mod tests {
         assert_eq!(props.square_size, 4.0);
         assert_eq!(props.grid_gap, 6.0);
         assert_eq!(props.flicker_chance, 0.3);
-        assert_eq!(props.max_opacity, 0.2);
+        assert_eq!(props.max_opacity, 0.3);
     }
 }
