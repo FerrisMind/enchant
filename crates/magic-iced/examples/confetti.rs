@@ -28,7 +28,7 @@ struct ConfettiExample {
 
 #[derive(Debug, Clone)]
 enum Message {
-    Fire,
+    Fire(ConfettiAction),
     Tick(Instant),
 }
 
@@ -46,9 +46,9 @@ impl ConfettiExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Fire => {
+            Message::Fire(action) => {
                 self.state
-                    .apply_action(&ConfettiAction::Fire(None), self.now, &self.props);
+                    .apply_action(&action, self.now, &self.props);
             }
             Message::Tick(now) => {
                 self.now = now;
@@ -76,7 +76,7 @@ impl ConfettiExample {
                         &self.state,
                         self.now,
                         &self.props,
-                        |_| Message::Fire,
+                        Message::Fire,
                     ),
                 ]
                 .spacing(16)

@@ -1,10 +1,13 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{column, container, stack};
-use iced::{Element, Length, Point, Rectangle, Size, Subscription, Task};
-use magic_iced::{AnchorBounds, AnimatedBeamProps, animated_beam};
+use iced::widget::{column, container};
+use iced::{Element, Length, Size, Subscription, Task};
+use magic_iced::{AnchorMeasurements, AnchorRemeasure, measure_anchors};
 use std::time::Duration;
+
+use _shared::beam_demo;
+use _shared::beam_scene::BeamSceneKind;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -25,12 +28,15 @@ struct AnimatedBeamExample {
     active: usize,
     started_at: Instant,
     elapsed: Duration,
+    measurements: Option<AnchorMeasurements>,
+    remeasure: AnchorRemeasure,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Select(usize),
     Tick(Instant),
+    Measured(AnchorMeasurements),
 }
 
 impl AnimatedBeamExample {
@@ -41,9 +47,20 @@ impl AnimatedBeamExample {
                 active: 0,
                 started_at,
                 elapsed: Duration::ZERO,
+                measurements: None,
+                remeasure: AnchorRemeasure::new(),
             },
-            Task::none(),
+            measure_scene(0),
         )
+    }
+
+    fn scene_kind(active: usize) -> BeamSceneKind {
+        match active {
+            0 => BeamSceneKind::Demo,
+            1 => BeamSceneKind::Unidirectional,
+            2 => BeamSceneKind::Bidirectional,
+            _ => BeamSceneKind::MultipleInputs,
+        }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -52,10 +69,23 @@ impl AnimatedBeamExample {
                 self.active = index.min(3);
                 self.started_at = Instant::now();
                 self.elapsed = Duration::ZERO;
+                self.measurements = None;
+                self.remeasure.schedule();
+                measure_scene(self.active)
             }
-            Message::Tick(now) => self.elapsed = now.duration_since(self.started_at),
+            Message::Tick(now) => {
+                self.elapsed = now.duration_since(self.started_at);
+                if self.remeasure.take() {
+                    measure_scene(self.active)
+                } else {
+                    Task::none()
+                }
+            }
+            Message::Measured(measurements) => {
+                self.measurements = Some(measurements);
+                Task::none()
+            }
         }
-        Task::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -64,83 +94,12 @@ impl AnimatedBeamExample {
 
     fn view(&self) -> Element<'_, Message> {
         let labels = ["Demo", "Unidirectional", "Bidirectional", "Multiple Inputs"];
+        let measurements = self.measurements.as_ref();
         let scene = match self.active {
-            0 => beam_scene(vec![beam_pair(
-                self.elapsed,
-                AnchorBounds::from_bounds(Rectangle::new(
-                    Point::new(120.0, 220.0),
-                    iced::Size::new(180.0, 88.0),
-                )),
-                AnchorBounds::from_bounds(Rectangle::new(
-                    Point::new(820.0, 200.0),
-                    iced::Size::new(180.0, 88.0),
-                )),
-                AnimatedBeamProps::new(),
-            )]),
-            1 => beam_scene(vec![beam_pair(
-                self.elapsed,
-                AnchorBounds::from_bounds(Rectangle::new(
-                    Point::new(100.0, 160.0),
-                    iced::Size::new(180.0, 88.0),
-                )),
-                AnchorBounds::from_bounds(Rectangle::new(
-                    Point::new(860.0, 120.0),
-                    iced::Size::new(180.0, 88.0),
-                )),
-                AnimatedBeamProps::new().reverse(false),
-            )]),
-            2 => beam_scene(vec![beam_pair(
-                self.elapsed,
-                AnchorBounds::from_bounds(Rectangle::new(
-                    Point::new(120.0, 420.0),
-                    iced::Size::new(180.0, 88.0),
-                )),
-                AnchorBounds::from_bounds(Rectangle::new(
-                    Point::new(840.0, 160.0),
-                    iced::Size::new(180.0, 88.0),
-                )),
-                AnimatedBeamProps {
-                    curvature: -42.0,
-                    reverse: true,
-                    delay_secs: 0.6,
-                    ..AnimatedBeamProps::new()
-                },
-            )]),
-            _ => beam_scene(vec![
-                beam_pair(
-                    self.elapsed,
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(110.0, 180.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(700.0, 120.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnimatedBeamProps {
-                        curvature: 28.0,
-                        ..AnimatedBeamProps::new()
-                    },
-                ),
-                beam_pair(
-                    self.elapsed,
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(110.0, 180.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnchorBounds::from_bounds(Rectangle::new(
-                        Point::new(700.0, 360.0),
-                        iced::Size::new(180.0, 88.0),
-                    )),
-                    AnimatedBeamProps {
-                        curvature: -8.0,
-                        delay_secs: 0.3,
-                        gradient_start_color: iced::Color::from_rgb8(0x6B, 0xC9, 0xFF),
-                        gradient_stop_color: iced::Color::from_rgb8(0xFF, 0x8A, 0xC2),
-                        ..AnimatedBeamProps::new()
-                    },
-                ),
-            ]),
+            0 => beam_demo::demo_scene(self.elapsed, measurements),
+            1 => beam_demo::unidirectional_scene(self.elapsed, measurements),
+            2 => beam_demo::bidirectional_scene(self.elapsed, measurements),
+            _ => beam_demo::multiple_inputs_scene(self.elapsed, measurements),
         };
 
         _shared::shell(
@@ -149,37 +108,14 @@ impl AnimatedBeamExample {
                 _shared::tabs(&labels, self.active, Message::Select),
                 container(scene)
                     .width(Length::Fill)
-                    .height(Length::Fixed(520.0)),
+                    .center_x(Length::Fill),
             ]
             .spacing(20),
         )
     }
 }
 
-fn beam_pair(
-    elapsed: Duration,
-    from: AnchorBounds,
-    to: AnchorBounds,
-    props: AnimatedBeamProps,
-) -> Element<'static, Message> {
-    animated_beam(from, to, elapsed, props)
-}
-
-fn beam_scene(beams: Vec<Element<'static, Message>>) -> Element<'static, Message> {
-    let overlay = stack(
-        beams
-            .into_iter()
-            .map(|beam| {
-                container(beam)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .into()
-            })
-            .collect::<Vec<_>>(),
-    );
-
-    container(overlay)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+fn measure_scene(active: usize) -> Task<Message> {
+    measure_anchors(beam_demo::measure_ids(AnimatedBeamExample::scene_kind(active)))
+        .map(Message::Measured)
 }

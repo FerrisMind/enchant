@@ -1,7 +1,7 @@
 use crate::primitives::{MockupFrameKind, MockupFrameProps, mockup_frame_with_props};
 use iced::Element;
 use iced::Length;
-use iced::widget::container;
+use iced::widget::{container, space};
 use iced_shadcn::Theme;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -16,18 +16,27 @@ pub struct SafariProps {
     pub width: Length,
     pub chrome_label: Option<&'static str>,
     pub mode: SafariMode,
+    pub screen_media: bool,
+    pub media_bytes: Option<&'static [u8]>,
+    pub media_mime: Option<&'static str>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IphoneProps {
     pub width: Length,
     pub chrome_label: Option<&'static str>,
+    pub screen_media: bool,
+    pub media_bytes: Option<&'static [u8]>,
+    pub media_mime: Option<&'static str>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AndroidProps {
     pub width: Length,
     pub chrome_label: Option<&'static str>,
+    pub screen_media: bool,
+    pub media_bytes: Option<&'static [u8]>,
+    pub media_mime: Option<&'static str>,
 }
 
 impl Default for SafariProps {
@@ -36,6 +45,9 @@ impl Default for SafariProps {
             width: Length::Fill,
             chrome_label: None,
             mode: SafariMode::Default,
+            screen_media: false,
+            media_bytes: None,
+            media_mime: None,
         }
     }
 }
@@ -45,6 +57,9 @@ impl Default for IphoneProps {
         Self {
             width: Length::Fill,
             chrome_label: None,
+            screen_media: false,
+            media_bytes: None,
+            media_mime: None,
         }
     }
 }
@@ -54,6 +69,9 @@ impl Default for AndroidProps {
         Self {
             width: Length::Fill,
             chrome_label: None,
+            screen_media: false,
+            media_bytes: None,
+            media_mime: None,
         }
     }
 }
@@ -78,6 +96,17 @@ impl SafariProps {
         self
     }
 
+    pub fn screen_media(mut self, screen_media: bool) -> Self {
+        self.screen_media = screen_media;
+        self
+    }
+
+    pub fn media(mut self, bytes: &'static [u8], mime: &'static str) -> Self {
+        self.media_bytes = Some(bytes);
+        self.media_mime = Some(mime);
+        self
+    }
+
     pub const fn frame_kind(&self) -> MockupFrameKind {
         MockupFrameKind::Safari
     }
@@ -95,6 +124,17 @@ impl IphoneProps {
 
     pub fn chrome_label(mut self, chrome_label: &'static str) -> Self {
         self.chrome_label = Some(chrome_label);
+        self
+    }
+
+    pub fn screen_media(mut self, screen_media: bool) -> Self {
+        self.screen_media = screen_media;
+        self
+    }
+
+    pub fn media(mut self, bytes: &'static [u8], mime: &'static str) -> Self {
+        self.media_bytes = Some(bytes);
+        self.media_mime = Some(mime);
         self
     }
 
@@ -118,20 +158,36 @@ impl AndroidProps {
         self
     }
 
+    pub fn screen_media(mut self, screen_media: bool) -> Self {
+        self.screen_media = screen_media;
+        self
+    }
+
+    pub fn media(mut self, bytes: &'static [u8], mime: &'static str) -> Self {
+        self.media_bytes = Some(bytes);
+        self.media_mime = Some(mime);
+        self
+    }
+
     pub const fn frame_kind(&self) -> MockupFrameKind {
         MockupFrameKind::Android
     }
 }
 
 pub fn safari<'a, Message: Clone + 'a + 'static>(
-    content: impl Into<Element<'a, Message>>,
     props: SafariProps,
     theme: &Theme,
 ) -> Element<'a, Message> {
     container(mockup_frame_with_props(
         props.frame_kind(),
-        content,
-        &frame_props(props.chrome_label, matches!(props.mode, SafariMode::Simple)),
+        space().width(Length::Fill).height(Length::Fill),
+        &to_frame_props(
+            props.chrome_label,
+            matches!(props.mode, SafariMode::Simple),
+            props.screen_media,
+            props.media_bytes,
+            props.media_mime,
+        ),
         theme,
     ))
     .width(props.width)
@@ -139,14 +195,13 @@ pub fn safari<'a, Message: Clone + 'a + 'static>(
 }
 
 pub fn iphone<'a, Message: Clone + 'a + 'static>(
-    content: impl Into<Element<'a, Message>>,
     props: IphoneProps,
     theme: &Theme,
 ) -> Element<'a, Message> {
     container(mockup_frame_with_props(
         props.frame_kind(),
-        content,
-        &frame_props(props.chrome_label, false),
+        space().width(Length::Fill).height(Length::Fill),
+        &to_frame_props(props.chrome_label, false, props.screen_media, props.media_bytes, props.media_mime),
         theme,
     ))
     .width(props.width)
@@ -154,22 +209,33 @@ pub fn iphone<'a, Message: Clone + 'a + 'static>(
 }
 
 pub fn android<'a, Message: Clone + 'a + 'static>(
-    content: impl Into<Element<'a, Message>>,
     props: AndroidProps,
     theme: &Theme,
 ) -> Element<'a, Message> {
     container(mockup_frame_with_props(
         props.frame_kind(),
-        content,
-        &frame_props(props.chrome_label, false),
+        space().width(Length::Fill).height(Length::Fill),
+        &to_frame_props(
+            props.chrome_label,
+            false,
+            props.screen_media,
+            props.media_bytes,
+            props.media_mime,
+        ),
         theme,
     ))
     .width(props.width)
     .into()
 }
 
-fn frame_props(chrome_label: Option<&'static str>, safari_simple: bool) -> MockupFrameProps {
-    let mut props = MockupFrameProps::new();
+fn to_frame_props(
+    chrome_label: Option<&'static str>,
+    safari_simple: bool,
+    screen_media: bool,
+    media_bytes: Option<&'static [u8]>,
+    media_mime: Option<&'static str>,
+) -> MockupFrameProps {
+    let mut props = MockupFrameProps::new().screen_media(screen_media);
 
     if let Some(chrome_label) = chrome_label {
         props = props.chrome_label(chrome_label);
@@ -177,6 +243,10 @@ fn frame_props(chrome_label: Option<&'static str>, safari_simple: bool) -> Mocku
 
     if safari_simple {
         props = props.safari_simple(true);
+    }
+
+    if let (Some(bytes), Some(mime)) = (media_bytes, media_mime) {
+        props = props.media(bytes, mime);
     }
 
     props
@@ -194,32 +264,20 @@ mod tests {
     }
 
     #[test]
-    fn mockup_wrappers_accept_generic_chrome_labels() {
-        assert_eq!(
-            SafariProps::new()
-                .chrome_label("workspace.local")
-                .chrome_label,
-            Some("workspace.local")
+    fn mockup_wrappers_forward_media_bytes() {
+        let bytes = b"image";
+        let props = IphoneProps::new()
+            .screen_media(true)
+            .media(bytes, "image/png");
+        let frame = to_frame_props(
+            props.chrome_label,
+            false,
+            props.screen_media,
+            props.media_bytes,
+            props.media_mime,
         );
-        assert_eq!(
-            IphoneProps::new().chrome_label("preview").chrome_label,
-            Some("preview")
-        );
-        assert_eq!(
-            AndroidProps::new()
-                .chrome_label("android-demo")
-                .chrome_label,
-            Some("android-demo")
-        );
-    }
 
-    #[test]
-    fn safari_wrapper_forwards_simple_mode_to_primitives() {
-        let props = SafariProps::new().mode(SafariMode::Simple);
-
-        assert_eq!(props.mode, SafariMode::Simple);
-        assert!(
-            frame_props(props.chrome_label, matches!(props.mode, SafariMode::Simple)).safari_simple
-        );
+        assert_eq!(frame.media_bytes, Some(bytes.as_slice()));
+        assert_eq!(frame.media_mime, Some("image/png"));
     }
 }

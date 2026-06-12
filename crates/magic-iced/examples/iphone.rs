@@ -1,6 +1,6 @@
 mod _shared;
 
-use iced::widget::{column, container, text};
+use iced::widget::{column, container};
 use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::Theme;
 use magic_iced::{IphoneProps, iphone};
@@ -55,22 +55,30 @@ impl IphoneExample {
     fn view(&self) -> Element<'_, Message> {
         let labels = ["iPhone Demo", "iPhone Demo 2", "iPhone Demo 3"];
         let content = match self.active {
-            0 => iphone_screen(
-                "Camera",
-                "Focus on top notch chrome.",
-                "Live preview",
+            0 => iphone(
+                IphoneProps::new()
+                    .width(Length::Fixed(320.0))
+                    .screen_media(false),
                 &self.theme,
             ),
-            1 => iphone_screen(
-                "Music",
-                "Tall content rail and compact card stack.",
-                "Now playing",
+            1 => iphone(
+                IphoneProps::new()
+                    .width(Length::Fixed(320.0))
+                    .screen_media(true)
+                    .media(
+                        include_bytes!("assets/android-demo.jpg"),
+                        "image/jpeg",
+                    ),
                 &self.theme,
             ),
-            _ => iphone_screen(
-                "Fitness",
-                "Activity summary with clean spacing.",
-                "3 goals met",
+            _ => iphone(
+                IphoneProps::new()
+                    .width(Length::Fixed(320.0))
+                    .screen_media(true)
+                    .media(
+                        include_bytes!("assets/android-demo-video.jpg"),
+                        "image/jpeg",
+                    ),
                 &self.theme,
             ),
         };
@@ -79,37 +87,9 @@ impl IphoneExample {
             "iPhone",
             column![
                 _shared::tabs(&labels, self.active, Message::Select),
-                content
+                container(content).center_x(Length::Fill)
             ]
             .spacing(20),
         )
     }
-}
-
-fn iphone_screen<'a>(
-    title: &'a str,
-    subtitle: &'a str,
-    metric: &'a str,
-    theme: &'a Theme,
-) -> Element<'a, Message> {
-    let body = column![
-        text(title).size(24),
-        text(subtitle).size(14),
-        container(column![
-            text(metric).size(34),
-            text("Swipe to explore").size(14)
-        ])
-        .padding(24)
-        .width(Length::Fill),
-    ]
-    .spacing(16);
-
-    iphone(
-        container(body)
-            .padding(20)
-            .width(Length::Fill)
-            .height(Length::Fill),
-        IphoneProps::new().width(Length::Fixed(320.0)),
-        theme,
-    )
 }

@@ -22,6 +22,9 @@ Thumbs.db
 # Example launcher state (local only)
 logs/
 
+# Python
+scripts/__pycache__/
+
 # Build artifacts
 *.o
 *.a

@@ -101,6 +101,15 @@ class ParityState:
         with log_path().open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
 
+    def append_comment(self, example: str, comment: str) -> bool:
+        text = comment.strip()
+        if not text:
+            return False
+        line = f"{utc_now()}\t{example}\tCOMMENT\t{text}"
+        with log_path().open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+        return True
+
     def write_problems_snapshot(self) -> None:
         problems = [name for name, ok in sorted(self.verified.items()) if not ok]
         ok_count = sum(1 for ok in self.verified.values() if ok)
@@ -132,6 +141,12 @@ class ParityState:
             "ok": ok_count,
             "problems": len(self.verified) - ok_count,
         }
+
+
+def comment_window_url(host: str, port: int, name: str) -> str:
+    from urllib.parse import quote
+
+    return f"http://{host}:{port}/comment?name={quote(name)}"
 
 
 class ExampleRunner:
@@ -187,6 +202,8 @@ def build_web_app(
     examples: list[str],
     state: ParityState,
     runner: ExampleRunner,
+    host: str = "127.0.0.1",
+    port: int = 8765,
 ) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
@@ -215,6 +232,14 @@ def build_web_app(
             path = urlparse(self.path).path
             if path in {"/", "/index.html"}:
                 self._html()
+                return
+            if path == "/comment":
+                query = parse_qs(urlparse(self.path).query)
+                name = str(query.get("name", [""])[0])
+                if name not in state.verified:
+                    self.send_error(404)
+                    return
+                self._comment_html(name)
                 return
             if path == "/api/examples":
                 rows = [
@@ -278,10 +303,23 @@ def build_web_app(
                             "started": name,
                             "message": message,
                             "runner": runner.status(),
+                            "comment_url": comment_window_url(host, port, name),
                         }
                     )
                 else:
                     self._json({"error": message}, 500)
+                return
+
+            if path == "/api/comment":
+                name = str(payload.get("name", ""))
+                if name not in state.verified:
+                    self._json({"error": "unknown example"}, 404)
+                    return
+                comment = str(payload.get("comment", ""))
+                if not state.append_comment(name, comment):
+                    self._json({"error": "empty comment"}, 400)
+                    return
+                self._json({"saved": True, "name": name})
                 return
 
             if path == "/api/stop":
@@ -293,6 +331,14 @@ def build_web_app(
 
         def _html(self) -> None:
             html = WEB_PAGE.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.end_headers()
+            self.wfile.write(html)
+
+        def _comment_html(self, name: str) -> None:
+            html = comment_page_html(name).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(html)))
@@ -333,7 +379,7 @@ WEB_PAGE = """<!doctype html>
 <body>
   <div class="wrap">
     <h1>Magic Iced — Example Launcher</h1>
-    <div class="sub">Галочка справа = компонент совпадает с референсом. Без галочки = есть проблема. Состояние пишется в <code>logs/example-parity.log</code>.</div>
+    <div class="sub">Галочка справа = компонент совпадает с референсом. Без галочки = есть проблема. При запуске открывается окно комментариев; заметки пишутся в <code>logs/example-parity.log</code>.</div>
     <div class="toolbar">
       <input id="search" placeholder="Поиск..." />
       <button id="runBtn">Запустить</button>
@@ -416,10 +462,17 @@ WEB_PAGE = """<!doctype html>
     document.getElementById("search").addEventListener("input", (event) => {
       renderRows(event.target.value);
     });
+  function openCommentWindow(name, url) {
+    const features = "width=520,height=420,menubar=no,toolbar=no,location=no,status=no";
+    const win = window.open(url || `/comment?name=${encodeURIComponent(name)}`, `comment_${name}`, features);
+    if (win) win.focus();
+  }
+
     document.getElementById("runBtn").addEventListener("click", async () => {
       if (!selected) return setStatus("Выберите пример", "problem");
       const data = await api("/api/run", { name: selected });
       setStatus(`Запущен: ${data.started} (${data.message})`);
+      openCommentWindow(data.started, data.comment_url);
     });
     document.getElementById("stopBtn").addEventListener("click", async () => {
       await api("/api/stop", {});
@@ -432,13 +485,93 @@ WEB_PAGE = """<!doctype html>
 </html>
 """
 
+COMMENT_PAGE = """<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Комментарий — {{EXAMPLE}}</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #111; color: #eee; }
+    .wrap { padding: 16px; display: flex; flex-direction: column; gap: 12px; height: 100vh; box-sizing: border-box; }
+    h1 { margin: 0; font-size: 18px; }
+    .sub { color: #aaa; font-size: 13px; }
+    textarea { flex: 1; resize: none; background: #1d1d1d; color: #eee; border: 1px solid #333; border-radius: 8px; padding: 12px; font: inherit; line-height: 1.4; }
+    .toolbar { display: flex; gap: 8px; align-items: center; }
+    button { background: #1d1d1d; color: #eee; border: 1px solid #333; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    button:hover { background: #262626; }
+    .status { color: #bdbdbd; min-height: 1.2em; font-size: 13px; }
+    .good { color: #89d185; }
+    .problem { color: #f48771; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <h1>{{EXAMPLE}}</h1>
+      <div class="sub">Комментарий будет записан в <code>logs/example-parity.log</code> для этого примера.</div>
+    </div>
+    <textarea id="comment" placeholder="Заметки по визуалу, расхождениям с референсом, багам..."></textarea>
+    <div class="toolbar">
+      <button id="saveBtn">Сохранить в лог</button>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+  <script>
+    const example = {{EXAMPLE_JSON}};
+    const comment = document.getElementById("comment");
+    const status = document.getElementById("status");
+
+    function setStatus(text, cls = "") {
+      status.textContent = text;
+      status.className = "status " + cls;
+    }
+
+    async function saveComment() {
+      const text = comment.value.trim();
+      if (!text) {
+        setStatus("Введите комментарий", "problem");
+        return;
+      }
+      const res = await fetch("/api/comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: example, comment: text }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus(data.error || res.statusText, "problem");
+        return;
+      }
+      comment.value = "";
+      setStatus("Сохранено в лог", "good");
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", saveComment);
+    comment.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        saveComment();
+      }
+    });
+    comment.focus();
+  </script>
+</body>
+</html>
+"""
+
+
+def comment_page_html(name: str) -> str:
+    encoded = json.dumps(name, ensure_ascii=False)
+    return COMMENT_PAGE.replace("{{EXAMPLE}}", name).replace("{{EXAMPLE_JSON}}", encoded)
+
 
 def run_web_ui(host: str = "127.0.0.1", port: int = 8765) -> int:
     examples = discover_examples()
     state = ParityState.load(examples)
     state.write_problems_snapshot()
     runner = ExampleRunner()
-    handler = build_web_app(examples, state, runner)
+    handler = build_web_app(examples, state, runner, host=host, port=port)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"Example launcher: {url}")
@@ -458,7 +591,64 @@ def run_web_ui(host: str = "127.0.0.1", port: int = 8765) -> int:
 
 def run_tk_ui() -> int:
     import tkinter as tk
-    from tkinter import messagebox, ttk
+    from tkinter import messagebox, scrolledtext, ttk
+
+    class CommentWindow(tk.Toplevel):
+        def __init__(
+            self,
+            master: tk.Misc,
+            example: str,
+            state: ParityState,
+            *,
+            offset: int = 0,
+        ) -> None:
+            super().__init__(master)
+            self.example = example
+            self.state = state
+            self.title(f"Комментарий — {example}")
+            self.geometry(f"520x420+{40 + offset}+{40 + offset}")
+            self.minsize(420, 280)
+
+            frame = ttk.Frame(self, padding=12)
+            frame.pack(fill=tk.BOTH, expand=True)
+
+            ttk.Label(
+                frame,
+                text=f"Пример: {example}",
+                font=("", 11, "bold"),
+            ).pack(anchor=tk.W)
+            ttk.Label(
+                frame,
+                text="Комментарий будет записан в logs/example-parity.log для этого примера.",
+                wraplength=480,
+            ).pack(anchor=tk.W, pady=(4, 8))
+
+            self.text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, height=12)
+            self.text.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+            self.text.focus_set()
+
+            toolbar = ttk.Frame(frame)
+            toolbar.pack(fill=tk.X)
+
+            ttk.Button(toolbar, text="Сохранить в лог", command=self._save).pack(
+                side=tk.LEFT
+            )
+            self.status_var = tk.StringVar()
+            ttk.Label(toolbar, textvariable=self.status_var).pack(side=tk.LEFT, padx=(12, 0))
+
+            self.text.bind("<Control-Return>", lambda _event: self._save())
+            self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        def _save(self) -> None:
+            comment = self.text.get("1.0", tk.END)
+            if not self.state.append_comment(self.example, comment):
+                self.status_var.set("Введите комментарий")
+                return
+            self.text.delete("1.0", tk.END)
+            self.status_var.set("Сохранено в лог")
+
+        def _on_close(self) -> None:
+            self.destroy()
 
     class ExampleLauncher(tk.Tk):
         def __init__(self) -> None:
@@ -471,6 +661,7 @@ def run_tk_ui() -> int:
             self.state = ParityState.load(self.examples)
             self.runner = ExampleRunner()
             self.row_vars: dict[str, tk.BooleanVar] = {}
+            self.comment_windows: dict[str, CommentWindow] = {}
 
             self._build_ui()
             self._refresh_summary()
@@ -482,7 +673,7 @@ def run_tk_ui() -> int:
 
             ttk.Label(
                 root,
-                text="Выберите пример, запустите и отметьте галочкой, если компонент совпадает с референсом.",
+                text="Выберите пример, запустите и отметьте галочкой, если компонент совпадает с референсом. При запуске открывается окно комментариев.",
                 wraplength=860,
             ).pack(fill=tk.X, pady=(0, 8))
 
@@ -594,6 +785,25 @@ def run_tk_ui() -> int:
             self._refresh_summary()
             self.status_var.set(f"{name}: {'OK' if ok else 'нужно исправить'}")
 
+        def _open_comment_window(self, name: str) -> None:
+            existing = self.comment_windows.get(name)
+            if existing and existing.winfo_exists():
+                existing.deiconify()
+                existing.lift()
+                existing.focus_force()
+                existing.text.focus_set()
+                return
+
+            offset = 24 * len(self.comment_windows)
+            window = CommentWindow(self, name, self.state, offset=offset)
+            self.comment_windows[name] = window
+
+            def _forget(_event: tk.Event[tk.Misc] | None = None) -> None:
+                if self.comment_windows.get(name) is window:
+                    self.comment_windows.pop(name, None)
+
+            window.bind("<Destroy>", _forget)
+
         def _run_selected(self) -> None:
             name = self._selected_name()
             if not name:
@@ -602,6 +812,7 @@ def run_tk_ui() -> int:
             ok, message = self.runner.run(name)
             if ok:
                 self.state.append_log(name, self.state.verified.get(name, False), note="run")
+                self._open_comment_window(name)
                 self.status_var.set(f"Запущен: {name} ({message})")
             else:
                 messagebox.showerror("Ошибка запуска", message)
@@ -623,6 +834,10 @@ def run_tk_ui() -> int:
                 messagebox.showinfo("logs/", f"{path}\n\n{error}")
 
         def _on_close(self) -> None:
+            for window in list(self.comment_windows.values()):
+                if window.winfo_exists():
+                    window.destroy()
+            self.comment_windows.clear()
             self.runner.stop()
             self.state.save()
             self.state.write_problems_snapshot()

@@ -70,18 +70,30 @@ impl<Message> EffectProgram<Message> for FlickeringGridProgram {
         let step = (self.props.square_size + self.props.grid_gap).max(1.0);
         let columns = (bounds.width / step).ceil().max(1.0) as usize;
         let rows = (bounds.height / step).ceil().max(1.0) as usize;
-        let tick = (self.elapsed.as_secs_f32() * 12.0).floor() as u64;
 
         for column in 0..columns {
             for row in 0..rows {
                 let index = (column * rows + row) as u64;
-                let chance = stable_noise(self.props.seed + tick, index);
-                if chance > self.props.flicker_chance.clamp(0.0, 1.0) {
+
+                // Determine if this cell is active based on flicker_chance
+                let is_active_noise = stable_noise(self.props.seed ^ 0x5555_5555_5555_5555, index);
+                if is_active_noise > self.props.flicker_chance.clamp(0.0, 1.0) {
                     continue;
                 }
 
-                let opacity = stable_noise(self.props.seed ^ 0x9E37_79B9, index + tick * 13)
+                // Vary speed per cell to make flickering organic
+                let speed_mult = 0.4 + stable_noise(self.props.seed ^ 0xAAAA_AAAA_AAAA_AAAA, index) * 1.2;
+                let cell_time = self.elapsed.as_secs_f32() * 5.0 * speed_mult;
+                let tick = cell_time.floor() as u64;
+                let fract = cell_time.fract();
+
+                let noise_current = stable_noise(self.props.seed + tick, index);
+                let noise_next = stable_noise(self.props.seed + tick + 1, index);
+
+                // Lerp between current and next noise values
+                let opacity = (noise_current + (noise_next - noise_current) * fract)
                     * self.props.max_opacity.clamp(0.0, 1.0);
+
                 frame.fill(
                     &canvas::Path::rectangle(
                         Point::new(column as f32 * step, row as f32 * step),

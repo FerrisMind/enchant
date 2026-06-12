@@ -5,7 +5,7 @@ use crate::primitives::{
 use iced::border;
 use iced::mouse;
 use iced::time::Instant;
-use iced::widget::{canvas, mouse_area, stack};
+use iced::widget::{canvas, container, mouse_area};
 use iced::{Color, Element, Length, Point, Rectangle, Renderer};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -143,13 +143,29 @@ pub fn confetti<'a, Message: 'a>(
 
 pub fn confetti_button<'a, Message: Clone + 'a>(
     content: impl Into<Element<'a, Message>>,
-    state: &'a ConfettiState,
-    now: Instant,
-    props: &'a ConfettiProps,
+    _state: &'a ConfettiState,
+    _now: Instant,
+    _props: &'a ConfettiProps,
     on_action: impl Fn(ConfettiAction) -> Message + Clone + 'a,
 ) -> Element<'a, Message> {
-    mouse_area(stack(vec![content.into(), confetti(state, now, props)]))
-        .on_press(on_action(ConfettiAction::Fire(None)))
+    let button_content = container(content.into())
+        .padding([8.0, 16.0])
+        .style(|theme: &iced::Theme| {
+            let palette = theme.palette();
+            iced::widget::container::Style {
+                background: Some(iced::Background::Color(palette.primary)),
+                text_color: Some(palette.background),
+                border: border::Border {
+                    radius: 6.0.into(),
+                    width: 0.0,
+                    color: Color::TRANSPARENT,
+                },
+                ..Default::default()
+            }
+        });
+
+    mouse_area(button_content)
+        .on_press(on_action(ConfettiAction::Fire(Some(Point::new(0.5, 0.65)))))
         .interaction(mouse::Interaction::Pointer)
         .into()
 }

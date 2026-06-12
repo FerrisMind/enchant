@@ -1,6 +1,6 @@
 mod _shared;
 
-use iced::widget::{column, container, text};
+use iced::widget::{column, container};
 use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::Theme;
 use magic_iced::{SafariMode, SafariProps, safari};
@@ -60,32 +60,36 @@ impl SafariExample {
             "Safari Demo 4",
         ];
         let content = match self.active {
-            0 => safari_screen(
-                "Docs",
-                "Browser chrome with hero preview.",
-                "magicui.design",
-                SafariMode::Default,
+            0 => safari(
+                SafariProps::new()
+                    .width(Length::Fixed(680.0))
+                    .chrome_label("magicui.design")
+                    .screen_media(false),
                 &self.theme,
             ),
-            1 => safari_screen(
-                "Dashboard",
-                "Simple mode for cleaner framing.",
-                "Analytics",
-                SafariMode::Simple,
+            1 => safari(
+                SafariProps::new()
+                    .width(Length::Fixed(680.0))
+                    .chrome_label("magicui.design")
+                    .screen_media(true)
+                    .media(include_bytes!("assets/hero-light.png"), "image/png"),
                 &self.theme,
             ),
-            2 => safari_screen(
-                "Landing",
-                "Wide screen with polished meta bar.",
-                "Launch page",
-                SafariMode::Default,
+            2 => safari(
+                SafariProps::new()
+                    .width(Length::Fixed(680.0))
+                    .chrome_label("magicui.design")
+                    .screen_media(true)
+                    .media(include_bytes!("assets/hero-dark.png"), "image/png"),
                 &self.theme,
             ),
-            _ => safari_screen(
-                "Composer",
-                "Tall browser frame with content stack.",
-                "Product copy",
-                SafariMode::Simple,
+            _ => safari(
+                SafariProps::new()
+                    .width(Length::Fixed(680.0))
+                    .chrome_label("magicui.design")
+                    .mode(SafariMode::Simple)
+                    .screen_media(true)
+                    .media(include_bytes!("assets/hero-light.png"), "image/png"),
                 &self.theme,
             ),
         };
@@ -94,41 +98,9 @@ impl SafariExample {
             "Safari",
             column![
                 _shared::tabs(&labels, self.active, Message::Select),
-                content
+                container(content).center_x(Length::Fill)
             ]
             .spacing(20),
         )
     }
-}
-
-fn safari_screen<'a>(
-    title: &'a str,
-    subtitle: &'a str,
-    footer: &'static str,
-    mode: SafariMode,
-    theme: &'a Theme,
-) -> Element<'a, Message> {
-    let body = column![
-        text(title).size(24),
-        text(subtitle).size(14),
-        container(column![
-            text(footer).size(34),
-            text("Preview in browser frame").size(14)
-        ])
-        .padding(24)
-        .width(Length::Fill),
-    ]
-    .spacing(16);
-
-    safari(
-        container(body)
-            .padding(20)
-            .width(Length::Fill)
-            .height(Length::Fill),
-        SafariProps::new()
-            .width(Length::Fixed(680.0))
-            .mode(mode)
-            .chrome_label(footer),
-        theme,
-    )
 }

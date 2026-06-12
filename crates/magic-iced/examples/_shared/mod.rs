@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+pub mod beam_demo;
+pub mod beam_icons;
+pub mod beam_scene;
 pub mod shadcn_forms;
 
 use iced::widget::{button, column, container, row, text};

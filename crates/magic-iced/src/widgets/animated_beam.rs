@@ -95,8 +95,8 @@ impl<Message> EffectProgram<Message> for AnimatedBeamProgram {
         _viewport: &Rectangle,
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
-        let from = local_anchor(self.from, bounds);
-        let to = local_anchor(self.to, bounds);
+        let from = scene_local_anchor(self.from);
+        let to = scene_local_anchor(self.to);
         let path = beam_path(
             from,
             to,
@@ -117,15 +117,17 @@ impl<Message> EffectProgram<Message> for AnimatedBeamProgram {
                 }),
         );
 
-        if let Some(head) = beam_motion_phase(self.elapsed, &self.props) {
+        if let Some(progress) = beam_motion_phase(self.elapsed, &self.props) {
+            let (head, head_grows) = beam_head_progress(progress, self.props.reverse, from, to);
+
             for index in (0..12).rev() {
                 let factor = index as f32 / 11.0;
-                let progress = if self.props.reverse {
-                    head + factor * 0.06
+                let path_progress = if head_grows {
+                    (head - factor * 0.12).clamp(0.0, 1.0)
                 } else {
-                    head - factor * 0.06
+                    (head + factor * 0.12).clamp(0.0, 1.0)
                 };
-                let sample = point_at(path, progress);
+                let sample = point_at(path, path_progress);
                 let color = mix_color(
                     self.props.gradient_start_color,
                     self.props.gradient_stop_color,
@@ -162,19 +164,31 @@ fn beam_motion_phase(elapsed: Duration, props: &AnimatedBeamProps) -> Option<f32
         return None;
     }
 
-    let mut progress = (time_in_cycle / active_duration).clamp(0.0, 1.0);
-    if props.reverse {
-        progress = 1.0 - progress;
-    }
+    let progress = (time_in_cycle / active_duration).clamp(0.0, 1.0);
 
     Some(progress)
 }
 
-fn local_anchor(anchor: AnchorBounds, bounds: Rectangle) -> AnchorBounds {
-    AnchorBounds::from_bounds(Rectangle::new(
-        iced::Point::new(anchor.bounds.x - bounds.x, anchor.bounds.y - bounds.y),
-        anchor.bounds.size(),
-    ))
+fn scene_local_anchor(anchor: AnchorBounds) -> AnchorBounds {
+    anchor
+}
+
+/// Maps timeline progress to path head position, matching `animated-beam.tsx` gradient sweep.
+///
+/// `reverse` flips the gradient direction. On left→right paths that inverts travel
+/// (bidirectional lower arc). On right→left paths `reverse` aligns sweep with from→to
+/// (main demo right-side beams into center).
+fn beam_head_progress(
+    progress: f32,
+    reverse: bool,
+    from: AnchorBounds,
+    to: AnchorBounds,
+) -> (f32, bool) {
+    let path_left_to_right = to.center.x > from.center.x;
+    let invert = reverse && path_left_to_right;
+    let head = if invert { 1.0 - progress } else { progress };
+    let head_grows_over_time = !invert;
+    (head, head_grows_over_time)
 }
 
 fn mix_color(from: Color, to: Color, progress: f32) -> Color {
@@ -202,10 +216,8 @@ mod tests {
     }
 
     #[test]
-    fn beam_motion_phase_respects_delay_repeat_delay_and_reverse() {
+    fn beam_motion_phase_respects_delay_and_repeat_delay() {
         let delayed = beam_motion_phase(Duration::from_secs_f32(0.2), &AnimatedBeamProps::new());
-        let reversed_props = AnimatedBeamProps::new().reverse(true);
-        let reversed = beam_motion_phase(Duration::from_secs_f32(1.0), &reversed_props).unwrap();
         let paused = beam_motion_phase(
             Duration::from_secs_f32(5.3),
             &AnimatedBeamProps {
@@ -215,23 +227,48 @@ mod tests {
         );
 
         assert_eq!(delayed, Some(0.04));
-        assert!(reversed < 1.0);
         assert!(paused.is_none());
     }
 
     #[test]
-    fn local_anchor_translates_global_bounds_into_canvas_space() {
+    fn reverse_inverts_only_on_left_to_right_paths() {
+        let left = AnchorBounds::from_bounds(Rectangle::new(
+            iced::Point::new(0.0, 0.0),
+            iced::Size::new(48.0, 48.0),
+        ));
+        let right = AnchorBounds::from_bounds(Rectangle::new(
+            iced::Point::new(200.0, 0.0),
+            iced::Size::new(48.0, 48.0),
+        ));
+        let center = AnchorBounds::from_bounds(Rectangle::new(
+            iced::Point::new(100.0, 0.0),
+            iced::Size::new(64.0, 64.0),
+        ));
+
+        let (main_left, grows) = beam_head_progress(0.25, false, left, center);
+        assert!((main_left - 0.25).abs() < f32::EPSILON);
+        assert!(grows);
+
+        let (main_right, grows) = beam_head_progress(0.25, true, right, center);
+        assert!((main_right - 0.25).abs() < f32::EPSILON);
+        assert!(grows);
+
+        let (bidirectional, grows) = beam_head_progress(0.25, true, left, right);
+        assert!((bidirectional - 0.75).abs() < f32::EPSILON);
+        assert!(!grows);
+    }
+
+    #[test]
+    fn scene_local_anchor_preserves_scene_coordinates() {
         let anchor = AnchorBounds::from_bounds(Rectangle::new(
             iced::Point::new(120.0, 80.0),
             iced::Size::new(40.0, 20.0),
         ));
-        let canvas_bounds =
-            Rectangle::new(iced::Point::new(100.0, 50.0), iced::Size::new(400.0, 200.0));
-        let translated = local_anchor(anchor, canvas_bounds);
+        let translated = scene_local_anchor(anchor);
 
-        assert_eq!(translated.bounds.x, 20.0);
-        assert_eq!(translated.bounds.y, 30.0);
-        assert_eq!(translated.center.x, 40.0);
-        assert_eq!(translated.center.y, 40.0);
+        assert_eq!(translated.bounds.x, 120.0);
+        assert_eq!(translated.bounds.y, 80.0);
+        assert_eq!(translated.center.x, 140.0);
+        assert_eq!(translated.center.y, 90.0);
     }
 }
