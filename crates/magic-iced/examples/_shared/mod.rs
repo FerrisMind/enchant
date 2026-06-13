@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+pub mod animated_list_notifications;
 pub mod beam_demo;
 pub mod beam_icons;
 pub mod beam_scene;

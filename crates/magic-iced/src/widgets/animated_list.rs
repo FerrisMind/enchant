@@ -1,6 +1,6 @@
 use iced::time::Instant;
 use iced::widget::{column, container, float};
-use iced::{Element, Length};
+use iced::{Alignment, Element, Length, Vector};
 use twill::prelude::{Easing, TransitionDuration};
 
 use crate::primitives::{AnimatedValue, MotionSpec};
@@ -10,7 +10,9 @@ pub struct AnimatedListProps {
     pub delay_ms: u64,
     pub gap: f32,
     pub scale_from: f32,
+    pub item_height: f32,
     pub width: Length,
+    pub max_width: f32,
 }
 
 impl Default for AnimatedListProps {
@@ -18,8 +20,10 @@ impl Default for AnimatedListProps {
         Self {
             delay_ms: 1000,
             gap: 16.0,
-            scale_from: 0.85,
+            scale_from: 0.0,
+            item_height: 76.0,
             width: Length::Fill,
+            max_width: 400.0,
         }
     }
 }
@@ -28,6 +32,10 @@ impl AnimatedListProps {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn item_stride(&self) -> f32 {
+        self.item_height + self.gap
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -35,6 +43,7 @@ struct AnimatedListFingerprint {
     delay_ms: u64,
     gap: f32,
     scale_from: f32,
+    item_height: f32,
 }
 
 impl From<&AnimatedListProps> for AnimatedListFingerprint {
@@ -43,6 +52,7 @@ impl From<&AnimatedListProps> for AnimatedListFingerprint {
             delay_ms: props.delay_ms,
             gap: props.gap,
             scale_from: props.scale_from,
+            item_height: props.item_height,
         }
     }
 }
@@ -52,6 +62,7 @@ pub struct AnimatedListState {
     started_at: Option<Instant>,
     visible_target: usize,
     reveal_progress: AnimatedValue,
+    shift_progress: AnimatedValue,
     fingerprint: AnimatedListFingerprint,
 }
 
@@ -60,7 +71,8 @@ impl AnimatedListState {
         Self {
             started_at: None,
             visible_target: 0,
-            reveal_progress: AnimatedValue::with_spec(0.0, reveal_motion(props)),
+            reveal_progress: AnimatedValue::with_spec(0.0, item_motion(props)),
+            shift_progress: AnimatedValue::with_spec(1.0, item_motion(props)),
             fingerprint: AnimatedListFingerprint::from(props),
         }
     }
@@ -77,8 +89,10 @@ impl AnimatedListState {
 
         if next_visible_target != self.visible_target {
             self.visible_target = next_visible_target;
-            self.reveal_progress = AnimatedValue::with_spec(0.0, reveal_motion(props));
+            self.reveal_progress = AnimatedValue::with_spec(0.0, item_motion(props));
             self.reveal_progress.transition(1.0, now);
+            self.shift_progress = AnimatedValue::with_spec(0.0, item_motion(props));
+            self.shift_progress.transition(1.0, now);
         }
     }
 
@@ -104,6 +118,15 @@ impl AnimatedListState {
         let _ = props;
         self.reveal_progress.value_at(now).clamp(0.0, 1.0)
     }
+
+    pub fn shift_progress(&self, now: Instant, props: &AnimatedListProps) -> f32 {
+        if self.started_at.is_none() {
+            return 1.0;
+        }
+
+        let _ = props;
+        self.shift_progress.value_at(now).clamp(0.0, 1.0)
+    }
 }
 
 pub fn animated_list<'a, Message: 'a>(
@@ -116,16 +139,31 @@ pub fn animated_list<'a, Message: 'a>(
         .visible_count(now, items.len(), props)
         .min(items.len());
     let newest_progress = state.newest_progress(now, props);
+    let shift_progress = state.shift_progress(now, props);
     let newest_scale = props.scale_from + (1.0 - props.scale_from) * newest_progress;
+    let shift_offset = props.item_stride() * (1.0 - shift_progress);
 
     let mut children = Vec::with_capacity(visible);
     for (display_index, item) in items.into_iter().take(visible).rev().enumerate() {
+        let item = container(item)
+            .width(props.width)
+            .max_width(props.max_width)
+            .height(Length::Fixed(props.item_height));
+
         let child: Element<'a, Message> = if display_index == 0 {
-            float(container(item).width(props.width))
-                .scale(newest_scale)
+            let scale = newest_scale.max(f32::EPSILON);
+            float(item)
+                .scale(scale)
+                .translate(move |bounds, _viewport| {
+                    Vector::new(0.0, -bounds.height * (1.0 - scale) / 2.0)
+                })
+                .into()
+        } else if shift_offset > f32::EPSILON {
+            float(item)
+                .translate(move |_bounds, _viewport| Vector::new(0.0, -shift_offset))
                 .into()
         } else {
-            container(item).width(props.width).into()
+            item.into()
         };
         children.push(child);
     }
@@ -133,13 +171,15 @@ pub fn animated_list<'a, Message: 'a>(
     column(children)
         .spacing(props.gap)
         .width(props.width)
+        .max_width(props.max_width)
+        .align_x(Alignment::Center)
         .into()
 }
 
-fn reveal_motion(props: &AnimatedListProps) -> MotionSpec {
+fn item_motion(props: &AnimatedListProps) -> MotionSpec {
     MotionSpec::new()
         .duration(TransitionDuration::CustomMs(
-            ((props.delay_ms as f32 * 0.35).round() as u64).clamp(1, u16::MAX as u64) as u16,
+            ((props.delay_ms as f32 * 0.45).round() as u64).clamp(1, u16::MAX as u64) as u16,
         ))
         .easing(Easing::Out)
 }
@@ -154,6 +194,9 @@ mod tests {
         let props = AnimatedListProps::new();
 
         assert_eq!(props.delay_ms, 1000);
+        assert_eq!(props.scale_from, 0.0);
+        assert_eq!(props.gap, 16.0);
+        assert_eq!(props.item_height, 76.0);
     }
 
     #[test]
@@ -175,5 +218,6 @@ mod tests {
             3
         );
         assert!(state.newest_progress(start + Duration::from_millis(2600), &props) > 0.9);
+        assert!(state.shift_progress(start + Duration::from_millis(2600), &props) > 0.9);
     }
 }

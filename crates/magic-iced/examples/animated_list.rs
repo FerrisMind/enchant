@@ -92,19 +92,25 @@ impl AnimatedListExample {
                 delay_ms: 700,
                 gap: 12.0,
                 scale_from: 0.88,
+                item_height: 52.0,
                 width: Length::Fill,
+                ..Default::default()
             },
             1 => AnimatedListProps {
                 delay_ms: 1200,
                 gap: 16.0,
                 scale_from: 0.84,
+                item_height: 52.0,
                 width: Length::Fill,
+                ..Default::default()
             },
             _ => AnimatedListProps {
                 delay_ms: 900,
                 gap: 10.0,
                 scale_from: 0.9,
+                item_height: 52.0,
                 width: Length::Fill,
+                ..Default::default()
             },
         }
     }

@@ -7,6 +7,7 @@ mod media_frames;
 mod media_timeline;
 mod particle_field;
 mod pattern_grid;
+mod pattern_transform;
 mod pointer_motion;
 mod scroll_motion;
 mod sphere_projection;
@@ -35,6 +36,7 @@ pub use pattern_grid::{
     GridCellIndex, GridPatternSpec, grid_cell_origin, grid_cell_rect, grid_dimensions,
     stable_grid_cell,
 };
+pub use pattern_transform::{PatternSkewAxis, PatternTransform, pulse_opacity, sample_easing};
 pub(crate) use pointer_motion::POINTER_SPEED_THRESHOLD_PX_PER_SEC;
 pub use pointer_motion::{PointerMotion, PointerSample};
 pub(crate) use pointer_motion::{pointer_distance, pointer_strength};

@@ -2,7 +2,7 @@ mod _shared;
 
 use iced::time::Instant;
 use iced::widget::{column, container};
-use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
+use iced::{Alignment, Background, Border, Element, Length, Size, Subscription, Task};
 use iced_shadcn::Theme;
 use magic_iced::{AnimatedGridPatternProps, animated_grid_pattern};
 use std::time::Duration;
@@ -64,16 +64,23 @@ impl AnimatedGridPatternExample {
                 width: Length::Fill,
                 height: Length::Fill,
                 num_squares: 30,
-                max_opacity: 0.1,
+                max_opacity: 0.3,
                 duration_secs: 3.0,
                 repeat_delay_secs: 1.0,
+                skew_x_deg: 12.0,
+                pattern_height_scale: 2.0,
+                pattern_offset_y_ratio: -0.3,
+                mask_radius: 250.0,
                 ..AnimatedGridPatternProps::new()
             },
             &self.theme,
         ))
+        .clip(true)
         .width(Length::Fixed(720.0))
         .height(Length::Fixed(500.0))
-        .style(|_| container::Style {
+        .padding(80.0)
+        .style(move |_| container::Style {
+            background: Some(Background::Color(self.theme.palette.background)),
             border: Border {
                 width: 1.0,
                 radius: 12.0.into(),

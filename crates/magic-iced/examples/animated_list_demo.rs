@@ -1,10 +1,19 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{column, container, text};
-use iced::{Element, Length, Size, Subscription, Task};
+use iced::widget::{column, container, stack, Space};
+use iced::{Alignment, Element, Length, Size, Subscription, Task};
+use iced_shadcn::Theme;
 use magic_iced::{AnimatedListProps, AnimatedListState, animated_list};
 use std::time::Duration;
+use twill::prelude::{SemanticThemeVars, ThemeVariant};
+
+use _shared::animated_list_notifications::{
+    bottom_background_fade, notification_card, repeated_notifications,
+};
+
+const STAGE_HEIGHT: f32 = 500.0;
+const FADE_HEIGHT: f32 = STAGE_HEIGHT / 4.0;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -14,7 +23,7 @@ pub fn main() -> iced::Result {
     )
     .title("Animated List Demo")
     .window(iced::window::Settings {
-        size: Size::new(1000.0, 760.0),
+        size: Size::new(900.0, 620.0),
         ..Default::default()
     })
     .subscription(AnimatedListDemoExample::subscription)
@@ -22,6 +31,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedListDemoExample {
+    theme: Theme,
     props: AnimatedListProps,
     state: AnimatedListState,
     now: Instant,
@@ -38,6 +48,10 @@ impl AnimatedListDemoExample {
         let now = Instant::now();
         (
             Self {
+                theme: Theme::from_semantic_theme(
+                    SemanticThemeVars::shadcn_neutral(),
+                    ThemeVariant::Dark,
+                ),
                 state: AnimatedListState::new(&props),
                 props,
                 now,
@@ -47,11 +61,9 @@ impl AnimatedListDemoExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        match message {
-            Message::Tick(now) => {
-                self.now = now;
-                self.state.tick(now, &self.props);
-            }
+        if let Message::Tick(now) = message {
+            self.now = now;
+            self.state.tick(now, &self.props);
         }
         Task::none()
     }
@@ -61,32 +73,38 @@ impl AnimatedListDemoExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let items = vec![
-            container(text("Inbox sync"))
-                .padding(16)
-                .width(Length::Fill)
-                .into(),
-            container(text("Automations"))
-                .padding(16)
-                .width(Length::Fill)
-                .into(),
-            container(text("Release notes"))
-                .padding(16)
-                .width(Length::Fill)
-                .into(),
-            container(text("Design review"))
-                .padding(16)
-                .width(Length::Fill)
-                .into(),
-        ];
+        let items = repeated_notifications(10)
+            .into_iter()
+            .map(|item| notification_card(item, &self.theme))
+            .collect();
 
-        _shared::shell(
-            "Animated List Demo",
+        let list = container(animated_list(items, &self.state, self.now, &self.props))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(8)
+            .align_x(Alignment::Center)
+            .align_y(Alignment::Start);
+
+        let fade = container(
             column![
-                text("Cards reveal in sequence with a focus scale on the newest item."),
-                animated_list(items, &self.state, self.now, &self.props),
+                Space::new().height(Length::Fill),
+                bottom_background_fade(FADE_HEIGHT, self.theme.palette.background),
             ]
-            .spacing(20),
+            .width(Length::Fill)
+            .height(Length::Fill),
         )
+        .width(Length::Fill)
+        .height(Length::Fill);
+
+        let stage = container(
+            stack![list, fade]
+                .width(Length::Fill)
+                .height(Length::Fill),
+        )
+        .width(Length::Fill)
+        .height(Length::Fixed(STAGE_HEIGHT))
+        .clip(true);
+
+        _shared::shell("Animated List Demo", column![stage].align_x(Alignment::Center))
     }
 }
