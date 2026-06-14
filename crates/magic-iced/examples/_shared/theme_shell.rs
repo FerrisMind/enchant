@@ -77,6 +77,18 @@ impl ThemeShell {
         self.blended_palette_color(now, |palette| palette.primary)
     }
 
+    /// Line-shadow stripe color — same reveal progress as `blended_foreground`.
+    pub fn blended_line_shadow(&self, now: Instant) -> Color {
+        let target_dark = self.controller.dark_mode();
+        let target = magic_iced::line_shadow_color_for_mode(target_dark);
+        if !self.controller.is_transition_active(now) {
+            return target;
+        }
+
+        let source = magic_iced::line_shadow_color_for_mode(!target_dark);
+        blend_colors(source, target, self.controller.reveal_at(now))
+    }
+
     /// Shiny button label color — same reveal progress as `blended_foreground`.
     pub fn blended_shiny_text_color(&self, now: Instant) -> Color {
         let target_dark = self.controller.dark_mode();

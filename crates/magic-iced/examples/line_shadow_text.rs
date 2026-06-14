@@ -1,9 +1,8 @@
 mod _shared;
 
-use iced::alignment::Vertical;
 use iced::time::Instant;
-use iced::widget::{column, row, text};
-use iced::{Color, Element, Size, Subscription, Task};
+use iced::widget::column;
+use iced::{Element, Size, Subscription, Task};
 use magic_iced::{LineShadowTextProps, line_shadow_text};
 use std::time::Duration;
 
@@ -41,7 +40,7 @@ impl LineShadowTextExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               start,
+                start,
                 elapsed: Duration::ZERO,
             },
             Task::none(),
@@ -58,9 +57,8 @@ impl LineShadowTextExample {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
             Message::Tick(now) => {
-self.theme_shell.tick(now);
-
-            self.elapsed = now.duration_since(self.start);
+                self.theme_shell.tick(now);
+                self.elapsed = now.duration_since(self.start);
             }
         }
         Task::none()
@@ -71,22 +69,31 @@ self.theme_shell.tick(now);
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let now = self.theme_shell.now;
         let font_size = 72_u16;
-        let headline = row![
-            text("Ship ").size(f32::from(font_size)),
-            line_shadow_text(
-                "Fast",
-                self.elapsed,
-                LineShadowTextProps {
-                    font_size: Some(font_size),
-                    shadow_color: Color::BLACK,
-                    ..LineShadowTextProps::new()
-                },
-            ),
-        ]
-        .spacing(0)
-        .align_y(Vertical::Bottom);
+        let foreground = self.theme_shell.blended_foreground(now);
+        let shadow = self.theme_shell.blended_line_shadow(now);
 
-        _shared::themed_shell("Line Shadow Text", column![headline].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        let headline = line_shadow_text(
+            "Fast",
+            self.elapsed,
+            LineShadowTextProps {
+                prefix: Some("Ship"),
+                font_size: Some(font_size),
+                text_color: Some(foreground),
+                shadow_color: Some(shadow),
+                italic: true,
+                semibold: true,
+                ..LineShadowTextProps::new()
+            },
+            self.theme_shell.blended_theme(),
+        );
+
+        _shared::themed_shell(
+            "Line Shadow Text",
+            column![headline].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

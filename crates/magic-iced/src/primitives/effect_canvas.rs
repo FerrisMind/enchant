@@ -196,7 +196,11 @@ where
         if state.cache_mode != self.props.cache {
             state.cache_mode = self.props.cache;
             state.cache = EffectCanvasCacheState::new(self.props.cache);
+        }
+
+        if state.cache_revision != self.props.cache_revision {
             state.cache_revision = self.props.cache_revision;
+            clear_cache_if_needed(state.cache.as_ref());
         }
     }
 

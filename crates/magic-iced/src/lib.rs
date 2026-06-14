@@ -74,7 +74,7 @@ pub use widgets::{
     file_tree,
     flickering_grid, glare_hover, globe, grid_pattern, hero_video_dialog, hexagon_pattern,
     highlighter, hyper_text, icon_cloud, interactive_grid_pattern, interactive_hover_button,
-    iphone, kinetic_text, lens, light_rays, line_shadow_text, magic_card, marquee, marquee_indexed,
+    iphone, kinetic_text, lens, light_rays, line_shadow_color_for_mode, line_shadow_text, magic_card, marquee, marquee_indexed,
     meteors, noise_texture, noise_texture_layer,
     morphing_text, neon_gradient_card, number_ticker, orbiting_circles, particles, pixel_image,
     pointer, progressive_blur, pulsating_button, rainbow_button, retro_grid, ripple, ripple_button,

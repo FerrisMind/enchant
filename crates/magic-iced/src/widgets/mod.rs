@@ -133,7 +133,9 @@ pub use interactive_hover_button::{InteractiveHoverButtonProps, interactive_hove
 pub use kinetic_text::{KineticTextProps, KineticTextRole, KineticTextState, kinetic_text};
 pub use lens::{LensAction, LensProps, LensState, lens};
 pub use light_rays::{LightRaysProps, light_rays};
-pub use line_shadow_text::{LineShadowTextProps, line_shadow_text};
+pub use line_shadow_text::{
+    LineShadowTextProps, line_shadow_color_for_mode, line_shadow_text,
+};
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
 pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee, marquee_indexed};
 pub use meteors::{MeteorsProps, meteors};
