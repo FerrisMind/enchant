@@ -1,28 +1,62 @@
 mod _shared;
 
 use iced::time::Instant;
-use std::time::Duration;
-
-use iced::widget::{column, container, image, text};
-use iced::{Border, Element, Length, Size, Task};
+use iced::widget::{column, container, image, row, svg, text};
+use iced::{Alignment, ContentFit, Element, Length, Size, Task};
+use magic_iced::theme::MagicTheme;
 use magic_iced::{BacklightProps, backlight};
+use magic_iced::primitives::glow_from_svg_bytes;
+
+const IMAGE_WIDTH: f32 = 480.0;
+const IMAGE_HEIGHT: f32 = 320.0;
+const SVG_ICON: f32 = 64.0;
+const SVG_BLUR: f32 = 5.0;
 
 fn hero_image() -> image::Handle {
-    let width = 48;
-    let height = 32;
-    let mut pixels = Vec::with_capacity(width * height * 4);
-    for y in 0..height {
-        for x in 0..width {
-            let t = x as f32 / width as f32;
-            pixels.extend_from_slice(&[
-                (80.0 + t * 140.0) as u8,
-                (40.0 + (1.0 - t) * 90.0) as u8,
-                (180.0 - t * 60.0) as u8,
-                255,
-            ]);
+    use std::sync::OnceLock;
+
+    static HERO: OnceLock<image::Handle> = OnceLock::new();
+    HERO.get_or_init(|| {
+        image::Handle::from_bytes(include_bytes!("assets/backlight/hero.jpg").as_slice())
+    })
+    .clone()
+}
+
+fn prewarm_image_glow(source: &image::Handle, props: &BacklightProps, width: f32, height: f32) {
+    let _ = magic_iced::primitives::glow_from_handle(
+        source,
+        props.blur,
+        props.saturation,
+        props.radius,
+        width,
+        height,
+    );
+}
+
+fn prewarm_svg_glows() {
+    for dark in [false, true] {
+        let theme = theme_for_mode(dark);
+        for icon in svg_icon_specs() {
+            let tint = icon.mono.then(|| theme.palette.foreground);
+            let _ = glow_from_svg_bytes(
+                icon.bytes,
+                SVG_BLUR,
+                BacklightProps::new().saturation,
+                0.0,
+                SVG_ICON,
+                SVG_ICON,
+                tint,
+            );
         }
     }
-    image::Handle::from_rgba(width as u32, height as u32, pixels)
+}
+
+fn theme_for_mode(dark: bool) -> iced_shadcn::Theme {
+    if dark {
+        MagicTheme::dark()
+    } else {
+        MagicTheme::light()
+    }
 }
 
 pub fn main() -> iced::Result {
@@ -33,16 +67,16 @@ pub fn main() -> iced::Result {
     )
     .title("Backlight")
     .window(iced::window::Settings {
-        size: Size::new(900.0, 520.0),
+        size: Size::new(900.0, 720.0),
         ..Default::default()
     })
     .subscription(BacklightExample::subscription)
-        
     .run()
 }
 
 struct BacklightExample {
     theme_shell: _shared::ThemeShell,
+    image_props: BacklightProps,
 }
 
 #[derive(Debug, Clone)]
@@ -54,7 +88,22 @@ enum Message {
 
 impl BacklightExample {
     fn new() -> (Self, Task<Message>) {
-        (Self { theme_shell: _shared::ThemeShell::new() }, Task::none())
+        let image_props = BacklightProps::new().glow_source(hero_image()).radius(16.0);
+        prewarm_image_glow(
+            image_props.glow_source.as_ref().expect("hero"),
+            &image_props,
+            IMAGE_WIDTH,
+            IMAGE_HEIGHT,
+        );
+        prewarm_svg_glows();
+
+        (
+            Self {
+                theme_shell: _shared::ThemeShell::new(),
+                image_props,
+            },
+            Task::none(),
+        )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -73,26 +122,105 @@ impl BacklightExample {
         Task::none()
     }
 
-
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
 
-    fn view(&self) -> Element<'_, Message> {
-        let image_card = container(image(hero_image()))
-            .width(Length::Fixed(480.0))
-            .height(Length::Fixed(320.0))
-            .style(|_| container::Style {
-                border: Border {
-                    radius: 16.0.into(),
-                    ..Border::default()
-                },
-                ..container::Style::default()
-            });
+    fn image_demo(&self) -> Element<'_, Message> {
+        let image_card = container(
+            image(
+                self.image_props
+                    .glow_source
+                    .as_ref()
+                    .expect("hero")
+                    .clone(),
+            )
+            .width(Length::Fixed(IMAGE_WIDTH))
+            .height(Length::Fixed(IMAGE_HEIGHT))
+            .content_fit(ContentFit::Cover)
+            .border_radius(16.0),
+        )
+        .width(Length::Fixed(IMAGE_WIDTH))
+        .height(Length::Fixed(IMAGE_HEIGHT));
 
-        let body = backlight(image_card, BacklightProps::new(), self.theme_shell.theme());
-
-        _shared::themed_shell("Backlight", column![body, text("Fancy gradient backlight around media").size(14)].spacing(16),
-            &self.theme_shell, Message::ToggleTheme)
+        backlight(
+            image_card,
+            self.image_props.clone(),
+            self.theme_shell.theme(),
+        )
     }
+
+    fn svg_demo(&self) -> Element<'_, Message> {
+        let icons = svg_icon_specs()
+            .into_iter()
+            .map(|icon| self.svg_icon(icon))
+            .collect::<Vec<_>>();
+
+        row(icons)
+            .spacing(64)
+            .align_y(Alignment::Center)
+            .into()
+    }
+
+    fn svg_icon(&self, icon: SvgIconSpec) -> Element<'_, Message> {
+        let foreground = self.theme_shell.theme().palette.foreground;
+        let mut graphic = svg(icon.handle)
+            .width(Length::Fixed(SVG_ICON))
+            .height(Length::Fixed(SVG_ICON))
+            .content_fit(ContentFit::Contain);
+
+        if icon.mono {
+            graphic = graphic.style(move |_, _| svg::Style {
+                color: Some(foreground),
+                ..svg::Style::default()
+            });
+        }
+
+        let props = BacklightProps::new()
+            .blur(SVG_BLUR)
+            .glow_svg(icon.bytes, icon.mono)
+            .radius(0.0);
+
+        backlight(graphic, props, self.theme_shell.theme())
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        let body = column![
+            text("Image").size(16),
+            self.image_demo(),
+            text("SVG").size(16),
+            self.svg_demo(),
+        ]
+        .spacing(20)
+        .align_x(Alignment::Center);
+
+        _shared::themed_shell("Backlight", body, &self.theme_shell, Message::ToggleTheme)
+    }
+}
+
+#[derive(Clone)]
+struct SvgIconSpec {
+    bytes: &'static [u8],
+    handle: svg::Handle,
+    mono: bool,
+}
+
+fn svg_icon_specs() -> [SvgIconSpec; 3] {
+    [
+        SvgIconSpec {
+            bytes: include_bytes!("assets/beam/openai.svg"),
+            handle: _shared::beam_icons::openai(),
+            mono: true,
+        },
+        SvgIconSpec {
+            bytes: include_bytes!("assets/beam/google-drive.svg"),
+            handle: _shared::beam_icons::google_drive(),
+            mono: false,
+        },
+        SvgIconSpec {
+            bytes: include_bytes!("assets/beam/whatsapp.svg"),
+            handle: _shared::beam_icons::whatsapp(),
+            mono: false,
+        },
+    ]
 }

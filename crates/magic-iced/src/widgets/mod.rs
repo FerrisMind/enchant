@@ -92,7 +92,7 @@ pub use animated_theme_toggler::{
 };
 pub use aurora_text::{AuroraTextProps, aurora_text};
 pub use avatar_circles::{AvatarCircleEntry, AvatarCirclesProps, avatar_circles};
-pub use backlight::{BacklightProps, backlight};
+pub use backlight::{BacklightProps, BacklightSvgGlow, backlight};
 pub use blur_fade::{BlurFadeDirection, BlurFadeProps, BlurFadeState, blur_fade};
 pub use border_beam::{BorderBeamProps, border_beam};
 pub use code_comparison::{CodeComparisonProps, code_comparison};

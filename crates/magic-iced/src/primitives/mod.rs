@@ -1,5 +1,6 @@
 mod anchor_geometry;
 mod animated_value;
+mod backlight_glow;
 mod circular_geometry;
 mod effect_canvas;
 mod geo_map;
@@ -19,6 +20,7 @@ pub use anchor_geometry::{
     canvas_path, measure_anchors, point_at,
 };
 pub use animated_value::{AnimatedValue, MotionSpec, RepeatMode};
+pub use backlight_glow::{glow_from_handle, glow_from_svg_bytes, glow_spread, rasterize_svg_bytes};
 pub use circular_geometry::{OrbitPoint, circle_point, orbit_points, orbit_translation};
 pub use effect_canvas::{EffectCanvasCache, EffectCanvasProps, EffectProgram, effect_canvas};
 pub use geo_map::{GeoPoint, project_equirectangular, stagger_offset, world_point_cloud};

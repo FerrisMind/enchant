@@ -27,7 +27,7 @@ pub use widgets::{
     AnimatedCircularProgressBarState, AnimatedGradientTextProps, AnimatedGridPatternProps,
     AnimatedListProps, AnimatedListState, AnimatedShinyTextProps, AnimatedThemeTogglerController,
     AnimatedThemeTogglerProps, AuroraTextProps, AvatarCircleEntry, AvatarCirclesProps,
-    BacklightProps, BlurFadeDirection, BlurFadeProps, BlurFadeState, BorderBeamProps,
+    BacklightProps, BacklightSvgGlow, BlurFadeDirection, BlurFadeProps, BlurFadeState, BorderBeamProps,
     ClientTweetCardAction, ClientTweetCardProps, ClientTweetCardState, ClientTweetCardStatus,
     CodeComparisonProps, ComicTextProps, ComicTextState, ConfettiAction, ConfettiBurst,
     ConfettiProps, ConfettiState,     CoolModeAction, CoolModeProps, CoolModeState, CoolParticleVisual,
