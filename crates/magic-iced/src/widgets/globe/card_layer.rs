@@ -6,8 +6,8 @@ use iced::advanced::layout::{self, Layout};
 use iced::advanced::overlay;
 use iced::advanced::widget::{Operation, Tree, Widget};
 use iced::advanced::{Clipboard, Shell};
-use iced::widget::{container, shader};
-use iced::{Background, border, Color, Element, Event, Length, Point, Rectangle, Renderer, Size, Vector, Border};
+use iced::widget::shader;
+use iced::{Element, Event, Length, Point, Rectangle, Renderer, Size, Vector};
 
 pub struct GlobeCardLayer<'a, Message> {
     globe: Element<'a, Message>,
@@ -18,32 +18,16 @@ pub fn globe_card_layer<'a, Message: Clone + 'static>(
     state: &'a GlobeState,
     props: &'a GlobeProps,
     top_offset: f32,
-    canvas_background: Color,
     on_action: impl Fn(GlobeAction) -> Message + 'static + 'a,
 ) -> Element<'a, Message> {
-    let globe = {
-        let shader = shader(GlobeShaderProgram {
-            state,
-            props,
-            on_action: Box::new(on_action),
-        })
-        .width(Length::Fixed(GLOBE_CANVAS_SIDE))
-        .height(Length::Fixed(GLOBE_CANVAS_SIDE));
-
-        container(shader)
-            .width(Length::Fixed(GLOBE_CANVAS_SIDE))
-            .height(Length::Fixed(GLOBE_CANVAS_SIDE))
-            .clip(true)
-            .style(move |_| iced::widget::container::Style {
-                background: Some(Background::Color(canvas_background)),
-                border: Border {
-                    radius: border::bottom(super::DEMO_CARD_INNER_RADIUS).into(),
-                    ..Border::default()
-                },
-                ..iced::widget::container::Style::default()
-            })
-            .into()
-    };
+    let globe = shader(GlobeShaderProgram {
+        state,
+        props,
+        on_action: Box::new(on_action),
+    })
+    .width(Length::Fixed(GLOBE_CANVAS_SIDE))
+    .height(Length::Fixed(GLOBE_CANVAS_SIDE))
+    .into();
 
     Element::new(GlobeCardLayer { globe, top_offset })
 }
@@ -157,7 +141,8 @@ impl<Message: Clone + 'static> Widget<Message, iced::Theme, Renderer>
         cursor: iced::mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        let Some(clipped_viewport) = layout.bounds().intersection(viewport) else {
+        let child_layout = layout.children().next().expect("globe child layout");
+        let Some(clip) = child_layout.bounds().intersection(viewport) else {
             return;
         };
 
@@ -166,27 +151,21 @@ impl<Message: Clone + 'static> Widget<Message, iced::Theme, Renderer>
             renderer,
             theme,
             style,
-            layout.children().next().unwrap(),
+            child_layout,
             cursor,
-            &clipped_viewport,
+            &clip,
         );
     }
 
     fn overlay<'b>(
         &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &Renderer,
-        viewport: &Rectangle,
-        translation: Vector,
+        _tree: &'b mut Tree,
+        _layout: Layout<'b>,
+        _renderer: &Renderer,
+        _viewport: &Rectangle,
+        _translation: Vector,
     ) -> Option<overlay::Element<'b, Message, iced::Theme, Renderer>> {
-        overlay::from_children(
-            std::slice::from_mut(&mut self.globe),
-            tree,
-            layout,
-            renderer,
-            viewport,
-            translation,
-        )
+        // Shader draws via `draw_primitive` only — no overlay (would bypass card clip).
+        None
     }
 }

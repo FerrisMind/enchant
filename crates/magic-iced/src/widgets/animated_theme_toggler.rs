@@ -2,7 +2,7 @@ use iced::mouse;
 use iced::time::Instant;
 use iced::widget::{button, canvas, container, svg};
 use iced::{Color, Element, Length, Point, Rectangle, Renderer};
-use iced_shadcn::Theme;
+use iced_shadcn::{Palette, Theme};
 
 use crate::primitives::{AnimatedValue, MotionSpec};
 use crate::theme::MagicTheme;
@@ -86,6 +86,20 @@ impl AnimatedThemeTogglerController {
 
     pub fn is_transition_active(&self, now: Instant) -> bool {
         self.started.is_some() && self.reveal.is_animating(now)
+    }
+
+    /// Theme with palette colors interpolated during circle-reveal (page background, dock, etc.).
+    pub fn blended_theme(&self, now: Instant) -> Theme {
+        let target = theme_for_mode(self.dark_mode);
+        if !self.is_transition_active(now) {
+            return target;
+        }
+
+        let source = theme_for_mode(!self.dark_mode);
+        let reveal = self.reveal_at(now);
+        let mut theme = target.clone();
+        theme.palette = blend_palette(source.palette, target.palette, reveal);
+        theme
     }
 
     /// Theme painted by the page while the transition runs (old theme until reveal ends).
@@ -243,6 +257,57 @@ fn theme_for_mode(dark_mode: bool) -> Theme {
         MagicTheme::dark()
     } else {
         MagicTheme::light()
+    }
+}
+
+fn blend_palette(from: Palette, to: Palette, progress: f32) -> Palette {
+    let blend = |from: Color, to: Color| blend_colors(from, to, progress);
+    Palette {
+        background: blend(from.background, to.background),
+        foreground: blend(from.foreground, to.foreground),
+        card: blend(from.card, to.card),
+        card_foreground: blend(from.card_foreground, to.card_foreground),
+        popover: blend(from.popover, to.popover),
+        popover_foreground: blend(from.popover_foreground, to.popover_foreground),
+        border: blend(from.border, to.border),
+        input: blend(from.input, to.input),
+        ring: blend(from.ring, to.ring),
+        primary: blend(from.primary, to.primary),
+        primary_foreground: blend(from.primary_foreground, to.primary_foreground),
+        secondary: blend(from.secondary, to.secondary),
+        secondary_foreground: blend(from.secondary_foreground, to.secondary_foreground),
+        accent: blend(from.accent, to.accent),
+        accent_foreground: blend(from.accent_foreground, to.accent_foreground),
+        muted: blend(from.muted, to.muted),
+        muted_foreground: blend(from.muted_foreground, to.muted_foreground),
+        destructive: blend(from.destructive, to.destructive),
+        destructive_foreground: blend(from.destructive_foreground, to.destructive_foreground),
+        chart_1: blend(from.chart_1, to.chart_1),
+        chart_2: blend(from.chart_2, to.chart_2),
+        chart_3: blend(from.chart_3, to.chart_3),
+        chart_4: blend(from.chart_4, to.chart_4),
+        chart_5: blend(from.chart_5, to.chart_5),
+        sidebar: blend(from.sidebar, to.sidebar),
+        sidebar_foreground: blend(from.sidebar_foreground, to.sidebar_foreground),
+        sidebar_primary: blend(from.sidebar_primary, to.sidebar_primary),
+        sidebar_primary_foreground: blend(
+            from.sidebar_primary_foreground,
+            to.sidebar_primary_foreground,
+        ),
+        sidebar_accent: blend(from.sidebar_accent, to.sidebar_accent),
+        sidebar_accent_foreground: blend(from.sidebar_accent_foreground, to.sidebar_accent_foreground),
+        sidebar_border: blend(from.sidebar_border, to.sidebar_border),
+        sidebar_ring: blend(from.sidebar_ring, to.sidebar_ring),
+    }
+}
+
+fn blend_colors(from: Color, to: Color, progress: f32) -> Color {
+    let t = progress.clamp(0.0, 1.0);
+    Color {
+        r: from.r + (to.r - from.r) * t,
+        g: from.g + (to.g - from.g) * t,
+        b: from.b + (to.b - from.b) * t,
+        a: from.a + (to.a - from.a) * t,
     }
 }
 

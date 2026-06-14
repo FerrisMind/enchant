@@ -2,19 +2,21 @@ mod card_layer;
 mod pipeline;
 mod primitive;
 mod program;
+mod vignette_layer;
 
 pub use pipeline::lat_lon_to_unit;
 
 use crate::widgets::AnimatedThemeTogglerController;
 use card_layer::globe_card_layer;
+use vignette_layer::globe_vignette_layer;
 use iced::alignment::Vertical;
 use iced::mouse;
 use iced::time::Instant;
 use iced::advanced::graphics::gradient as canvas_gradient;
 use iced::widget::{canvas, container, shader, stack, Space};
 use iced::{
-    border, gradient, Alignment, Background, Border, Color, Element, Font, Length, Pixels, Point,
-    Radians, Rectangle, Renderer, Size,
+    border, Alignment, Background, Border, Color, Element, Font, Length, Pixels, Point,
+    Rectangle, Renderer,
 };
 use iced_shadcn::Theme;
 use program::GlobeShaderProgram;
@@ -167,13 +169,14 @@ impl Default for GlobeProps {
             dark: 0.0,
             scale: 1.0,
             offset: [0.0, 0.0],
-            marker_elevation: 0.05,
+            // COBE default is 0.05; Magic UI globe demos read as on-surface at 0.
+            marker_elevation: 0.0,
             device_pixel_ratio: 2.0,
             auto_rotate_speed: 0.3,
             drag_sensitivity: 1.0 / MOVEMENT_DAMPING,
-            base_color: None,
-            marker_color: None,
-            glow_color: None,
+            base_color: Some(DEFAULT_BASE),
+            marker_color: Some(DEFAULT_MARKER),
+            glow_color: Some(DEFAULT_GLOW),
             outer_glow: false,
             canvas_background: None,
             markers: default_markers(),
@@ -309,8 +312,6 @@ pub fn globe_demo<'a, Message: Clone + 'static>(
     on_action: impl Fn(GlobeAction) -> Message + 'static + 'a,
 ) -> Element<'a, Message> {
     let title = demo_title(colors.title_top, colors.title_bottom);
-    let vignette = vignette_overlay(colors.dark_mode);
-
     let top_offset = globe_top_offset(DEMO_CARD_HEIGHT);
 
     let title_layer = container(title)
@@ -320,9 +321,9 @@ pub fn globe_demo<'a, Message: Clone + 'static>(
 
     let stage = stack![
         Space::new().width(Length::Fill).height(Length::Fill),
-        globe_card_layer(state, props, top_offset, colors.background, on_action),
+        globe_card_layer(state, props, top_offset, on_action),
         title_layer,
-        vignette,
+        globe_vignette_layer(),
     ]
     .width(Length::Fill)
     .height(Length::Fill)
@@ -359,34 +360,6 @@ fn demo_title<'a, Message: 'a>(top: Color, bottom: Color) -> Element<'a, Message
     canvas(GlobeTitleProgram { top, bottom })
         .width(Length::Fill)
         .height(Length::Fixed(DEMO_TITLE_SIZE as f32 * 1.05))
-        .into()
-}
-
-fn vignette_overlay<'a, Message: 'a>(dark_mode: bool) -> Element<'a, Message> {
-    let bottom = if dark_mode {
-        Color::from_rgba(0.0, 0.0, 0.0, 0.35)
-    } else {
-        Color::from_rgba(0.0, 0.0, 0.0, 0.20)
-    };
-    container(Space::new())
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .clip(true)
-        .style(move |_| container::Style {
-            // Magic UI: radial-gradient(circle_at_50%_200%, …) — darkening from the bottom.
-            // iced: angle 0 → line bottom → top (see `Radians::to_distance`).
-            background: Some(Background::Gradient(gradient::Gradient::Linear(
-                gradient::Linear::new(Radians(0.0))
-                    .add_stop(0.0, bottom)
-                    .add_stop(0.45, Color::TRANSPARENT)
-                    .add_stop(1.0, Color::TRANSPARENT),
-            ))),
-            border: Border {
-                radius: border::radius(DEMO_CARD_INNER_RADIUS).into(),
-                ..Border::default()
-            },
-            ..container::Style::default()
-        })
         .into()
 }
 
@@ -524,6 +497,45 @@ mod tests {
         let pos = lat_lon_to_unit(0.0, 180.0);
         assert!(pos[0] < -0.99);
         assert!(pos[1].abs() < 0.01);
+    }
+
+    /// COBE `globe.frag.glslx` map UV + unflipped WebGPU texture upload (PNG top = v=0).
+    #[test]
+    fn cobe_map_samples_land_at_magic_ui_markers() {
+        const COBE_MAP: &[u8] = include_bytes!("../../../assets/cobe_map.png");
+        let img = image::load_from_memory(COBE_MAP)
+            .expect("cobe map")
+            .to_luma8();
+        let (w, h) = img.dimensions();
+
+        for marker in default_markers() {
+            let [x, y, z] = lat_lon_to_unit(marker.lat, marker.lng);
+            let g_phi = y.clamp(-1.0, 1.0).asin();
+            let mut g_theta = (-x / g_phi.cos()).clamp(-1.0, 1.0).acos();
+            if z < 0.0 {
+                g_theta = -g_theta;
+            }
+            let u = (g_theta * 0.5) / std::f32::consts::PI;
+            let v = -(g_phi / std::f32::consts::PI + 0.5);
+            let px = ((u.rem_euclid(1.0)) * w as f32) as u32 % w;
+            let py = ((v.rem_euclid(1.0)) * h as f32) as u32 % h;
+            let mut peak = 0u8;
+            for dy in -4i32..=4 {
+                for dx in -4i32..=4 {
+                    let sx = (px as i32 + dx).rem_euclid(w as i32) as u32;
+                    let sy = (py as i32 + dy).rem_euclid(h as i32) as u32;
+                    peak = peak.max(img.get_pixel(sx, sy).0[0]);
+                }
+            }
+            assert!(
+                peak > 128,
+                "expected land near lat={} lng={}, uv=({:.3},{:.3}) peak={peak}",
+                marker.lat,
+                marker.lng,
+                u.rem_euclid(1.0),
+                v.rem_euclid(1.0),
+            );
+        }
     }
 
     #[test]

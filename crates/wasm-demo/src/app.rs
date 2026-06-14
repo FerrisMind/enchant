@@ -121,6 +121,8 @@ impl WasmDemoApp {
         let number_ticker_state = NumberTickerState::new(&number_ticker_props);
         let globe_state = GlobeState::new(&globe_props);
         let icon_cloud_state = IconCloudState::new(&icon_cloud_props);
+        let mut dock_state = DockState::new();
+        dock_state.prepare(4, DockProps::new().icon_size);
         let app = Self {
             route,
             route_revision: 0,
@@ -145,7 +147,7 @@ impl WasmDemoApp {
             terminal_state,
             word_rotate_state,
             number_ticker_state,
-            dock_state: DockState::new(),
+            dock_state,
             globe_state,
             icon_cloud_state,
             theme_toggler: AnimatedThemeTogglerController::new(true, &toggler_props),
@@ -170,6 +172,7 @@ impl WasmDemoApp {
                     .tick(now, &self.number_ticker_props);
                 self.theme_toggler.tick(now, &theme_toggler_props());
                 self.theme = self.theme_toggler.display_theme(now);
+                self.dock_state.tick(now, &DockProps::new());
                 self.globe_state.tick(now, &self.globe_props);
                 self.icon_cloud_state.tick(now, &self.icon_cloud_props);
                 self.video_text_state.tick(now);
@@ -196,7 +199,12 @@ impl WasmDemoApp {
             Message::SetPreviewTab(tab) => self.preview_tab = tab,
             Message::ResetDetailDemo => self.reset_demos(),
             Message::SearchChanged(value) => self.search = value,
-            Message::Dock(action) => self.dock_state.apply_action(&action),
+            Message::Dock(action) => {
+                let props = DockProps::new();
+                let now = self.origin + self.elapsed;
+                self.dock_state.apply_action(&action, 4, props.icon_size);
+                self.dock_state.tick(now, &props);
+            }
             Message::Globe(action) => self.globe_state.apply_action(&action, &self.globe_props),
             Message::IconCloud(action) => self
                 .icon_cloud_state
@@ -272,6 +280,7 @@ impl WasmDemoApp {
         self.word_rotate_state = WordRotateState::new(&self.word_rotate_props);
         self.number_ticker_state = NumberTickerState::new(&self.number_ticker_props);
         self.dock_state = DockState::new();
+        self.dock_state.prepare(4, DockProps::new().icon_size);
         self.globe_state = GlobeState::new(&self.globe_props);
         self.icon_cloud_state = IconCloudState::new(&self.icon_cloud_props);
         self.theme_toggler = AnimatedThemeTogglerController::new(

@@ -266,26 +266,26 @@ impl WasmDemoApp {
     }
 
     pub(crate) fn preview_dock_variant(&self, direction: DockDirection) -> Element<'_, Message> {
+        let now = self.origin + self.elapsed;
+        let theme = self.theme_toggler.blended_theme(now);
+        let foreground = theme.palette.foreground;
         let items = vec![
-            dock_icon(lucide(LucideIcon::House, 18, self.theme.palette.foreground)),
-            dock_icon(lucide(LucideIcon::Code, 18, self.theme.palette.foreground)),
-            dock_icon(lucide(LucideIcon::Box, 18, self.theme.palette.foreground)),
-            dock_icon(lucide(
-                LucideIcon::Sparkles,
-                18,
-                self.theme.palette.foreground,
-            )),
+            dock_icon(lucide(LucideIcon::House, 18, foreground)),
+            dock_icon(lucide(LucideIcon::Code, 18, foreground)),
+            dock_icon(lucide(LucideIcon::Box, 18, foreground)),
+            dock_icon(lucide(LucideIcon::Sparkles, 18, foreground)),
         ];
 
+        let props = DockProps {
+            direction,
+            ..DockProps::new()
+        };
         centered(dock(
             items,
             &self.dock_state,
-            DockProps {
-                direction,
-                ..DockProps::new()
-            },
+            props,
             Message::Dock,
-            &self.theme,
+            &theme,
         ))
     }
 

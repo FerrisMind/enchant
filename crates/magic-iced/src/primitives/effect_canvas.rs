@@ -7,7 +7,7 @@ use iced::advanced::widget::tree;
 use iced::advanced::{Clipboard, Layout, Shell, Widget};
 use iced::mouse;
 use iced::widget::canvas;
-use iced::{Element, Event, Length, Rectangle, Renderer, Size, Vector};
+use iced::{Element, Event, Length, Padding, Point, Rectangle, Renderer, Size, Vector};
 use std::cell::Cell;
 
 pub trait EffectProgram<Message> {
@@ -122,6 +122,8 @@ pub struct EffectCanvasProps {
     pub height: Length,
     pub cache: EffectCanvasCache,
     pub cache_revision: u64,
+    /// Extra pixels drawn past the layout bounds on each side (`overflow: visible`).
+    pub draw_overflow: Padding,
 }
 
 impl Default for EffectCanvasProps {
@@ -131,6 +133,7 @@ impl Default for EffectCanvasProps {
             height: Length::Fixed(220.0),
             cache: EffectCanvasCache::Off,
             cache_revision: 0,
+            draw_overflow: Padding::ZERO,
         }
     }
 }
@@ -157,6 +160,11 @@ impl EffectCanvasProps {
 
     pub fn cache_revision(mut self, cache_revision: u64) -> Self {
         self.cache_revision = cache_revision;
+        self
+    }
+
+    pub fn draw_overflow(mut self, draw_overflow: Padding) -> Self {
+        self.draw_overflow = draw_overflow;
         self
     }
 }
@@ -286,10 +294,17 @@ where
         }
 
         let state = tree.state.downcast_ref::<EffectCanvasTreeState<P::State>>();
+        let overflow = self.props.draw_overflow;
+        let draw_bounds = Rectangle::with_size(Size::new(
+            bounds.width + overflow.left + overflow.right,
+            bounds.height + overflow.top + overflow.bottom,
+        ));
 
-        renderer.with_translation(Vector::new(bounds.x, bounds.y), |renderer| {
+        renderer.with_translation(
+            Vector::new(bounds.x - overflow.left, bounds.y - overflow.top),
+            |renderer| {
             if let Some(cache_state) = state.cache.as_ref() {
-                let cached_bounds = CachedBounds::from(bounds.size());
+                let cached_bounds = CachedBounds::from(draw_bounds.size());
                 if cache_needs_clear(
                     cache_state.bounds.get(),
                     cache_state.revision.get(),
@@ -304,12 +319,12 @@ where
                 let used_cache = Cell::new(false);
                 let geometry = cache_state.cache.draw_with_bounds(
                     renderer,
-                    Rectangle::with_size(bounds.size()),
+                    draw_bounds,
                     |frame| {
                         used_cache.set(self.program.draw_cached(
                             &state.program,
                             frame,
-                            Rectangle::with_size(bounds.size()),
+                            draw_bounds,
                             cursor,
                             viewport,
                         ));
@@ -320,22 +335,26 @@ where
                     renderer.draw_geometry(geometry);
                 } else {
                     cache_state.cache.clear();
-                    for geometry in
-                        self.program
-                            .draw(&state.program, renderer, bounds, cursor, viewport)
-                    {
+                    for geometry in self.program.draw(
+                        &state.program,
+                        renderer,
+                        draw_bounds,
+                        cursor,
+                        viewport,
+                    ) {
                         renderer.draw_geometry(geometry);
                     }
                 }
             } else {
                 for geometry in
                     self.program
-                        .draw(&state.program, renderer, bounds, cursor, viewport)
+                        .draw(&state.program, renderer, draw_bounds, cursor, viewport)
                 {
                     renderer.draw_geometry(geometry);
                 }
             }
-        });
+        },
+        );
     }
 }
 
@@ -402,6 +421,7 @@ mod tests {
         assert_eq!(props.height, Length::Fixed(220.0));
         assert_eq!(props.cache, EffectCanvasCache::Off);
         assert_eq!(props.cache_revision, 0);
+        assert_eq!(props.draw_overflow, Padding::ZERO);
     }
 
     #[test]

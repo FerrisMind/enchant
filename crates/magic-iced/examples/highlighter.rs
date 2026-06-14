@@ -1,8 +1,8 @@
 mod _shared;
 
 use iced::time::{Duration, Instant};
-use iced::widget::{column, row, text};
-use iced::{Color, Element, Size, Subscription, Task};
+use iced::widget::{button, column, row, svg, text, tooltip};
+use iced::{Alignment, Color, Element, Length, Size, Subscription, Task};
 use magic_iced::{
     HighlighterAction, HighlighterProps, HighlighterState, highlighter,
 };
@@ -28,12 +28,12 @@ struct HighlighterExample {
     highlight_state: HighlighterState,
     underline_props: HighlighterProps,
     highlight_props: HighlighterProps,
-    now: Instant,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     ToggleTheme,
+    ResetAnimations,
     AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
@@ -57,7 +57,6 @@ impl HighlighterExample {
                 highlight_state: HighlighterState::new(&highlight_props),
                 underline_props,
                 highlight_props,
-                now: Instant::now(),
             },
             Task::none(),
         )
@@ -69,15 +68,18 @@ impl HighlighterExample {
                 return _shared::ThemeShell::measure_toggle_anchor()
                     .map(Message::AnchorsMeasured);
             }
+            Message::ResetAnimations => {
+                let now = self.theme_shell.now;
+                self.underline_state.reset(now, &self.underline_props);
+                self.highlight_state.reset(now, &self.highlight_props);
+            }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
             Message::Tick(now) => {
-self.theme_shell.tick(now);
-
-            self.now = now;
-            self.underline_state.tick(now, &self.underline_props);
-            self.highlight_state.tick(now, &self.highlight_props);
+                self.theme_shell.tick(now);
+                self.underline_state.tick(now, &self.underline_props);
+                self.highlight_state.tick(now, &self.highlight_props);
             }
         }
         Task::none()
@@ -88,27 +90,79 @@ self.theme_shell.tick(now);
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = row![
-            text("The "),
-            highlighter(
-                text("Magic UI Highlighter"),
-                &self.underline_state,
-                self.now,
-                &self.underline_props,
-                self.theme_shell.theme(),
-            ),
-            text(" makes important "),
-            highlighter(
-                text("text stand out"),
-                &self.highlight_state,
-                self.now,
-                &self.highlight_props,
-                self.theme_shell.theme(),
-            ),
-            text(" effortlessly."),
-        ]
-        .spacing(4);
+        let now = self.theme_shell.now;
+        let foreground = self.theme_shell.blended_foreground(now);
+        let theme = self.theme_shell.blended_theme();
 
-        _shared::themed_shell("Highlighter", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        let body = row![
+            body_text("The ", foreground),
+            highlighter(
+                body_text("Magic UI Highlighter", foreground),
+                &self.underline_state,
+                now,
+                &self.underline_props,
+                theme,
+            ),
+            body_text(" makes important ", foreground),
+            highlighter(
+                body_text("text stand out", foreground),
+                &self.highlight_state,
+                now,
+                &self.highlight_props,
+                theme,
+            ),
+            body_text(" effortlessly.", foreground),
+        ]
+        .spacing(0);
+
+        let controls = row![
+            reset_button(foreground),
+            text("Replay with new random strokes")
+                .size(13)
+                .style(move |_| iced::widget::text::Style {
+                    color: Some(foreground),
+                }),
+        ]
+        .spacing(10)
+        .align_y(Alignment::Center);
+
+        _shared::themed_shell(
+            "Highlighter",
+            column![controls, body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
+}
+
+fn body_text<'a>(label: &'static str, foreground: Color) -> Element<'a, Message> {
+    text(label)
+        .style(move |_| iced::widget::text::Style {
+            color: Some(foreground),
+        })
+        .into()
+}
+
+fn reset_button(foreground: Color) -> Element<'static, Message> {
+    let icon = svg(reset_icon_handle())
+        .width(Length::Fixed(18.0))
+        .height(Length::Fixed(18.0))
+        .style(move |_, _| svg::Style {
+            color: Some(foreground),
+            ..svg::Style::default()
+        });
+
+    tooltip(
+        button(icon)
+            .padding(8)
+            .on_press(Message::ResetAnimations),
+        "New random strokes",
+        tooltip::Position::Bottom,
+    )
+    .into()
+}
+
+fn reset_icon_handle() -> svg::Handle {
+    const ROTATE_CCW: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>"#;
+    svg::Handle::from_memory(ROTATE_CCW.as_bytes())
 }

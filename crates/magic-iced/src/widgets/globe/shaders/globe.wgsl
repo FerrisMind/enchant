@@ -109,9 +109,9 @@ fn vs_globe(@builtin(vertex_index) vi: u32) -> VertexOutput {
     let ndc = corners[vi];
     var out: VertexOutput;
     out.clip_position = vec4(ndc, 0.0, 1.0);
-    // Widget-local coords with WebGL-style Y (up), independent of framebuffer origin.
+    // Iced widget coords: origin top-left (matches COBE `gl_FragCoord` uv math without Y flip).
     let local = (ndc * 0.5 + 0.5) * u.resolution;
-    out.local_gl = vec2(local.x, u.resolution.y - local.y);
+    out.local_gl = local;
     return out;
 }
 

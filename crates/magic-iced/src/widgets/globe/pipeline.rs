@@ -87,8 +87,7 @@ impl GlobePipeline {
 
         let map_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("globe.map.sampler"),
-            // COBE relies on GL_TEXTURE_WRAP_* = REPEAT (default in WebGL) because map UVs
-            // use negative V in `-(gPhi / PI + 0.5)`; ClampToEdge samples white pole rows.
+            // COBE map UVs can be < 0 on V; Repeat matches WebGL `REPEAT` wrap.
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Nearest,
@@ -96,7 +95,9 @@ impl GlobePipeline {
             ..Default::default()
         });
 
-        let rgba = load_cobe_map_rgba_flipped();
+        let rgba = image::load_from_memory(COBE_MAP)
+            .expect("cobe map png")
+            .to_rgba8();
         let (width, height) = rgba.dimensions();
 
         let map_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -384,7 +385,7 @@ impl GlobePipeline {
         state: &GlobeState,
         props: &GlobeProps,
         bounds: Rectangle,
-        dpr: f32,
+        _dpr: f32,
     ) {
         let scale_factor = viewport.scale_factor();
         let width = (bounds.width * scale_factor).max(1.0);
@@ -397,8 +398,8 @@ impl GlobePipeline {
         self.pending_globe = GlobeUniforms {
             resolution: [width, height],
             offset: [
-                props.offset[0] * dpr,
-                props.offset[1] * dpr,
+                props.offset[0] * scale_factor,
+                props.offset[1] * scale_factor,
             ],
             rotation: [state.phi, state.theta],
             dots: props.map_samples as f32,
@@ -428,8 +429,8 @@ impl GlobePipeline {
             scale: props.scale,
             marker_elevation: props.marker_elevation,
             offset: [
-                props.offset[0] * dpr,
-                props.offset[1] * dpr,
+                props.offset[0] * scale_factor,
+                props.offset[1] * scale_factor,
             ],
             marker_color,
         };
@@ -486,24 +487,6 @@ impl GlobePipeline {
             render_pass.draw(0..6, 0..self.marker_count);
         }
     }
-}
-
-/// WebGL flips image rows on `texImage2D` upload; match that so COBE map UVs align.
-fn load_cobe_map_rgba_flipped() -> image::RgbaImage {
-    let mut rgba = image::load_from_memory(COBE_MAP)
-        .expect("cobe map png")
-        .to_rgba8();
-    let (width, height) = rgba.dimensions();
-    let row_bytes = (width * 4) as usize;
-    let pixels = rgba.as_mut();
-    for y in 0..height / 2 {
-        let top = y as usize * row_bytes;
-        let bottom = (height as usize - 1 - y as usize) * row_bytes;
-        for i in 0..row_bytes {
-            pixels.swap(top + i, bottom + i);
-        }
-    }
-    rgba
 }
 
 fn uniform_buffer_size<T>() -> u64 {
