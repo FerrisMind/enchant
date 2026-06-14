@@ -64,7 +64,10 @@ impl ShineBorderExample {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
 
-            Message::Tick(now) => self.elapsed = now.duration_since(self.start),
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+                self.elapsed = now.duration_since(self.start);
+            }
             Message::EmailChanged(value) => self.email = value,
             Message::PasswordChanged(value) => self.password = value,
             Message::SignIn => {}
@@ -83,7 +86,7 @@ impl ShineBorderExample {
             Some(Message::EmailChanged),
             Some(Message::PasswordChanged),
             Some(Message::SignIn),
-            self.theme_shell.theme(),
+            self.theme_shell.blended_theme(),
         );
 
         let card = container(stack(vec![
@@ -94,7 +97,8 @@ impl ShineBorderExample {
                 .into(),
         ]))
         .width(Length::Fixed(350.0))
-        .height(Length::Fixed(360.0));
+        .height(Length::Fixed(360.0))
+        .clip(true);
 
         _shared::themed_shell("Shine Border", column![card].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }

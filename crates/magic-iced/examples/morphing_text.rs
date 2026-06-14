@@ -87,7 +87,15 @@ self.theme_shell.tick(now);
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = morphing_text(self.elapsed, &self.props, self.theme_shell.theme());
+        let props = MorphingTextProps {
+            color: Some(self.theme_shell.blended_foreground(self.theme_shell.now)),
+            ..self.props.clone()
+        };
+        let body = morphing_text(
+            self.elapsed,
+            &props,
+            self.theme_shell.blended_theme(),
+        );
         _shared::themed_shell("Morphing Text", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

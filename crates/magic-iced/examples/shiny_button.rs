@@ -1,7 +1,7 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{column, text};
+use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
 use magic_iced::{ShinyButtonProps, shiny_button};
 use std::time::Duration;
@@ -56,8 +56,10 @@ impl ShinyButtonExample {
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
-
-            Message::Tick(now) => self.elapsed = now.duration_since(self.start),
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+                self.elapsed = now.duration_since(self.start);
+            }
         }
         Task::none()
     }
@@ -67,14 +69,28 @@ impl ShinyButtonExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let now = self.theme_shell.now;
+        let transition = self.theme_shell.controller.is_transition_active(now);
         let body = shiny_button(
-            text("Shiny Button").size(16),
+            "SHINY BUTTON",
+            14,
             None,
             self.elapsed,
-            ShinyButtonProps::new(),
+            ShinyButtonProps::new()
+                .text_color(self.theme_shell.blended_shiny_text_color(now))
+                .primary_color(self.theme_shell.blended_shiny_primary(now))
+                .border_color(self.theme_shell.blended_shiny_border(now))
+                .background_color(self.theme_shell.blended_shiny_background(now))
+                .text_shine_enabled(!transition)
+                .border_shine_enabled(!transition),
             self.theme_shell.theme(),
         );
 
-        _shared::themed_shell("Shiny Button", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Shiny Button",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

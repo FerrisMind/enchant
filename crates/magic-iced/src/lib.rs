@@ -79,7 +79,7 @@ pub use widgets::{
     morphing_text, neon_gradient_card, number_ticker, orbiting_circles, particles, pixel_image,
     pointer, progressive_blur, pulsating_button, rainbow_button, retro_grid, ripple, ripple_button,
     safari, scroll_progress, scroll_velocity_container, scroll_velocity_row, shimmer_button,
-    shine_border, shiny_button, smooth_cursor, sparkles_text, spinning_text, striped_pattern,
+    shine_border, shiny_button, shiny_text_color_for_mode, smooth_cursor, sparkles_text, spinning_text, striped_pattern,
     terminal, text_3d_flip, text_animate, text_reveal, tweet_card, typing_animation, video_text,
     warp_background, word_rotate,
 };

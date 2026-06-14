@@ -164,7 +164,7 @@ pub use scroll_based_velocity::{
 pub use scroll_progress::{ScrollProgressProps, scroll_progress};
 pub use shimmer_button::{ShimmerButtonProps, shimmer_button};
 pub use shine_border::{ShineBorderProps, shine_border};
-pub use shiny_button::{ShinyButtonProps, shiny_button};
+pub use shiny_button::{ShinyButtonProps, shiny_button, shiny_text_color_for_mode};
 pub use smooth_cursor::{
     SmoothCursorAction, SmoothCursorProps, SmoothCursorSpringConfig, SmoothCursorState,
     smooth_cursor,
