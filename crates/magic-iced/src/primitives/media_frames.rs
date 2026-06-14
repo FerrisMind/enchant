@@ -247,6 +247,7 @@ fn safari_media_svg(bytes: &[u8], mime: &str, url: &str, _simple: bool) -> Vec<u
     svg.into_bytes()
 }
 
+#[cfg(test)]
 fn resvg_parse_ok(bytes: &[u8]) -> bool {
     let options = resvg::usvg::Options::default();
     resvg::usvg::Tree::from_data(bytes, &options).is_ok()
@@ -303,9 +304,7 @@ pub fn mockup_frame_with_props<'a, Message: Clone + 'a + 'static>(
             };
             frame_svg(bytes)
         }
-        MockupFrameKind::Safari => {
-            safari_svg(SAFARI_DEVICE_LIGHT, &url)
-        }
+        MockupFrameKind::Safari => safari_svg(SAFARI_DEVICE_LIGHT, &url),
     };
 
     aspect_ratio(
@@ -372,12 +371,11 @@ mod tests {
             &mut pixmap.as_mut(),
         );
 
-        let opaque = pixmap
-            .pixels()
-            .iter()
-            .filter(|px| px.alpha() > 10)
-            .count();
-        assert!(opaque > 50_000, "expected visible frame chrome, got {opaque}");
+        let opaque = pixmap.pixels().iter().filter(|px| px.alpha() > 10).count();
+        assert!(
+            opaque > 50_000,
+            "expected visible frame chrome, got {opaque}"
+        );
     }
 
     #[test]

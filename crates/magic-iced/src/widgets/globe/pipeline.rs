@@ -1,8 +1,8 @@
 use crate::widgets::globe::{GlobeMarker, GlobeProps, GlobeState};
 use iced::Rectangle;
-use iced::widget::shader::Viewport;
 use iced::wgpu;
 use iced::wgpu::util::DeviceExt;
+use iced::widget::shader::Viewport;
 
 const COBE_MAP: &[u8] = include_bytes!("../../../assets/cobe_map.png");
 
@@ -377,6 +377,7 @@ impl GlobePipeline {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
@@ -391,8 +392,16 @@ impl GlobePipeline {
         let width = (bounds.width * scale_factor).max(1.0);
         let height = (bounds.height * scale_factor).max(1.0);
 
-        let base = color_to_vec4(props.base_color.unwrap_or(crate::widgets::globe::DEFAULT_BASE));
-        let glow = color_to_vec4(props.glow_color.unwrap_or(crate::widgets::globe::DEFAULT_GLOW));
+        let base = color_to_vec4(
+            props
+                .base_color
+                .unwrap_or(crate::widgets::globe::DEFAULT_BASE),
+        );
+        let glow = color_to_vec4(
+            props
+                .glow_color
+                .unwrap_or(crate::widgets::globe::DEFAULT_GLOW),
+        );
         let opacity = state.opacity;
 
         self.pending_globe = GlobeUniforms {
@@ -409,17 +418,14 @@ impl GlobePipeline {
             _vec4_align: [0.0; 2],
             base_color: base,
             glow_color: glow,
-            render_params: [
-                props.map_brightness,
-                props.diffuse,
-                props.dark,
-                opacity,
-            ],
+            render_params: [props.map_brightness, props.diffuse, props.dark, opacity],
             _struct_pad: [0.0; 4],
         };
 
         let marker_color = color_to_vec4(
-            props.marker_color.unwrap_or(crate::widgets::globe::DEFAULT_MARKER),
+            props
+                .marker_color
+                .unwrap_or(crate::widgets::globe::DEFAULT_MARKER),
         );
 
         self.pending_marker = MarkerUniforms {
@@ -435,11 +441,7 @@ impl GlobePipeline {
             marker_color,
         };
 
-        self.pending_markers = props
-            .markers
-            .iter()
-            .map(|marker| marker_instance(marker))
-            .collect();
+        self.pending_markers = props.markers.iter().map(marker_instance).collect();
         self.marker_count = self.pending_markers.len() as u32;
 
         if self.pending_markers.len() > self.marker_capacity {
@@ -513,5 +515,9 @@ pub fn lat_lon_to_unit(lat: f32, lng: f32) -> [f32; 3] {
     let lat_rad = lat.to_radians();
     let lon_rad = lng.to_radians() - std::f32::consts::PI;
     let cos_lat = lat_rad.cos();
-    [-cos_lat * lon_rad.cos(), lat_rad.sin(), cos_lat * lon_rad.sin()]
+    [
+        -cos_lat * lon_rad.cos(),
+        lat_rad.sin(),
+        cos_lat * lon_rad.sin(),
+    ]
 }

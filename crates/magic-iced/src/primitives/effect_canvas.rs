@@ -7,7 +7,7 @@ use iced::advanced::widget::tree;
 use iced::advanced::{Clipboard, Layout, Shell, Widget};
 use iced::mouse;
 use iced::widget::canvas;
-use iced::{Element, Event, Length, Padding, Point, Rectangle, Renderer, Size, Vector};
+use iced::{Element, Event, Length, Padding, Rectangle, Renderer, Size, Vector};
 use std::cell::Cell;
 
 pub trait EffectProgram<Message> {
@@ -303,57 +303,56 @@ where
         renderer.with_translation(
             Vector::new(bounds.x - overflow.left, bounds.y - overflow.top),
             |renderer| {
-            if let Some(cache_state) = state.cache.as_ref() {
-                let cached_bounds = CachedBounds::from(draw_bounds.size());
-                if cache_needs_clear(
-                    cache_state.bounds.get(),
-                    cache_state.revision.get(),
-                    cached_bounds,
-                    self.props.cache_revision,
-                ) {
-                    cache_state.cache.clear();
-                    cache_state.bounds.set(Some(cached_bounds));
-                    cache_state.revision.set(self.props.cache_revision);
-                }
+                if let Some(cache_state) = state.cache.as_ref() {
+                    let cached_bounds = CachedBounds::from(draw_bounds.size());
+                    if cache_needs_clear(
+                        cache_state.bounds.get(),
+                        cache_state.revision.get(),
+                        cached_bounds,
+                        self.props.cache_revision,
+                    ) {
+                        cache_state.cache.clear();
+                        cache_state.bounds.set(Some(cached_bounds));
+                        cache_state.revision.set(self.props.cache_revision);
+                    }
 
-                let used_cache = Cell::new(false);
-                let geometry = cache_state.cache.draw_with_bounds(
-                    renderer,
-                    draw_bounds,
-                    |frame| {
-                        used_cache.set(self.program.draw_cached(
+                    let used_cache = Cell::new(false);
+                    let geometry =
+                        cache_state
+                            .cache
+                            .draw_with_bounds(renderer, draw_bounds, |frame| {
+                                used_cache.set(self.program.draw_cached(
+                                    &state.program,
+                                    frame,
+                                    draw_bounds,
+                                    cursor,
+                                    viewport,
+                                ));
+                            });
+
+                    if used_cache.get() {
+                        renderer.draw_geometry(geometry);
+                    } else {
+                        cache_state.cache.clear();
+                        for geometry in self.program.draw(
                             &state.program,
-                            frame,
+                            renderer,
                             draw_bounds,
                             cursor,
                             viewport,
-                        ));
-                    },
-                );
-
-                if used_cache.get() {
-                    renderer.draw_geometry(geometry);
+                        ) {
+                            renderer.draw_geometry(geometry);
+                        }
+                    }
                 } else {
-                    cache_state.cache.clear();
-                    for geometry in self.program.draw(
-                        &state.program,
-                        renderer,
-                        draw_bounds,
-                        cursor,
-                        viewport,
-                    ) {
+                    for geometry in
+                        self.program
+                            .draw(&state.program, renderer, draw_bounds, cursor, viewport)
+                    {
                         renderer.draw_geometry(geometry);
                     }
                 }
-            } else {
-                for geometry in
-                    self.program
-                        .draw(&state.program, renderer, draw_bounds, cursor, viewport)
-                {
-                    renderer.draw_geometry(geometry);
-                }
-            }
-        },
+            },
         );
     }
 }

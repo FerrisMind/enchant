@@ -48,8 +48,7 @@ impl GlobeExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);

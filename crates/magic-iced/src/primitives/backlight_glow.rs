@@ -1,9 +1,9 @@
+use iced::Color;
 use iced::advanced::image::Id;
 use iced::widget::image::Handle;
-use iced::Color;
 use image::{ImageBuffer, Rgba, RgbaImage};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::{LazyLock, Mutex};
 
@@ -100,10 +100,10 @@ pub fn glow_from_svg_bytes(
         tint: tint_key(tint),
     };
 
-    if let Ok(cache) = SVG_GLOW_CACHE.lock() {
-        if let Some(handle) = cache.get(&key) {
-            return Some(handle.clone());
-        }
+    if let Ok(cache) = SVG_GLOW_CACHE.lock()
+        && let Some(handle) = cache.get(&key)
+    {
+        return Some(handle.clone());
     }
 
     let raster_w = (display_width * SVG_GLOW_SUPERSAMPLE).round().max(1.0) as u32;
@@ -165,7 +165,7 @@ fn pixmap_to_rgba(pixmap: &resvg::tiny_skia::Pixmap) -> Vec<u8> {
         .iter()
         .flat_map(|pixel| {
             let a = pixel.alpha();
-            let rgba = if a == 0 {
+            if a == 0 {
                 [0, 0, 0, 0]
             } else if a == 255 {
                 [pixel.red(), pixel.green(), pixel.blue(), 255]
@@ -177,8 +177,7 @@ fn pixmap_to_rgba(pixmap: &resvg::tiny_skia::Pixmap) -> Vec<u8> {
                     (pixel.blue() as f32 / af).round().min(255.0) as u8,
                     a,
                 ]
-            };
-            rgba
+            }
         })
         .collect()
 }
@@ -204,10 +203,10 @@ pub fn glow_from_handle(
         height: height_key,
     };
 
-    if let Ok(cache) = GLOW_CACHE.lock() {
-        if let Some(handle) = cache.get(&key) {
-            return Some(handle.clone());
-        }
+    if let Ok(cache) = GLOW_CACHE.lock()
+        && let Some(handle) = cache.get(&key)
+    {
+        return Some(handle.clone());
     }
 
     let source = decode_handle(source)?;
@@ -429,13 +428,21 @@ fn box_blur_pass(
     if horizontal {
         for y in 0..height {
             for x in 0..width {
-                dest.put_pixel(x, y, average_window(source, width, height, x, y, radius, true));
+                dest.put_pixel(
+                    x,
+                    y,
+                    average_window(source, width, height, x, y, radius, true),
+                );
             }
         }
     } else {
         for y in 0..height {
             for x in 0..width {
-                dest.put_pixel(x, y, average_window(source, width, height, x, y, radius, false));
+                dest.put_pixel(
+                    x,
+                    y,
+                    average_window(source, width, height, x, y, radius, false),
+                );
             }
         }
     }
@@ -493,7 +500,9 @@ mod tests {
 
     #[test]
     fn glow_from_rgba_handle_preserves_padded_dimensions() {
-        let pixels = vec![255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255];
+        let pixels = vec![
+            255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+        ];
         let source = Handle::from_rgba(2, 2, pixels);
         let spread = glow_spread(2.0).round() as u32;
         let glow = glow_from_handle(&source, 2.0, 4.0, 0.0, 2.0, 2.0).expect("glow");

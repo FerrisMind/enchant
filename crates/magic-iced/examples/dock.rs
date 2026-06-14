@@ -2,10 +2,11 @@ mod _shared;
 
 use iced::time::Instant;
 use iced::widget::{column, text};
-use iced::{Color, Element, Size, Task};
+use iced::{Alignment, Color, Element, Font, Size, Task};
+use lucide_icons::{Icon as LucideIcon, LUCIDE_FONT_BYTES};
 use magic_iced::{
-    AnimatedGradientTextProps, DockAction, DockDirection, DockProps, DockState, animated_gradient_text,
-    dock, dock_icon,
+    AnimatedGradientTextProps, DockAction, DockDirection, DockEntry, DockProps, DockState,
+    animated_gradient_text, dock_entries, dock_icon, dock_separator,
 };
 use std::time::Duration;
 
@@ -17,6 +18,7 @@ pub fn main() -> iced::Result {
             ..Default::default()
         })
         .subscription(DockExample::subscription)
+        .font(LUCIDE_FONT_BYTES)
         .run()
 }
 
@@ -32,6 +34,7 @@ enum Message {
     Tick(Instant),
     AnchorsMeasured(magic_iced::AnchorMeasurements),
     Dock(DockAction),
+    DockIconPressed(&'static str),
 }
 
 impl DockExample {
@@ -56,8 +59,7 @@ impl DockExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -67,12 +69,12 @@ impl DockExample {
                 self.dock_state.tick(now, &self.dock_props);
             }
             Message::Dock(action) => {
-                self.dock_state.apply_action(
-                    &action,
-                    DOCK_ICON_COUNT,
-                    self.dock_props.icon_size,
-                );
+                self.dock_state
+                    .apply_action(&action, DOCK_ICON_COUNT, self.dock_props.icon_size);
                 self.dock_state.tick(self.theme_shell.now, &self.dock_props);
+            }
+            Message::DockIconPressed(label) => {
+                let _ = label;
             }
         }
         Task::none()
@@ -88,18 +90,19 @@ impl DockExample {
         let foreground = self.theme_shell.blended_foreground(now);
         let title = dock_title(now, &self.theme_shell);
 
-        let items = vec![
-            dock_icon(icon_label("⌂", foreground, 16)),
-            dock_icon(icon_label("✎", foreground, 16)),
-            dock_icon(icon_label("GH", foreground, 11)),
-            dock_icon(icon_label("in", foreground, 11)),
-            dock_icon(icon_label("X", foreground, 12)),
-            dock_icon(icon_label("✉", foreground, 16)),
+        let items: Vec<DockEntry<'_, Message>> = vec![
+            dock_demo_icon(LucideIcon::House, "Home", foreground).into(),
+            dock_demo_icon(LucideIcon::Pencil, "Blog", foreground).into(),
+            dock_separator(),
+            dock_demo_icon(LucideIcon::Github, "GitHub", foreground).into(),
+            dock_demo_icon(LucideIcon::Linkedin, "LinkedIn", foreground).into(),
+            dock_demo_icon(LucideIcon::Twitter, "X", foreground).into(),
+            dock_demo_icon(LucideIcon::Mail, "Send Email", foreground).into(),
         ];
 
         let body = column![
             title,
-            dock(
+            dock_entries(
                 items,
                 &self.dock_state,
                 self.dock_props,
@@ -107,7 +110,8 @@ impl DockExample {
                 theme,
             ),
         ]
-        .spacing(32);
+        .spacing(32)
+        .align_x(Alignment::Center);
 
         _shared::themed_shell("Dock", body, &self.theme_shell, Message::ToggleTheme)
     }
@@ -115,13 +119,20 @@ impl DockExample {
 
 const DOCK_ICON_COUNT: usize = 6;
 
-fn icon_label<'a>(
+fn dock_demo_icon<'a>(
+    icon: LucideIcon,
     label: &'static str,
     foreground: Color,
-    size: u16,
-) -> Element<'a, Message> {
-    text(label)
-        .size(u32::from(size))
+) -> magic_iced::DockIcon<'a, Message> {
+    dock_icon(lucide(icon, foreground))
+        .tooltip(label)
+        .on_press(Message::DockIconPressed(label))
+}
+
+fn lucide<'a>(icon: LucideIcon, foreground: Color) -> Element<'a, Message> {
+    text(char::from(icon).to_string())
+        .font(Font::with_name("lucide"))
+        .size(16)
         .style(move |_| iced::widget::text::Style {
             color: Some(foreground),
         })

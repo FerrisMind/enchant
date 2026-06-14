@@ -40,7 +40,7 @@ impl AnimatedShinyTextExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               start,
+                start,
                 elapsed: Duration::ZERO,
             },
             Task::none(),
@@ -50,16 +50,15 @@ impl AnimatedShinyTextExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
             Message::Tick(now) => {
-self.theme_shell.tick(now);
+                self.theme_shell.tick(now);
 
-            self.elapsed = now.duration_since(self.start);
+                self.elapsed = now.duration_since(self.start);
             }
         }
         Task::none()
@@ -90,6 +89,11 @@ self.theme_shell.tick(now);
             ..container::Style::default()
         });
 
-        _shared::themed_shell("Animated Shiny Text", column![pill].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Animated Shiny Text",
+            column![pill].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

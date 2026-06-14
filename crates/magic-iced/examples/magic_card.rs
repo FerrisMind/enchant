@@ -19,7 +19,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(MagicCardExample::subscription)
-        
     .run()
 }
 
@@ -54,8 +53,7 @@ impl MagicCardExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -70,7 +68,6 @@ impl MagicCardExample {
         }
         Task::none()
     }
-
 
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
@@ -95,6 +92,11 @@ impl MagicCardExample {
             self.theme_shell.theme(),
         );
 
-        _shared::themed_shell("Magic Card", column![card].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Magic Card",
+            column![card].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

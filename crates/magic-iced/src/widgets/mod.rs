@@ -1,10 +1,10 @@
 pub mod animated_beam;
-pub mod animated_subscribe_button;
 pub mod animated_circular_progress_bar;
 pub mod animated_gradient_text;
 pub mod animated_grid_pattern;
 pub mod animated_list;
 pub mod animated_shiny_text;
+pub mod animated_subscribe_button;
 pub mod animated_theme_toggler;
 pub mod aurora_text;
 pub mod avatar_circles;
@@ -75,9 +75,6 @@ pub mod warp_background;
 pub mod word_rotate;
 
 pub use animated_beam::{AnimatedBeamProps, animated_beam};
-pub use animated_subscribe_button::{
-    AnimatedSubscribeButtonProps, AnimatedSubscribeButtonState, animated_subscribe_button,
-};
 pub use animated_circular_progress_bar::{
     AnimatedCircularProgressBarProps, AnimatedCircularProgressBarState,
     animated_circular_progress_bar,
@@ -86,6 +83,9 @@ pub use animated_gradient_text::{AnimatedGradientTextProps, animated_gradient_te
 pub use animated_grid_pattern::{AnimatedGridPatternProps, animated_grid_pattern};
 pub use animated_list::{AnimatedListProps, AnimatedListState, animated_list};
 pub use animated_shiny_text::{AnimatedShinyTextProps, animated_shiny_text};
+pub use animated_subscribe_button::{
+    AnimatedSubscribeButtonProps, AnimatedSubscribeButtonState, animated_subscribe_button,
+};
 pub use animated_theme_toggler::{
     AnimatedThemeTogglerController, AnimatedThemeTogglerProps, animated_theme_toggler,
     animated_theme_toggler_with_controller, theme_transition_overlay,
@@ -105,7 +105,10 @@ pub use dia_text_reveal::{
     DEFAULT_DIA_COLORS, DiaTextRevealProps, DiaTextRevealState, dia_text_reveal,
     dia_text_reveal_companion,
 };
-pub use dock::{DockAction, DockDirection, DockIcon, DockProps, DockState, dock, dock_icon};
+pub use dock::{
+    DockAction, DockDirection, DockEntry, DockIcon, DockProps, DockState, dock, dock_entries,
+    dock_entry_icon, dock_entry_icon_count, dock_icon, dock_separator,
+};
 pub use dot_pattern::{DotPatternProps, dot_pattern};
 pub use dotted_map::{
     DottedMapMarker, DottedMapOverlay, DottedMapProps, DottedMapState, dotted_map,
@@ -137,9 +140,7 @@ pub use interactive_hover_button::{InteractiveHoverButtonProps, interactive_hove
 pub use kinetic_text::{KineticTextProps, KineticTextRole, KineticTextState, kinetic_text};
 pub use lens::{LensAction, LensProps, LensState, lens};
 pub use light_rays::{LightRaysProps, light_rays};
-pub use line_shadow_text::{
-    LineShadowTextProps, line_shadow_color_for_mode, line_shadow_text,
-};
+pub use line_shadow_text::{LineShadowTextProps, line_shadow_color_for_mode, line_shadow_text};
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
 pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee, marquee_indexed};
 pub use meteors::{MeteorsProps, meteors};

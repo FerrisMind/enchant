@@ -3,9 +3,7 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::{button, column, row, svg, text, tooltip};
 use iced::{Alignment, Color, Element, Length, Size, Subscription, Task};
-use magic_iced::{
-    HighlighterAction, HighlighterProps, HighlighterState, highlighter,
-};
+use magic_iced::{HighlighterAction, HighlighterProps, HighlighterState, highlighter};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -65,8 +63,7 @@ impl HighlighterExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::ResetAnimations => {
                 let now = self.theme_shell.now;
@@ -153,9 +150,7 @@ fn reset_button(foreground: Color) -> Element<'static, Message> {
         });
 
     tooltip(
-        button(icon)
-            .padding(8)
-            .on_press(Message::ResetAnimations),
+        button(icon).padding(8).on_press(Message::ResetAnimations),
         "New random strokes",
         tooltip::Position::Bottom,
     )

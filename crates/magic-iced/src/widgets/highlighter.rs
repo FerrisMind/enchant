@@ -550,14 +550,29 @@ fn rough_cubic(
 
     if overlay {
         let sh = offset_opt(half_offset, options.roughness, gain, rng);
-        let c1x = mid_disp_x + x1 + (x2 - x1) * diverge_point + offset_opt(half_offset, options.roughness, gain, rng);
-        let c1y = mid_disp_y + y1 + (y2 - y1) * diverge_point + offset_opt(half_offset, options.roughness, gain, rng);
-        let c2x = mid_disp_x + x1 + 2.0 * (x2 - x1) * diverge_point + offset_opt(half_offset, options.roughness, gain, rng);
-        let c2y = mid_disp_y + y1 + 2.0 * (y2 - y1) * diverge_point + offset_opt(half_offset, options.roughness, gain, rng);
+        let c1x = mid_disp_x
+            + x1
+            + (x2 - x1) * diverge_point
+            + offset_opt(half_offset, options.roughness, gain, rng);
+        let c1y = mid_disp_y
+            + y1
+            + (y2 - y1) * diverge_point
+            + offset_opt(half_offset, options.roughness, gain, rng);
+        let c2x = mid_disp_x
+            + x1
+            + 2.0 * (x2 - x1) * diverge_point
+            + offset_opt(half_offset, options.roughness, gain, rng);
+        let c2y = mid_disp_y
+            + y1
+            + 2.0 * (y2 - y1) * diverge_point
+            + offset_opt(half_offset, options.roughness, gain, rng);
         let ex = x2 + offset_opt(half_offset, options.roughness, gain, rng);
         let ey = y2 + offset_opt(half_offset, options.roughness, gain, rng);
         CubicBezier {
-            start: Point::new(x1 + sh, y1 + offset_opt(half_offset, options.roughness, gain, rng)),
+            start: Point::new(
+                x1 + sh,
+                y1 + offset_opt(half_offset, options.roughness, gain, rng),
+            ),
             control1: Point::new(c1x, c1y),
             control2: Point::new(c2x, c2y),
             end: Point::new(ex, ey),
@@ -565,10 +580,22 @@ fn rough_cubic(
     } else {
         let sx = x1 + offset_opt(offset_limit, options.roughness, gain, rng);
         let sy = y1 + offset_opt(offset_limit, options.roughness, gain, rng);
-        let c1x = mid_disp_x + x1 + (x2 - x1) * diverge_point + offset_opt(offset_limit, options.roughness, gain, rng);
-        let c1y = mid_disp_y + y1 + (y2 - y1) * diverge_point + offset_opt(offset_limit, options.roughness, gain, rng);
-        let c2x = mid_disp_x + x1 + 2.0 * (x2 - x1) * diverge_point + offset_opt(offset_limit, options.roughness, gain, rng);
-        let c2y = mid_disp_y + y1 + 2.0 * (y2 - y1) * diverge_point + offset_opt(offset_limit, options.roughness, gain, rng);
+        let c1x = mid_disp_x
+            + x1
+            + (x2 - x1) * diverge_point
+            + offset_opt(offset_limit, options.roughness, gain, rng);
+        let c1y = mid_disp_y
+            + y1
+            + (y2 - y1) * diverge_point
+            + offset_opt(offset_limit, options.roughness, gain, rng);
+        let c2x = mid_disp_x
+            + x1
+            + 2.0 * (x2 - x1) * diverge_point
+            + offset_opt(offset_limit, options.roughness, gain, rng);
+        let c2y = mid_disp_y
+            + y1
+            + 2.0 * (y2 - y1) * diverge_point
+            + offset_opt(offset_limit, options.roughness, gain, rng);
         let ex = x2 + offset_opt(offset_limit, options.roughness, gain, rng);
         let ey = y2 + offset_opt(offset_limit, options.roughness, gain, rng);
         CubicBezier {
@@ -708,6 +735,7 @@ fn clamp_horizontal_curve(curve: &mut CubicBezier, from: Point, to: Point) {
     curve.control2.x = curve.control2.x.clamp(min_x, max_x);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_rough_segment(
     frame: &mut canvas::Frame,
     from: Point,
@@ -764,6 +792,7 @@ fn draw_rough_rectangle(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_rough_ellipse(
     frame: &mut canvas::Frame,
     center: Point,

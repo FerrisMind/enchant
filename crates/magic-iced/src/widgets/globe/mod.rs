@@ -8,18 +8,17 @@ pub use pipeline::lat_lon_to_unit;
 
 use crate::widgets::AnimatedThemeTogglerController;
 use card_layer::globe_card_layer;
-use vignette_layer::globe_vignette_layer;
+use iced::advanced::graphics::gradient as canvas_gradient;
 use iced::alignment::Vertical;
 use iced::mouse;
 use iced::time::Instant;
-use iced::advanced::graphics::gradient as canvas_gradient;
-use iced::widget::{canvas, container, shader, stack, Space};
+use iced::widget::{Space, canvas, container, shader, stack};
 use iced::{
-    border, Alignment, Background, Border, Color, Element, Font, Length, Pixels, Point,
-    Rectangle, Renderer,
+    Alignment, Background, Border, Color, Element, Font, Length, Pixels, Point, Rectangle, Renderer,
 };
 use iced_shadcn::Theme;
 use program::GlobeShaderProgram;
+use vignette_layer::globe_vignette_layer;
 
 /// Cobe `MOVEMENT_DAMPING` from Magic UI `globe.tsx`.
 const MOVEMENT_DAMPING: f32 = 1400.0;
@@ -122,8 +121,8 @@ impl GlobeState {
             .map(|last| now.saturating_duration_since(last).as_secs_f32())
             .unwrap_or(0.0);
         self.last_tick_at = Some(now);
-        self.opacity = (now.saturating_duration_since(self.mount_at).as_secs_f32() / 0.5)
-            .clamp(0.0, 1.0);
+        self.opacity =
+            (now.saturating_duration_since(self.mount_at).as_secs_f32() / 0.5).clamp(0.0, 1.0);
 
         if !self.dragging {
             // COBE: `phi += 0.005` per frame (~60fps) ≈ 0.3 rad/s.
@@ -273,7 +272,11 @@ pub fn blend_globe_demo_colors(
         border: blend(from.border, to.border),
         title_top: blend(from.title_top, to.title_top),
         title_bottom: blend(from.title_bottom, to.title_bottom),
-        dark_mode: if progress >= 0.5 { to.dark_mode } else { from.dark_mode },
+        dark_mode: if progress >= 0.5 {
+            to.dark_mode
+        } else {
+            from.dark_mode
+        },
     }
 }
 

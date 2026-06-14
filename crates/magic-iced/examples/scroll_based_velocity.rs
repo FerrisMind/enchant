@@ -5,8 +5,7 @@ use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
 use magic_iced::{
     ScrollVelocityContainerProps, ScrollVelocityDirection, ScrollVelocityItem,
-    ScrollVelocityRowProps, ScrollVelocityRowState, scroll_velocity_container,
-    scroll_velocity_row,
+    ScrollVelocityRowProps, ScrollVelocityRowState, scroll_velocity_container, scroll_velocity_row,
 };
 use std::time::Duration;
 
@@ -58,18 +57,17 @@ impl ScrollBasedVelocityExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
             Message::Tick(now) => {
-self.theme_shell.tick(now);
+                self.theme_shell.tick(now);
 
-            self.elapsed = now.duration_since(self.start);
-            self.forward_state.tick();
-            self.reverse_state.tick();
+                self.elapsed = now.duration_since(self.start);
+                self.forward_state.tick();
+                self.reverse_state.tick();
             }
         }
         Task::none()
@@ -109,6 +107,11 @@ self.theme_shell.tick(now);
             ScrollVelocityContainerProps::new(),
         );
 
-        _shared::themed_shell("Scroll Based Velocity", column![rows].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Scroll Based Velocity",
+            column![rows].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

@@ -1,14 +1,14 @@
 use iced::time::Instant;
-use iced::widget::{column, container, row, stack, text, Space};
 use iced::widget::Id;
+use iced::widget::{Space, column, container, row, stack, text};
 use iced::{Alignment, Background, Color, Element, Length, Task};
 use iced_shadcn::{Palette, Theme};
-use magic_iced::{
-    anchor, measure_anchors, globe_demo_colors_blended,
-    AnimatedThemeTogglerController, AnimatedThemeTogglerProps, GlobeDemoColors,
-    animated_theme_toggler_with_controller, theme_transition_overlay, AnchorMeasurements,
-};
 use magic_iced::theme::MagicTheme;
+use magic_iced::{
+    AnchorMeasurements, AnimatedThemeTogglerController, AnimatedThemeTogglerProps, GlobeDemoColors,
+    anchor, animated_theme_toggler_with_controller, globe_demo_colors_blended, measure_anchors,
+    theme_transition_overlay,
+};
 
 pub const TOGGLER_ANCHOR: &str = "theme-toggler";
 
@@ -208,12 +208,10 @@ pub fn themed_shell<'a, Message: Clone + 'a>(
     );
 
     let header = row![
-        text(title)
-            .size(28)
-            .style({
-                let color = title_color;
-                move |_| iced::widget::text::Style { color: Some(color) }
-            }),
+        text(title).size(28).style({
+            let color = title_color;
+            move |_| iced::widget::text::Style { color: Some(color) }
+        }),
         Space::new().width(Length::Fill),
         toggler,
     ]
@@ -298,7 +296,10 @@ fn blend_palette(from: Palette, to: Palette, progress: f32) -> Palette {
             to.sidebar_primary_foreground,
         ),
         sidebar_accent: blend(from.sidebar_accent, to.sidebar_accent),
-        sidebar_accent_foreground: blend(from.sidebar_accent_foreground, to.sidebar_accent_foreground),
+        sidebar_accent_foreground: blend(
+            from.sidebar_accent_foreground,
+            to.sidebar_accent_foreground,
+        ),
         sidebar_border: blend(from.sidebar_border, to.sidebar_border),
         sidebar_ring: blend(from.sidebar_ring, to.sidebar_ring),
     }

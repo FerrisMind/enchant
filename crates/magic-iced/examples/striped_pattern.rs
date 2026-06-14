@@ -19,7 +19,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(StripedPatternExample::subscription)
-        
     .run()
 }
 
@@ -36,13 +35,17 @@ enum Message {
 
 impl StripedPatternExample {
     fn new() -> (Self, Task<Message>) {
-        (Self { theme_shell: _shared::ThemeShell::new() }, Task::none())
+        (
+            Self {
+                theme_shell: _shared::ThemeShell::new(),
+            },
+            Task::none(),
+        )
     }
 
     fn update(&mut self, _message: Message) -> Task<Message> {
         Task::none()
     }
-
 
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
@@ -68,7 +71,11 @@ impl StripedPatternExample {
             ..container::Style::default()
         });
 
-        _shared::themed_shell("Striped Pattern", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme,
+        _shared::themed_shell(
+            "Striped Pattern",
+            column![stage].spacing(24).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
         )
     }
 }

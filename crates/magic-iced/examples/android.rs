@@ -28,7 +28,8 @@ struct AndroidExample {
 }
 
 #[derive(Debug, Clone)]
-enum Message {    Tick(Instant),
+enum Message {
+    Tick(Instant),
     ToggleTheme,
     AnchorsMeasured(magic_iced::AnchorMeasurements),
     Select(usize),
@@ -48,8 +49,7 @@ impl AndroidExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -80,10 +80,7 @@ impl AndroidExample {
                 AndroidProps::new()
                     .width(Length::Fixed(320.0))
                     .screen_media(true)
-                    .media(
-                        include_bytes!("assets/android-demo.jpg"),
-                        "image/jpeg",
-                    ),
+                    .media(include_bytes!("assets/android-demo.jpg"), "image/jpeg"),
                 self.theme_shell.theme(),
             ),
             _ => android(
@@ -98,11 +95,15 @@ impl AndroidExample {
             ),
         };
 
-        _shared::themed_shell("Android", column![
+        _shared::themed_shell(
+            "Android",
+            column![
                 _shared::tabs(&labels, self.active, Message::Select),
                 container(content).center_x(Length::Fill)
             ]
             .spacing(20),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

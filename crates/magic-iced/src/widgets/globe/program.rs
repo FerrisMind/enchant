@@ -25,20 +25,15 @@ impl<Message: Clone + 'static> shader::Program<Message> for GlobeShaderProgram<'
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                Some(
-                    Action::publish((self.on_action)(GlobeAction::Press))
-                        .and_capture(),
-                )
+                Some(Action::publish((self.on_action)(GlobeAction::Press)).and_capture())
             }
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                Some(
-                    Action::publish((self.on_action)(GlobeAction::Release))
-                        .and_capture(),
-                )
+                Some(Action::publish((self.on_action)(GlobeAction::Release)).and_capture())
             }
-            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
-                Some(Action::publish((self.on_action)(GlobeAction::Move(position))))
-            }
+            Event::Mouse(mouse::Event::CursorMoved { .. }) => Some(Action::publish((self
+                .on_action)(
+                GlobeAction::Move(position),
+            ))),
             Event::Mouse(mouse::Event::CursorLeft) => {
                 Some(Action::publish((self.on_action)(GlobeAction::Exit)))
             }

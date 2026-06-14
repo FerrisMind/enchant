@@ -157,17 +157,19 @@ impl<Message> EffectProgram<Message> for SparklesProgram {
             let generation = ((time + birth_offset) / lifetime).floor() as u64;
             let x_pct = stable_noise(
                 self.seed,
-                index.wrapping_mul(3).wrapping_add(generation.wrapping_mul(97)),
+                index
+                    .wrapping_mul(3)
+                    .wrapping_add(generation.wrapping_mul(97)),
             );
             let y_pct = stable_noise(
                 self.seed.wrapping_add(1),
-                index.wrapping_mul(7).wrapping_add(generation.wrapping_mul(97)),
+                index
+                    .wrapping_mul(7)
+                    .wrapping_add(generation.wrapping_mul(97)),
             );
             // Percentages are relative to the text box; padding lets sparkles spill freely.
-            let center_x =
-                self.field_padding + x_pct * self.text_width + SPARKLE_HALF;
-            let center_y =
-                self.field_padding + y_pct * self.text_height + SPARKLE_HALF;
+            let center_x = self.field_padding + x_pct * self.text_width + SPARKLE_HALF;
+            let center_y = self.field_padding + y_pct * self.text_height + SPARKLE_HALF;
             let delay = stable_noise(self.seed.wrapping_add(2), index.wrapping_mul(13)) * 2.0;
             let scale = 0.3 + stable_noise(self.seed.wrapping_add(3), index.wrapping_mul(17));
             let color = if stable_noise(self.seed.wrapping_add(4), index.wrapping_mul(19)) > 0.5 {
@@ -190,7 +192,10 @@ impl<Message> EffectProgram<Message> for SparklesProgram {
                 Point::new(center_x, center_y),
                 animated_scale,
                 rotation,
-                Color { a: opacity, ..color },
+                Color {
+                    a: opacity,
+                    ..color
+                },
             );
         }
 

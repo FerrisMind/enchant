@@ -1,4 +1,6 @@
-use crate::primitives::{AnimatedValue, EffectCanvasProps, EffectProgram, MotionSpec, effect_canvas};
+use crate::primitives::{
+    AnimatedValue, EffectCanvasProps, EffectProgram, MotionSpec, effect_canvas,
+};
 use iced::advanced::graphics::text::Paragraph as GraphicsParagraph;
 use iced::advanced::text::{
     self as text_layout, Alignment, LineHeight, Paragraph as TextParagraph, Shaping, Wrapping,
@@ -181,7 +183,11 @@ impl KineticCanvasState {
 
         for (letter_index, animation) in self.letters.iter_mut().enumerate() {
             let padding = kinetic_padding_target(letter_index, index, hover_padding);
-            let stroke = if index == Some(letter_index) { 1.0 } else { 0.0 };
+            let stroke = if index == Some(letter_index) {
+                1.0
+            } else {
+                0.0
+            };
             animation.set_targets(padding, stroke, now);
         }
     }
@@ -203,15 +209,14 @@ impl<Message> EffectProgram<Message> for KineticTextProgram {
         match event {
             canvas::Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 let position = cursor.position_in(bounds)?;
-                let next = hit_test_letter(&self.content, self.font_size, state, self.now, position.x);
+                let next =
+                    hit_test_letter(&self.content, self.font_size, state, self.now, position.x);
                 if next != state.hovered_index {
                     state.set_hovered(next, self.font_size, self.now);
                     return Some(canvas::Action::request_redraw());
                 }
             }
-            canvas::Event::Mouse(mouse::Event::CursorLeft)
-                if state.hovered_index.is_some() =>
-            {
+            canvas::Event::Mouse(mouse::Event::CursorLeft) if state.hovered_index.is_some() => {
                 state.set_hovered(None, self.font_size, self.now);
                 return Some(canvas::Action::request_redraw());
             }
@@ -292,19 +297,14 @@ fn draw_layout_glyphs(
 
     let buffer = paragraph.buffer();
     let mut swash_cache = cosmic_text::SwashCache::new();
-    let mut font_system = gfx_text::font_system()
-        .write()
-        .expect("Write font system");
+    let mut font_system = gfx_text::font_system().write().expect("Write font system");
 
     for run in buffer.layout_runs() {
         for glyph in run.glyphs.iter() {
             let letter_index = glyph.metadata;
             let pad_before = padding_before(letter_index, padding);
             let pad = padding.get(letter_index).copied().unwrap_or(0.0);
-            let stroke_amount = stroke_amounts
-                .get(letter_index)
-                .copied()
-                .unwrap_or(0.0);
+            let stroke_amount = stroke_amounts.get(letter_index).copied().unwrap_or(0.0);
             let physical_glyph = glyph.physical((0.0, 0.0), 1.0);
             let start_x = glyph.x + glyph.x_offset + pad_before + pad;
             let start_y = glyph.y_offset + run.line_y + y_offset;
@@ -315,10 +315,9 @@ fn draw_layout_glyphs(
                 ..color
             };
 
-            if let Some(commands) = swash_cache.get_outline_commands(
-                font_system.raw(),
-                physical_glyph.cache_key,
-            ) {
+            if let Some(commands) =
+                swash_cache.get_outline_commands(font_system.raw(), physical_glyph.cache_key)
+            {
                 let path = canvas::Path::new(|path| {
                     for command in commands {
                         match command {
@@ -529,9 +528,7 @@ fn measure_kinetic_layout(content: &str, font_size: f32) -> KineticLayoutMetrics
     for hovered in hover_states {
         let paragraph = build_layout_paragraph(content, hovered, font_size);
         let padding: Vec<f32> = (0..chars.len())
-            .map(|index| {
-                kinetic_padding_target(index, hovered, hover_padding)
-            })
+            .map(|index| kinetic_padding_target(index, hovered, hover_padding))
             .collect();
 
         if let Some(last) = chars.len().checked_sub(1)
@@ -638,9 +635,7 @@ mod tests {
             .layout_runs()
             .flat_map(|run| {
                 let line_y = run.line_y;
-                run.glyphs
-                    .iter()
-                    .map(move |glyph| line_y + glyph.y_offset)
+                run.glyphs.iter().map(move |glyph| line_y + glyph.y_offset)
             })
             .collect()
     }

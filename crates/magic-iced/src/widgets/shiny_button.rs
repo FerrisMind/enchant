@@ -1,7 +1,7 @@
 use super::border_track::RoundedRectTrack;
 use crate::primitives::{EffectCanvasProps, EffectProgram, effect_canvas};
-use iced::widget::{button, canvas, container, stack, text};
 use iced::widget::canvas::{LineCap, Stroke};
+use iced::widget::{button, canvas, container, stack, text};
 use iced::{Border, Color, Element, Length, Padding, Point, Rectangle, Renderer, Shadow, Size};
 use iced_shadcn::{DecorativeSurfaceProps, Theme, decorative_surface};
 use std::time::Duration;
@@ -102,12 +102,10 @@ pub fn shiny_button<'a, Message: Clone + 'a>(
         props.text_shine_enabled,
     );
 
-    let mut control = button(label)
-        .padding(Padding::from([8.0, 24.0]))
-        .style({
-            let radius = resolved.radius;
-            move |_, status| shiny_button_style(radius, status)
-        });
+    let mut control = button(label).padding(Padding::from([8.0, 24.0])).style({
+        let radius = resolved.radius;
+        move |_, status| shiny_button_style(radius, status)
+    });
 
     if let Some(message) = on_press {
         control = control.on_press(message);

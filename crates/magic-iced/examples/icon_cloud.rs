@@ -54,7 +54,7 @@ impl IconCloudExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               state,
+                state,
                 props,
                 start: Instant::now(),
             },
@@ -65,8 +65,7 @@ impl IconCloudExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -87,6 +86,11 @@ impl IconCloudExample {
 
     fn view(&self) -> Element<'_, Message> {
         let body = icon_cloud(&self.state, &self.props, Message::IconCloud);
-        _shared::themed_shell("Icon Cloud", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Icon Cloud",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

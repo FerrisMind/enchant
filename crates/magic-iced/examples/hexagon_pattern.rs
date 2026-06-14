@@ -31,7 +31,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(HexagonPatternExample::subscription)
-        
     .run()
 }
 
@@ -48,14 +47,18 @@ enum Message {
 
 impl HexagonPatternExample {
     fn new() -> (Self, Task<Message>) {
-        (Self { theme_shell: _shared::ThemeShell::new() }, Task::none())
+        (
+            Self {
+                theme_shell: _shared::ThemeShell::new(),
+            },
+            Task::none(),
+        )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -66,7 +69,6 @@ impl HexagonPatternExample {
         }
         Task::none()
     }
-
 
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
@@ -94,7 +96,11 @@ impl HexagonPatternExample {
             ..container::Style::default()
         });
 
-        _shared::themed_shell("Hexagon Pattern", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme,
+        _shared::themed_shell(
+            "Hexagon Pattern",
+            column![stage].spacing(24).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
         )
     }
 }

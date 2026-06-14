@@ -1,10 +1,10 @@
 mod _shared;
 
-use iced::widget::{column, text};
 use iced::time::Instant;
-use std::time::Duration;
+use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
 use magic_iced::{CodeComparisonProps, code_comparison};
+use std::time::Duration;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -18,7 +18,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(CodeComparisonExample::subscription)
-        
     .run()
 }
 
@@ -47,7 +46,6 @@ impl CodeComparisonExample {
         Task::none()
     }
 
-
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
@@ -61,11 +59,20 @@ impl CodeComparisonExample {
     Ok(fetch_data()?)
 }"#;
 
-        _shared::themed_shell("Code Comparison", column![
+        _shared::themed_shell(
+            "Code Comparison",
+            column![
                 text("Highlight the diff between the old and new code paths."),
-                code_comparison(before, after, CodeComparisonProps::new(), self.theme_shell.theme()),
+                code_comparison(
+                    before,
+                    after,
+                    CodeComparisonProps::new(),
+                    self.theme_shell.theme()
+                ),
             ]
             .spacing(20),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

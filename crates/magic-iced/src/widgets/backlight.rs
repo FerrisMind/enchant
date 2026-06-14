@@ -120,10 +120,10 @@ where
         limits: &layout::Limits,
     ) -> layout::Node {
         let spread = glow_spread(self.props.blur);
-        let content_node = self
-            .content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, limits);
+        let content_node =
+            self.content
+                .as_widget_mut()
+                .layout(&mut tree.children[0], renderer, limits);
         let content_size = content_node.size();
 
         layout::Node::with_children(

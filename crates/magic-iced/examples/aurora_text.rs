@@ -41,11 +41,9 @@ impl AuroraTextExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               start,
+                start,
                 elapsed: Duration::ZERO,
-                props: AuroraTextProps::new()
-                    .prefix("Ship ")
-                    .font_size(72),
+                props: AuroraTextProps::new().prefix("Ship ").font_size(72),
             },
             Task::none(),
         )
@@ -54,8 +52,7 @@ impl AuroraTextExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -74,9 +71,13 @@ impl AuroraTextExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = column![aurora_text::<Message>("beautiful", self.elapsed, &self.props)]
-            .spacing(24)
-            .align_x(iced::Alignment::Center);
+        let body = column![aurora_text::<Message>(
+            "beautiful",
+            self.elapsed,
+            &self.props
+        )]
+        .spacing(24)
+        .align_x(iced::Alignment::Center);
 
         _shared::themed_shell("Aurora Text", body, &self.theme_shell, Message::ToggleTheme)
     }

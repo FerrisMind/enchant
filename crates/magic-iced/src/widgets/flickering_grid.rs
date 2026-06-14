@@ -82,7 +82,8 @@ impl<Message> EffectProgram<Message> for FlickeringGridProgram {
                 }
 
                 // Vary speed per cell to make flickering organic
-                let speed_mult = 0.4 + stable_noise(self.props.seed ^ 0xAAAA_AAAA_AAAA_AAAA, index) * 1.2;
+                let speed_mult =
+                    0.4 + stable_noise(self.props.seed ^ 0xAAAA_AAAA_AAAA_AAAA, index) * 1.2;
                 let cell_time = self.elapsed.as_secs_f32() * 5.0 * speed_mult;
                 let tick = cell_time.floor() as u64;
                 let fract = cell_time.fract();

@@ -1,10 +1,10 @@
 mod _shared;
 
-use iced::widget::{column, text};
 use iced::time::Instant;
-use std::time::Duration;
+use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
 use magic_iced::{InteractiveHoverButtonProps, interactive_hover_button};
+use std::time::Duration;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -18,7 +18,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(InteractiveHoverButtonExample::subscription)
-        
     .run()
 }
 
@@ -49,21 +48,22 @@ impl InteractiveHoverButtonExample {
         Task::none()
     }
 
-
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<'_, Message> {
-        _shared::themed_shell("Interactive Hover Button", column![
-                interactive_hover_button(
-                    text("Hover Me"),
-                    Some(Message::Clicked),
-                    InteractiveHoverButtonProps::new(),
-                    self.theme_shell.theme(),
-                ),
-            ]
+        _shared::themed_shell(
+            "Interactive Hover Button",
+            column![interactive_hover_button(
+                text("Hover Me"),
+                Some(Message::Clicked),
+                InteractiveHoverButtonProps::new(),
+                self.theme_shell.theme(),
+            ),]
             .spacing(20),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

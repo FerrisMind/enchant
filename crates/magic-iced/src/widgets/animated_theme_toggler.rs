@@ -216,10 +216,7 @@ impl<Message> canvas::Program<Message> for ThemeTransitionProgram {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
         let (cx, cy) = transition_center(bounds, self.origin, self.from_center);
 
-        let max_radius = hypot(
-            cx.max(bounds.width - cx),
-            cy.max(bounds.height - cy),
-        );
+        let max_radius = hypot(cx.max(bounds.width - cx), cy.max(bounds.height - cy));
         let radius = max_radius * self.reveal;
 
         frame.fill(
@@ -295,7 +292,10 @@ fn blend_palette(from: Palette, to: Palette, progress: f32) -> Palette {
             to.sidebar_primary_foreground,
         ),
         sidebar_accent: blend(from.sidebar_accent, to.sidebar_accent),
-        sidebar_accent_foreground: blend(from.sidebar_accent_foreground, to.sidebar_accent_foreground),
+        sidebar_accent_foreground: blend(
+            from.sidebar_accent_foreground,
+            to.sidebar_accent_foreground,
+        ),
         sidebar_border: blend(from.sidebar_border, to.sidebar_border),
         sidebar_ring: blend(from.sidebar_ring, to.sidebar_ring),
     }

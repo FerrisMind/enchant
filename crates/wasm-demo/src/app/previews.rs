@@ -280,13 +280,7 @@ impl WasmDemoApp {
             direction,
             ..DockProps::new()
         };
-        centered(dock(
-            items,
-            &self.dock_state,
-            props,
-            Message::Dock,
-            &theme,
-        ))
+        centered(dock(items, &self.dock_state, props, Message::Dock, &theme))
     }
 
     pub(crate) fn preview_theme_toggler(&self) -> Element<'_, Message> {
@@ -329,12 +323,7 @@ impl WasmDemoApp {
     pub(crate) fn preview_globe(&self) -> Element<'_, Message> {
         let now = Instant::now();
         let colors = blended_globe_demo_colors(&self.theme_toggler, now);
-        globe_demo(
-            &self.globe_state,
-            &self.globe_props,
-            colors,
-            Message::Globe,
-        )
+        globe_demo(&self.globe_state, &self.globe_props, colors, Message::Globe)
     }
 
     pub(crate) fn preview_icon_cloud(&self) -> Element<'_, Message> {

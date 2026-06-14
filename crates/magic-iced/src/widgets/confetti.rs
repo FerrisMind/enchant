@@ -148,21 +148,22 @@ pub fn confetti_button<'a, Message: Clone + 'a>(
     _props: &'a ConfettiProps,
     on_action: impl Fn(ConfettiAction) -> Message + Clone + 'a,
 ) -> Element<'a, Message> {
-    let button_content = container(content.into())
-        .padding([8.0, 16.0])
-        .style(|theme: &iced::Theme| {
-            let palette = theme.palette();
-            iced::widget::container::Style {
-                background: Some(iced::Background::Color(palette.primary)),
-                text_color: Some(palette.background),
-                border: border::Border {
-                    radius: 6.0.into(),
-                    width: 0.0,
-                    color: Color::TRANSPARENT,
-                },
-                ..Default::default()
-            }
-        });
+    let button_content =
+        container(content.into())
+            .padding([8.0, 16.0])
+            .style(|theme: &iced::Theme| {
+                let palette = theme.palette();
+                iced::widget::container::Style {
+                    background: Some(iced::Background::Color(palette.primary)),
+                    text_color: Some(palette.background),
+                    border: border::Border {
+                        radius: 6.0.into(),
+                        width: 0.0,
+                        color: Color::TRANSPARENT,
+                    },
+                    ..Default::default()
+                }
+            });
 
     mouse_area(button_content)
         .on_press(on_action(ConfettiAction::Fire(Some(Point::new(0.5, 0.65)))))

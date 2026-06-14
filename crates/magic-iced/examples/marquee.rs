@@ -11,8 +11,7 @@ use iced::advanced::widget::{Operation, Tree, Widget};
 use iced::gradient;
 use iced::widget::{column, container, image, mouse_area, row, text};
 use iced::{
-    Alignment, Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Subscription,
-    Task,
+    Alignment, Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Subscription, Task,
 };
 use iced_shadcn::{CardProps, CardSize, DecorativeSurfaceProps, Theme, card, decorative_surface};
 use magic_iced::{MagicTheme, MarqueeItem, MarqueeOrientation, MarqueeProps, marquee_indexed};
@@ -83,8 +82,7 @@ impl MarqueeDemo {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -114,7 +112,11 @@ impl MarqueeDemo {
         .align_x(Alignment::Center);
 
         let preview = decorative_surface(
-            HorizontalFadeMask::new(rows.into(), self.theme_shell.theme().palette.background, FADE_WIDTH_RATIO),
+            HorizontalFadeMask::new(
+                rows.into(),
+                self.theme_shell.theme().palette.background,
+                FADE_WIDTH_RATIO,
+            ),
             Vec::new(),
             Vec::new(),
             DecorativeSurfaceProps::new()

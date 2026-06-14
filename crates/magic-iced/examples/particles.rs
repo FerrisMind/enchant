@@ -42,7 +42,7 @@ impl ParticlesExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               state: ParticlesState::new(),
+                state: ParticlesState::new(),
                 start,
                 elapsed: Duration::ZERO,
             },
@@ -53,8 +53,7 @@ impl ParticlesExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -108,6 +107,11 @@ impl ParticlesExample {
             ..container::Style::default()
         });
 
-        _shared::themed_shell("Particles", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Particles",
+            column![stage].spacing(24).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

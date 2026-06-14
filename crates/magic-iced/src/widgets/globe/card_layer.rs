@@ -1,7 +1,7 @@
 //! Positions the full-size Cobe canvas inside the demo card without shrinking it to the card height.
 
 use super::program::GlobeShaderProgram;
-use super::{GlobeAction, GlobeProps, GlobeState, GLOBE_CANVAS_SIDE};
+use super::{GLOBE_CANVAS_SIDE, GlobeAction, GlobeProps, GlobeState};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::overlay;
 use iced::advanced::widget::{Operation, Tree, Widget};
@@ -62,11 +62,10 @@ impl<Message: Clone + 'static> Widget<Message, iced::Theme, Renderer>
             .width(Length::Fixed(canvas.width))
             .height(Length::Fixed(canvas.height));
 
-        let globe_node = self.globe.as_widget_mut().layout(
-            &mut tree.children[0],
-            renderer,
-            &child_limits,
-        );
+        let globe_node =
+            self.globe
+                .as_widget_mut()
+                .layout(&mut tree.children[0], renderer, &child_limits);
 
         let x = (size.width - canvas.width) / 2.0;
         layout::Node::with_children(

@@ -62,8 +62,7 @@ impl AnimatedCircularProgressBarExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -71,20 +70,20 @@ impl AnimatedCircularProgressBarExample {
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
                 self.now = now;
-            if now.duration_since(self.last_step) >= Duration::from_secs(2) {
-                self.value = if self.value >= 100.0 {
-                    0.0
-                } else {
-                    self.value + 10.0
-                };
-                self.last_step = now;
-                self.props = AnimatedCircularProgressBarProps {
-                    value: self.value,
-                    fill_color: Some(Color::from_rgb8(0x4F, 0x46, 0xE5)),
-                    ..AnimatedCircularProgressBarProps::new(self.value)
-                };
-            }
-            self.state.tick(now, &self.props);
+                if now.duration_since(self.last_step) >= Duration::from_secs(2) {
+                    self.value = if self.value >= 100.0 {
+                        0.0
+                    } else {
+                        self.value + 10.0
+                    };
+                    self.last_step = now;
+                    self.props = AnimatedCircularProgressBarProps {
+                        value: self.value,
+                        fill_color: Some(Color::from_rgb8(0x4F, 0x46, 0xE5)),
+                        ..AnimatedCircularProgressBarProps::new(self.value)
+                    };
+                }
+                self.state.tick(now, &self.props);
             }
         }
         Task::none()
@@ -103,6 +102,11 @@ impl AnimatedCircularProgressBarExample {
             self.theme_shell.theme(),
             Some(foreground),
         );
-        _shared::themed_shell("Animated Circular Progress Bar", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Animated Circular Progress Bar",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

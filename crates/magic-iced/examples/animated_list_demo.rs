@@ -1,8 +1,8 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{column, container, scrollable, stack};
 use iced::widget::scrollable::Scrollbar;
+use iced::widget::{column, container, scrollable, stack};
 use iced::{Alignment, Element, Length, Size, Subscription, Task};
 use magic_iced::{AnimatedListProps, AnimatedListState, animated_list};
 use std::time::Duration;
@@ -64,8 +64,7 @@ impl AnimatedListDemoExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -90,7 +89,8 @@ impl AnimatedListDemoExample {
             .collect();
 
         let list = scrollable(
-            container(animated_list(items, &self.state, self.now, &self.props)).padding(STAGE_PADDING),
+            container(animated_list(items, &self.state, self.now, &self.props))
+                .padding(STAGE_PADDING),
         )
         .width(Length::Fill)
         .height(Length::Fixed(VIEWPORT_HEIGHT))
@@ -105,9 +105,7 @@ impl AnimatedListDemoExample {
 
         let stage = container(
             stack![
-                container(list)
-                    .width(Length::Fill)
-                    .height(Length::Fill),
+                container(list).width(Length::Fill).height(Length::Fill),
                 container(fade)
                     .width(Length::Fill)
                     .height(Length::Fill)

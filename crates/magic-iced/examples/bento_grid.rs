@@ -2,11 +2,14 @@ mod _shared;
 
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container, row, stack, text};
-use iced::{Alignment, Background, Border, Color, Element, Length, Padding, Point, Rectangle, Size, Subscription, Task};
+use iced::{
+    Alignment, Background, Border, Color, Element, Length, Padding, Point, Rectangle, Size,
+    Subscription, Task,
+};
 use magic_iced::{
-    animated_beam, bento_grid, marquee_indexed, number_ticker, AnchorBounds,
-    AnimatedBeamProps, BentoCardProps, BentoGridProps, MarqueeOrientation, MarqueeProps,
-    NumberTickerProps, NumberTickerState,
+    AnchorBounds, AnimatedBeamProps, BentoCardProps, BentoGridProps, MarqueeOrientation,
+    MarqueeProps, NumberTickerProps, NumberTickerState, animated_beam, bento_grid, marquee_indexed,
+    number_ticker,
 };
 
 pub fn main() -> iced::Result {
@@ -91,8 +94,7 @@ impl BentoGridExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -115,32 +117,46 @@ impl BentoGridExample {
 
     fn view(&self) -> Element<'_, Message> {
         // --- 1. Marquee file list background ---
-        let render_file = |file: &FileItem, _copy_idx: usize, _item_idx: usize| -> Element<'_, Message> {
-            container(
-                column![
-                    text(file.name).size(12).style(|_: &iced::Theme| text::Style {
-                        color: Some(self.theme_shell.theme().palette.foreground),
-                    }),
-                    text(file.body).size(9).style(|_: &iced::Theme| text::Style {
-                        color: Some(Color { a: 0.6, ..self.theme_shell.theme().palette.foreground }),
-                    }),
-                ]
-                .spacing(4)
-            )
-            .width(Length::Fixed(120.0))
-            .height(Length::Fixed(80.0))
-            .padding(10)
-            .style(|_: &iced::Theme| container::Style {
-                background: Some(Background::Color(Color { a: 0.05, ..self.theme_shell.theme().palette.foreground })),
-                border: Border {
-                    color: Color { a: 0.1, ..self.theme_shell.theme().palette.foreground },
-                    width: 1.0,
-                    radius: self.theme_shell.theme().radius.sm.into(),
-                },
-                ..Default::default()
-            })
-            .into()
-        };
+        let render_file =
+            |file: &FileItem, _copy_idx: usize, _item_idx: usize| -> Element<'_, Message> {
+                container(
+                    column![
+                        text(file.name)
+                            .size(12)
+                            .style(|_: &iced::Theme| text::Style {
+                                color: Some(self.theme_shell.theme().palette.foreground),
+                            }),
+                        text(file.body)
+                            .size(9)
+                            .style(|_: &iced::Theme| text::Style {
+                                color: Some(Color {
+                                    a: 0.6,
+                                    ..self.theme_shell.theme().palette.foreground
+                                }),
+                            }),
+                    ]
+                    .spacing(4),
+                )
+                .width(Length::Fixed(120.0))
+                .height(Length::Fixed(80.0))
+                .padding(10)
+                .style(|_: &iced::Theme| container::Style {
+                    background: Some(Background::Color(Color {
+                        a: 0.05,
+                        ..self.theme_shell.theme().palette.foreground
+                    })),
+                    border: Border {
+                        color: Color {
+                            a: 0.1,
+                            ..self.theme_shell.theme().palette.foreground
+                        },
+                        width: 1.0,
+                        radius: self.theme_shell.theme().radius.sm.into(),
+                    },
+                    ..Default::default()
+                })
+                .into()
+            };
 
         let marquee_bg = marquee_indexed(
             &self.files,
@@ -175,7 +191,10 @@ impl BentoGridExample {
             .style(|_: &iced::Theme| container::Style {
                 background: Some(Background::Color(self.theme_shell.theme().palette.card)),
                 border: Border {
-                    color: Color { a: 0.15, ..self.theme_shell.theme().palette.foreground },
+                    color: Color {
+                        a: 0.15,
+                        ..self.theme_shell.theme().palette.foreground
+                    },
                     width: 1.0,
                     radius: 18.0.into(),
                 },
@@ -188,7 +207,10 @@ impl BentoGridExample {
             .style(|_: &iced::Theme| container::Style {
                 background: Some(Background::Color(self.theme_shell.theme().palette.card)),
                 border: Border {
-                    color: Color { a: 0.15, ..self.theme_shell.theme().palette.foreground },
+                    color: Color {
+                        a: 0.15,
+                        ..self.theme_shell.theme().palette.foreground
+                    },
                     width: 1.0,
                     radius: 18.0.into(),
                 },
@@ -196,20 +218,36 @@ impl BentoGridExample {
             });
 
         let beam_canvas = animated_beam(
-            AnchorBounds::from_bounds(Rectangle::new(Point::new(20.0, 32.0), Size::new(36.0, 36.0))),
-            AnchorBounds::from_bounds(Rectangle::new(Point::new(244.0, 32.0), Size::new(36.0, 36.0))),
+            AnchorBounds::from_bounds(Rectangle::new(
+                Point::new(20.0, 32.0),
+                Size::new(36.0, 36.0),
+            )),
+            AnchorBounds::from_bounds(Rectangle::new(
+                Point::new(244.0, 32.0),
+                Size::new(36.0, 36.0),
+            )),
             self.elapsed,
             AnimatedBeamProps::new(),
         );
 
         let beam_card_bg = container(
             stack![
-                container(user_node).padding(Padding { top: 32.0, right: 0.0, bottom: 0.0, left: 20.0 }),
-                container(ai_node).padding(Padding { top: 32.0, right: 0.0, bottom: 0.0, left: 244.0 }),
+                container(user_node).padding(Padding {
+                    top: 32.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                    left: 20.0
+                }),
+                container(ai_node).padding(Padding {
+                    top: 32.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                    left: 244.0
+                }),
                 beam_canvas,
             ]
             .width(Length::Fixed(300.0))
-            .height(Length::Fixed(100.0))
+            .height(Length::Fixed(100.0)),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -223,9 +261,14 @@ impl BentoGridExample {
                 text("$").size(24).style(|_: &iced::Theme| text::Style {
                     color: Some(self.theme_shell.theme().palette.foreground),
                 }),
-                number_ticker(&self.ticker_state, self.now, &self.ticker_props, self.theme_shell.theme()),
+                number_ticker(
+                    &self.ticker_state,
+                    self.now,
+                    &self.ticker_props,
+                    self.theme_shell.theme()
+                ),
             ]
-            .align_y(Alignment::Center)
+            .align_y(Alignment::Center),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -318,12 +361,16 @@ impl BentoGridExample {
             },
         ];
 
-        _shared::themed_shell("Bento Grid", column![
+        _shared::themed_shell(
+            "Bento Grid",
+            column![
                 text("One section, multiple cells").size(14),
                 bento_grid(cards, BentoGridProps::new(), self.theme_shell.theme()),
             ]
             .spacing(16)
             .align_x(Alignment::Start),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

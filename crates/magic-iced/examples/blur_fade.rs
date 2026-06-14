@@ -122,8 +122,7 @@ impl BlurFadeExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -169,7 +168,13 @@ impl BlurFadeExample {
                 ..container::Style::default()
             });
 
-        blur_fade(content, &self.states[index], self.now, &props, self.theme_shell.theme())
+        blur_fade(
+            content,
+            &self.states[index],
+            self.now,
+            &props,
+            self.theme_shell.theme(),
+        )
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -181,7 +186,12 @@ impl BlurFadeExample {
         .spacing(16)
         .align_x(Alignment::Center);
 
-        _shared::themed_shell("Blur Fade", column![grid].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Blur Fade",
+            column![grid].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }
 

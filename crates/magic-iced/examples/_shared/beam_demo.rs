@@ -3,8 +3,10 @@
 use super::beam_icons;
 use super::beam_scene::{self, BeamSceneKind, CONTAINER};
 use iced::widget::{column, container, row, space, stack, svg};
-use iced::{Alignment, Background, Border, Color, Element, Length, Point, Rectangle, Shadow, Size, Vector};
-use magic_iced::{anchor, AnchorBounds, AnchorMeasurements, AnimatedBeamProps, animated_beam};
+use iced::{
+    Alignment, Background, Border, Color, Element, Length, Point, Rectangle, Shadow, Size, Vector,
+};
+use magic_iced::{AnchorBounds, AnchorMeasurements, AnimatedBeamProps, anchor, animated_beam};
 use std::time::Duration;
 
 pub const SCENE_WIDTH: f32 = 512.0;
@@ -151,18 +153,17 @@ fn spaced_column<Message: 'static>(
         items.push(row);
     }
 
-    container(
-        column(items)
-            .width(Length::Fill)
-            .height(Length::Fill),
-    )
-    .padding(SCENE_PAD)
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    container(column(items).width(Length::Fill).height(Length::Fill))
+        .padding(SCENE_PAD)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
 }
 
-fn centered_row<Message: 'static>(left: &'static str, right: &'static str) -> Element<'static, Message> {
+fn centered_row<Message: 'static>(
+    left: &'static str,
+    right: &'static str,
+) -> Element<'static, Message> {
     container(
         column![
             space().height(Length::Fill),
@@ -207,13 +208,9 @@ fn scene<Message: 'static>(
 
     anchor(
         CONTAINER,
-        container(
-            stack(layers)
-                .width(Length::Fill)
-                .height(Length::Fill),
-        )
-        .width(Length::Fixed(SCENE_WIDTH))
-        .height(Length::Fixed(height)),
+        container(stack(layers).width(Length::Fill).height(Length::Fill))
+            .width(Length::Fixed(SCENE_WIDTH))
+            .height(Length::Fixed(height)),
     )
     .into()
 }
@@ -260,7 +257,8 @@ pub fn demo_scene<Message: 'static>(
         vec![
             beam(
                 elapsed,
-                measured_anchor(measurements, 0, 1).unwrap_or_else(|| anchor_at(LEFT_X, ROW1_Y, NODE)),
+                measured_anchor(measurements, 0, 1)
+                    .unwrap_or_else(|| anchor_at(LEFT_X, ROW1_Y, NODE)),
                 center,
                 AnimatedBeamProps {
                     curvature: -75.0,
@@ -270,13 +268,15 @@ pub fn demo_scene<Message: 'static>(
             ),
             beam(
                 elapsed,
-                measured_anchor(measurements, 0, 2).unwrap_or_else(|| anchor_at(LEFT_X, ROW2_Y, NODE)),
+                measured_anchor(measurements, 0, 2)
+                    .unwrap_or_else(|| anchor_at(LEFT_X, ROW2_Y, NODE)),
                 center,
                 AnimatedBeamProps::new(),
             ),
             beam(
                 elapsed,
-                measured_anchor(measurements, 0, 3).unwrap_or_else(|| anchor_at(LEFT_X, ROW3_Y, NODE)),
+                measured_anchor(measurements, 0, 3)
+                    .unwrap_or_else(|| anchor_at(LEFT_X, ROW3_Y, NODE)),
                 center,
                 AnimatedBeamProps {
                     curvature: 75.0,
@@ -286,7 +286,8 @@ pub fn demo_scene<Message: 'static>(
             ),
             beam(
                 elapsed,
-                measured_anchor(measurements, 0, 5).unwrap_or_else(|| anchor_at(RIGHT_X, ROW1_Y, NODE)),
+                measured_anchor(measurements, 0, 5)
+                    .unwrap_or_else(|| anchor_at(RIGHT_X, ROW1_Y, NODE)),
                 center,
                 AnimatedBeamProps {
                     curvature: -75.0,
@@ -297,7 +298,8 @@ pub fn demo_scene<Message: 'static>(
             ),
             beam(
                 elapsed,
-                measured_anchor(measurements, 0, 6).unwrap_or_else(|| anchor_at(RIGHT_X, ROW2_Y, NODE)),
+                measured_anchor(measurements, 0, 6)
+                    .unwrap_or_else(|| anchor_at(RIGHT_X, ROW2_Y, NODE)),
                 center,
                 AnimatedBeamProps {
                     reverse: true,
@@ -306,7 +308,8 @@ pub fn demo_scene<Message: 'static>(
             ),
             beam(
                 elapsed,
-                measured_anchor(measurements, 0, 7).unwrap_or_else(|| anchor_at(RIGHT_X, ROW3_Y, NODE)),
+                measured_anchor(measurements, 0, 7)
+                    .unwrap_or_else(|| anchor_at(RIGHT_X, ROW3_Y, NODE)),
                 center,
                 AnimatedBeamProps {
                     curvature: 75.0,
@@ -318,7 +321,7 @@ pub fn demo_scene<Message: 'static>(
         ]
     };
 
-    scene(layout, beams, SCENE_HEIGHT).into()
+    scene(layout, beams, SCENE_HEIGHT)
 }
 
 /// Left user → right OpenAI, single beam.
@@ -338,7 +341,7 @@ pub fn unidirectional_scene<Message: 'static>(
         },
     )];
 
-    scene(layout, beams, SCENE_HEIGHT).into()
+    scene(layout, beams, SCENE_HEIGHT)
 }
 
 /// Two parallel beams between the same endpoints (opposite directions).
@@ -349,8 +352,10 @@ pub fn bidirectional_scene<Message: 'static>(
     let layout = centered_row("beam-left", "beam-right");
 
     let beams = {
-        let from = measured_anchor(measurements, 0, 1).unwrap_or_else(|| anchor_at(LEFT_X, CENTER_Y, NODE));
-        let to = measured_anchor(measurements, 0, 2).unwrap_or_else(|| anchor_at(RIGHT_X, CENTER_Y, NODE));
+        let from = measured_anchor(measurements, 0, 1)
+            .unwrap_or_else(|| anchor_at(LEFT_X, CENTER_Y, NODE));
+        let to = measured_anchor(measurements, 0, 2)
+            .unwrap_or_else(|| anchor_at(RIGHT_X, CENTER_Y, NODE));
         vec![
             beam(
                 elapsed,
@@ -378,7 +383,7 @@ pub fn bidirectional_scene<Message: 'static>(
         ]
     };
 
-    scene(layout, beams, SCENE_HEIGHT).into()
+    scene(layout, beams, SCENE_HEIGHT)
 }
 
 fn multi_io_layout<Message: 'static>(
@@ -387,7 +392,7 @@ fn multi_io_layout<Message: 'static>(
     center_icon: svg::Handle,
     right_id: &'static str,
     right_icon: svg::Handle,
-    scene_height: f32,
+    _scene_height: f32,
 ) -> Element<'static, Message> {
     let left_col = column(left_nodes)
         .spacing(MULTI_COL_GAP)
@@ -453,16 +458,11 @@ pub fn multiple_inputs_scene<Message: 'static>(
                 )
             })
             .collect::<Vec<_>>();
-        beams.push(beam(
-            elapsed,
-            center,
-            user,
-            AnimatedBeamProps::new(),
-        ));
+        beams.push(beam(elapsed, center, user, AnimatedBeamProps::new()));
         beams
     };
 
-    scene(layout, beams, MULTI_SCENE_HEIGHT).into()
+    scene(layout, beams, MULTI_SCENE_HEIGHT)
 }
 
 /// User left, center OpenAI, five right outputs — all beams in sync (`duration=3` in reference).
@@ -516,9 +516,8 @@ pub fn multiple_outputs_scene<Message: 'static>(
             .map(|index| {
                 beam(
                     elapsed,
-                    measured_anchor(measurements, 0, 3 + index).unwrap_or_else(|| {
-                        anchor_at(RIGHT_X, right_ys[index], NODE)
-                    }),
+                    measured_anchor(measurements, 0, 3 + index)
+                        .unwrap_or_else(|| anchor_at(RIGHT_X, right_ys[index], NODE)),
                     center,
                     props,
                 )
@@ -528,5 +527,5 @@ pub fn multiple_outputs_scene<Message: 'static>(
         beams
     };
 
-    scene(layout, beams, MULTI_SCENE_HEIGHT).into()
+    scene(layout, beams, MULTI_SCENE_HEIGHT)
 }

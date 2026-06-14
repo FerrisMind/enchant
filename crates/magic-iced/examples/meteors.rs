@@ -51,8 +51,7 @@ impl MeteorsExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -104,6 +103,11 @@ impl MeteorsExample {
         .width(Length::Fixed(720.0))
         .height(Length::Fixed(500.0));
 
-        _shared::themed_shell("Meteors", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Meteors",
+            column![stage].spacing(24).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

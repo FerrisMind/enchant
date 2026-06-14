@@ -53,8 +53,7 @@ impl RippleExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -93,12 +92,16 @@ impl RippleExample {
             }
         };
 
-        _shared::themed_shell("Ripple", column![
+        _shared::themed_shell(
+            "Ripple",
+            column![
                 _shared::tabs(&labels, self.active, Message::Select),
                 ripple(self.elapsed, props, self.theme_shell.theme()),
                 text("A concentric background effect for hero surfaces."),
             ]
             .spacing(20),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

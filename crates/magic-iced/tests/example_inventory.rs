@@ -244,8 +244,7 @@ fn local_example_binaries() -> BTreeSet<String> {
 }
 
 fn example_covers_component(component: &str, example_binaries: &BTreeSet<String>) -> bool {
-    example_binaries.contains(component)
-        || example_binaries.contains(&format!("{component}_demo"))
+    example_binaries.contains(component) || example_binaries.contains(&format!("{component}_demo"))
 }
 
 fn example_owned_component(name: &str) -> &str {

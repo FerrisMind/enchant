@@ -5,9 +5,7 @@ use std::time::Duration;
 
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Task};
-use magic_iced::{
-    FileTreeAction, FileTreeElement, FileTreeProps, FileTreeState, file_tree,
-};
+use magic_iced::{FileTreeAction, FileTreeElement, FileTreeProps, FileTreeState, file_tree};
 
 fn reference_tree() -> Vec<FileTreeElement> {
     vec![FileTreeElement::folder(
@@ -52,7 +50,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(FileTreeExample::subscription)
-        
     .run()
 }
 
@@ -89,8 +86,7 @@ impl FileTreeExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -105,7 +101,6 @@ impl FileTreeExample {
         Task::none()
     }
 
-
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
@@ -115,7 +110,9 @@ impl FileTreeExample {
             &self.elements,
             &self.state,
             Message::Tree,
-            FileTreeProps::new().width(Length::Fixed(360.0)).height(Length::Fixed(300.0)),
+            FileTreeProps::new()
+                .width(Length::Fixed(360.0))
+                .height(Length::Fixed(300.0)),
             self.theme_shell.theme(),
         ))
         .width(Length::Fixed(400.0))
@@ -130,6 +127,11 @@ impl FileTreeExample {
             ..container::Style::default()
         });
 
-        _shared::themed_shell("File Tree", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "File Tree",
+            column![stage].spacing(24).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

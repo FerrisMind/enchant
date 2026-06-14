@@ -213,13 +213,10 @@ where
 fn feature_row<'a, Message: 'a>(label: &'static str, muted: bool) -> Element<'a, Message> {
     let marker = if muted { "○" } else { "✓" };
     let size = 14_u32;
-    row![
-        text(marker).size(size),
-        text(label).size(size),
-    ]
-    .spacing(8)
-    .align_y(Alignment::Center)
-    .into()
+    row![text(marker).size(size), text(label).size(size),]
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .into()
 }
 
 /// Pro pricing card matching magicui glare-hover demo.
@@ -244,9 +241,9 @@ pub fn pricing_card_pro<'a, Message: Clone + 'a>(
 
     let price_row = row![
         text("$49").size(36),
-        text("/mo").size(14).style(move |_| iced::widget::text::Style {
-            color: Some(muted),
-        }),
+        text("/mo")
+            .size(14)
+            .style(move |_| iced::widget::text::Style { color: Some(muted) }),
     ]
     .spacing(4)
     .align_y(Alignment::End);

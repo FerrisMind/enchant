@@ -57,8 +57,7 @@ impl RippleButtonExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -90,6 +89,11 @@ impl RippleButtonExample {
             self.theme_shell.theme(),
         );
 
-        _shared::themed_shell("Ripple Button", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Ripple Button",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

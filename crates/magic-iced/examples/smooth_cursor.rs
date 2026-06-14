@@ -39,7 +39,7 @@ impl SmoothCursorExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               state: SmoothCursorState::new(),
+                state: SmoothCursorState::new(),
                 now: Instant::now(),
             },
             Task::none(),
@@ -49,8 +49,7 @@ impl SmoothCursorExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -91,6 +90,11 @@ impl SmoothCursorExample {
         let overlay = smooth_cursor(&self.state, self.now, props, Message::Cursor);
         let body = stack![stage, overlay];
 
-        _shared::themed_shell("Smooth Cursor", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Smooth Cursor",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

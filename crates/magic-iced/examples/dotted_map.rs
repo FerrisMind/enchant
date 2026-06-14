@@ -3,9 +3,7 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
-use magic_iced::{
-    DottedMapMarker, DottedMapOverlay, DottedMapProps, DottedMapState, dotted_map,
-};
+use magic_iced::{DottedMapMarker, DottedMapOverlay, DottedMapProps, DottedMapState, dotted_map};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -70,7 +68,7 @@ impl DottedMapExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               props,
+                props,
                 state,
                 now: Instant::now(),
             },
@@ -81,17 +79,16 @@ impl DottedMapExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
             Message::Tick(now) => {
-self.theme_shell.tick(now);
+                self.theme_shell.tick(now);
 
-            self.now = now;
-            self.state.tick(now, &self.props);
+                self.now = now;
+                self.state.tick(now, &self.props);
             }
         }
         Task::none()
@@ -114,6 +111,11 @@ self.theme_shell.tick(now);
                 ..container::Style::default()
             });
 
-        _shared::themed_shell("Dotted Map", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Dotted Map",
+            column![stage].spacing(24).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

@@ -26,7 +26,11 @@ pub fn measure_ids(kind: BeamSceneKind) -> Vec<Id> {
             Id::new("beam-n7"),
         ],
         BeamSceneKind::Unidirectional | BeamSceneKind::Bidirectional => {
-            vec![Id::new(CONTAINER), Id::new("beam-left"), Id::new("beam-right")]
+            vec![
+                Id::new(CONTAINER),
+                Id::new("beam-left"),
+                Id::new("beam-right"),
+            ]
         }
         BeamSceneKind::MultipleInputs => vec![
             Id::new(CONTAINER),

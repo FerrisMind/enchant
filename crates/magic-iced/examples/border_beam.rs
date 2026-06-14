@@ -58,8 +58,7 @@ impl BorderBeamExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -106,6 +105,11 @@ impl BorderBeamExample {
         .width(Length::Fixed(350.0))
         .height(Length::Fixed(380.0));
 
-        _shared::themed_shell("Border Beam", column![card].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Border Beam",
+            column![card].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

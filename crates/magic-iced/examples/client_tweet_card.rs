@@ -1,13 +1,13 @@
 mod _shared;
 
-use iced::widget::{column, text};
 use iced::time::Instant;
-use std::time::Duration;
+use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
 use magic_iced::{
     ClientTweetCardProps, ClientTweetCardState, ClientTweetCardStatus, TweetAsset, TweetAuthor,
     TweetCardData, TweetMedia, client_tweet_card,
 };
+use std::time::Duration;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -21,7 +21,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(ClientTweetCardExample::subscription)
-        
     .run()
 }
 
@@ -52,8 +51,7 @@ impl ClientTweetCardExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -67,7 +65,6 @@ impl ClientTweetCardExample {
         Task::none()
     }
 
-
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
@@ -75,15 +72,23 @@ impl ClientTweetCardExample {
     fn view(&self) -> Element<'_, Message> {
         let labels = ["Loading", "Ready", "Error"];
         let state = client_state(self.active);
-        let card = client_tweet_card(&state, &ClientTweetCardProps::new(), self.theme_shell.theme());
+        let card = client_tweet_card(
+            &state,
+            &ClientTweetCardProps::new(),
+            self.theme_shell.theme(),
+        );
 
-        _shared::themed_shell("Client Tweet Card", column![
+        _shared::themed_shell(
+            "Client Tweet Card",
+            column![
                 _shared::tabs(&labels, self.active, Message::Select),
                 card,
                 text("Client surface state demo.")
             ]
             .spacing(20),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }
 

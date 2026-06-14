@@ -2,8 +2,8 @@ use crate::primitives::{
     AnimatedValue, EffectCanvasProps, EffectProgram, MotionSpec, effect_canvas,
 };
 use iced::time::Instant;
-use iced::widget::{canvas, container, stack, text};
 use iced::widget::canvas::{LineCap, LineJoin};
+use iced::widget::{canvas, container, stack, text};
 use iced::{Color, Element, Length, Point, Radians, Rectangle, Renderer, Size};
 use iced_shadcn::Theme;
 use std::f32::consts::PI;
@@ -165,20 +165,18 @@ pub fn animated_circular_progress_bar<'a, Message: 'a>(
 
     if props.show_label {
         let display_percent = (progress * 100.0).round() as i32;
-        let label = container(
-            text(format!("{display_percent}")).size(u32::from(props.font_size)),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .style({
-            let color = foreground;
-            move |_| iced::widget::container::Style {
-                text_color: Some(color),
-                ..iced::widget::container::Style::default()
-            }
-        });
+        let label = container(text(format!("{display_percent}")).size(u32::from(props.font_size)))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .style({
+                let color = foreground;
+                move |_| iced::widget::container::Style {
+                    text_color: Some(color),
+                    ..iced::widget::container::Style::default()
+                }
+            });
         layers.push(
             container(label)
                 .width(Length::Fixed(props.size))
@@ -314,8 +312,7 @@ impl<Message> EffectProgram<Message> for CircularProgressProgram {
 
         if secondary_is_mounted(percent) {
             if secondary_fraction > f32::EPSILON {
-                let (_, _, secondary_start, secondary_end) =
-                    arc_angles(0.0, secondary_fraction);
+                let (_, _, secondary_start, secondary_end) = arc_angles(0.0, secondary_fraction);
                 stroke_arc(
                     &mut frame,
                     center,
@@ -370,10 +367,7 @@ fn fill_round_cap(
     color: Color,
 ) {
     let point = point_on_ring(center, radius, angle);
-    frame.fill(
-        &canvas::Path::circle(point, stroke_width / 2.0),
-        color,
-    );
+    frame.fill(&canvas::Path::circle(point, stroke_width / 2.0), color);
 }
 
 fn normalized_progress(min: f32, max: f32, value: f32) -> f32 {

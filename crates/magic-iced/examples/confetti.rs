@@ -55,16 +55,14 @@ impl ConfettiExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
 
             Message::Fire(action) => {
-                self.state
-                    .apply_action(&action, self.now, &self.props);
+                self.state.apply_action(&action, self.now, &self.props);
             }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
@@ -116,6 +114,11 @@ impl ConfettiExample {
             ..container::Style::default()
         });
 
-        _shared::themed_shell("Confetti", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Confetti",
+            column![stage].spacing(24).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

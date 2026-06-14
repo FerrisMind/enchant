@@ -20,6 +20,7 @@ iced = { version = "0.14", features = ["advanced", "canvas", "image", "svg", "to
 bytemuck = { version = "1.24", features = ["derive"] }
 iced_runtime = "0.14.0"
 iced-shadcn = { git = "https://github.com/FerrisMind/shadcn-rs", rev = "f782973e492f7bc6a54f2cb0d39dd712b60d48f6", default-features = false }
+lucide-icons = "0.575.0"
 twill = { git = "https://github.com/FerrisMind/twill.git", rev = "8c384341992e51fe7c15e77901096903cc1139f4", default-features = false, features = ["iced"] }
 unicode-segmentation = "1.12"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

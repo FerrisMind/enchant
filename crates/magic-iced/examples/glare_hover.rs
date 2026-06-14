@@ -50,8 +50,7 @@ impl GlareHoverExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -69,7 +68,10 @@ impl GlareHoverExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let pricing = _shared::shadcn_forms::pricing_card_pro(Some(Message::GetStarted), self.theme_shell.theme());
+        let pricing = _shared::shadcn_forms::pricing_card_pro(
+            Some(Message::GetStarted),
+            self.theme_shell.theme(),
+        );
 
         let card = glare_hover(
             pricing,
@@ -83,7 +85,11 @@ impl GlareHoverExample {
             self.theme_shell.theme(),
         );
 
-        _shared::themed_shell("Glare Hover", column![text("Pro pricing with glare hover").size(14), card].spacing(24),
-            &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Glare Hover",
+            column![text("Pro pricing with glare hover").size(14), card].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

@@ -1,8 +1,8 @@
 use crate::widgets::globe::pipeline::GlobePipeline;
 use crate::widgets::globe::{GlobeProps, GlobeState};
 use iced::Rectangle;
-use iced::widget::shader;
 use iced::wgpu;
+use iced::widget::shader;
 
 #[derive(Debug)]
 pub struct GlobePrimitive {
@@ -43,11 +43,7 @@ impl shader::Primitive for GlobePrimitive {
         );
     }
 
-    fn draw(
-        &self,
-        pipeline: &Self::Pipeline,
-        render_pass: &mut wgpu::RenderPass<'_>,
-    ) -> bool {
+    fn draw(&self, pipeline: &Self::Pipeline, render_pass: &mut wgpu::RenderPass<'_>) -> bool {
         pipeline.draw(render_pass);
         true
     }

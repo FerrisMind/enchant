@@ -1,4 +1,5 @@
 use crate::primitives::{EffectCanvasProps, EffectProgram, effect_canvas};
+use ::image::{Rgba, RgbaImage};
 use iced::advanced::graphics::text::Paragraph as GraphicsParagraph;
 use iced::advanced::text::{
     self as text_layout, Alignment, LineHeight, Paragraph as TextParagraph, Shaping, Wrapping,
@@ -7,11 +8,10 @@ use iced::alignment::Vertical;
 use iced::widget::{canvas, container, image as iced_image};
 use iced::{Color, Element, Font, Length, Pixels, Point, Rectangle, Renderer, Size};
 use iced_shadcn::Theme;
-use ::image::{Rgba, RgbaImage};
 use lyon_path::PathEvent;
 use resvg::tiny_skia::{self, FillRule, Pixmap, Transform};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
@@ -138,8 +138,7 @@ impl<Message> EffectProgram<Message> for MorphingTextProgram {
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
         let image = render_frame(self);
-        let handle =
-            iced_image::Handle::from_rgba(self.buffer_w, self.buffer_h, image.into_raw());
+        let handle = iced_image::Handle::from_rgba(self.buffer_w, self.buffer_h, image.into_raw());
         frame.draw_image(Rectangle::with_size(bounds.size()), &handle);
         vec![frame.into_geometry()]
     }
@@ -182,11 +181,7 @@ fn render_frame(program: &MorphingTextProgram) -> RgbaImage {
     )
 }
 
-fn masks_for_texts(
-    texts: &[String],
-    font_size: f32,
-    buffer: (u32, u32),
-) -> Arc<Vec<RgbaImage>> {
+fn masks_for_texts(texts: &[String], font_size: f32, buffer: (u32, u32)) -> Arc<Vec<RgbaImage>> {
     let key = texts_cache_key(texts, font_size, buffer);
     if let Some(cached) = MASK_CACHE.lock().expect("mask cache").get(&key) {
         return Arc::clone(cached);
@@ -219,7 +214,10 @@ fn texts_cache_key(texts: &[String], font_size: f32, buffer: (u32, u32)) -> u64 
 }
 
 fn buffer_dimensions(canvas_w: f32, canvas_h: f32) -> (u32, u32) {
-    (canvas_w.ceil().max(1.0) as u32, canvas_h.ceil().max(1.0) as u32)
+    (
+        canvas_w.ceil().max(1.0) as u32,
+        canvas_h.ceil().max(1.0) as u32,
+    )
 }
 
 fn rasterize_text_mask(
@@ -229,8 +227,7 @@ fn rasterize_text_mask(
     buffer_w: u32,
     buffer_h: u32,
 ) -> RgbaImage {
-    let mut pixmap =
-        Pixmap::new(buffer_w, buffer_h).unwrap_or_else(|| Pixmap::new(1, 1).unwrap());
+    let mut pixmap = Pixmap::new(buffer_w, buffer_h).unwrap_or_else(|| Pixmap::new(1, 1).unwrap());
     let paths = collect_text_paths(content, center, font_size);
 
     let mut paint = tiny_skia::Paint::default();
@@ -241,7 +238,13 @@ fn rasterize_text_mask(
         let Some(sk_path) = skia_path_from_canvas(&path) else {
             continue;
         };
-        pixmap.fill_path(&sk_path, &paint, FillRule::Winding, Transform::identity(), None);
+        pixmap.fill_path(
+            &sk_path,
+            &paint,
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 
     let mut image = pixmap_to_straight_rgba(&pixmap);
@@ -301,10 +304,10 @@ fn apply_container_blur_alpha(alpha: &mut [u8], width: u32, height: u32) {
         let mut blurred = alpha.to_vec();
         blur_alpha_in_place(&mut blurred, width, height, 1);
         for (sharp, soft) in alpha.iter_mut().zip(blurred.iter()) {
-            let blended =
-                (*sharp as f32 * (1.0 - CONTAINER_BLUR_RADIUS) + *soft as f32 * CONTAINER_BLUR_RADIUS)
-                    .round()
-                    .clamp(0.0, 255.0) as u8;
+            let blended = (*sharp as f32 * (1.0 - CONTAINER_BLUR_RADIUS)
+                + *soft as f32 * CONTAINER_BLUR_RADIUS)
+                .round()
+                .clamp(0.0, 255.0) as u8;
             *sharp = blended;
         }
         return;
@@ -363,7 +366,8 @@ fn box_blur_alpha_pass(
     } else {
         for y in 0..height {
             for x in 0..width {
-                dest[index(x, y)] = average_alpha_window(source, width, height, x, y, radius, false);
+                dest[index(x, y)] =
+                    average_alpha_window(source, width, height, x, y, radius, false);
             }
         }
     }
@@ -503,7 +507,9 @@ fn skia_path_from_canvas(path: &canvas::Path) -> Option<tiny_skia::Path> {
             PathEvent::Quadratic { ctrl, to, .. } => {
                 builder.quad_to(ctrl.x, ctrl.y, to.x, to.y);
             }
-            PathEvent::Cubic { ctrl1, ctrl2, to, .. } => {
+            PathEvent::Cubic {
+                ctrl1, ctrl2, to, ..
+            } => {
                 builder.cubic_to(ctrl1.x, ctrl1.y, ctrl2.x, ctrl2.y, to.x, to.y);
             }
             PathEvent::End { close, .. } => {
@@ -609,11 +615,7 @@ mod tests {
         let canvas_w = (layout.width + BLUR_PADDING * 2.0).ceil();
         let canvas_h = (layout.height + BLUR_PADDING * 2.0).ceil();
         let buffer = buffer_dimensions(canvas_w, canvas_h);
-        let masks = masks_for_texts(
-            &["Hello".to_string(), "World".to_string()],
-            64.0,
-            buffer,
-        );
+        let masks = masks_for_texts(&["Hello".to_string(), "World".to_string()], 64.0, buffer);
         let program = MorphingTextProgram {
             masks,
             index: 0,
@@ -651,7 +653,10 @@ mod tests {
 
         let frame = render_frame(&program);
         let opaque = frame.pixels().filter(|pixel| pixel.0[3] >= 200).count();
-        assert!(opaque > 100, "expected crisp opaque glyphs, got {opaque} pixels");
+        assert!(
+            opaque > 100,
+            "expected crisp opaque glyphs, got {opaque} pixels"
+        );
     }
 
     #[test]
@@ -660,11 +665,7 @@ mod tests {
         let canvas_w = (layout.width + BLUR_PADDING * 2.0).ceil();
         let canvas_h = (layout.height + BLUR_PADDING * 2.0).ceil();
         let buffer = buffer_dimensions(canvas_w, canvas_h);
-        let masks = masks_for_texts(
-            &["Hello".to_string(), "World".to_string()],
-            64.0,
-            buffer,
-        );
+        let masks = masks_for_texts(&["Hello".to_string(), "World".to_string()], 64.0, buffer);
         let program = MorphingTextProgram {
             masks,
             index: 1,

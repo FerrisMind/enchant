@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use iced::widget::{container, image, row, stack, text, Space};
 use iced::alignment::{Horizontal, Vertical};
-use iced::{Border, Color, ContentFit, Element, Length, Padding};
 use iced::border::Radius;
+use iced::widget::{Space, container, image, row, stack, text};
+use iced::{Border, Color, ContentFit, Element, Length, Padding};
 use iced_shadcn::{AvatarProps, AvatarSize, AvatarVariant, Theme, avatar};
 
 #[derive(Clone, Debug)]
@@ -126,12 +126,7 @@ pub fn avatar_circles<'a, Message: Clone + 'a>(
 
     let chip_offset = props.entries.len() as f32 * step;
     let total_w = total_width(props.entries.len(), true, avatar_px, step);
-    let chip = extra_chip(
-        props.extra_count,
-        avatar_px,
-        props.border_width,
-        theme,
-    );
+    let chip = extra_chip(props.extra_count, avatar_px, props.border_width, theme);
 
     // Counter in a higher stack layer (above avatar border rings), positioned via padding.
     stack![

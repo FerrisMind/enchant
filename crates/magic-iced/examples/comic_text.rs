@@ -41,7 +41,7 @@ impl ComicTextExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               state: ComicTextState::new(&props),
+                state: ComicTextState::new(&props),
                 props,
                 now,
             },
@@ -52,17 +52,16 @@ impl ComicTextExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
             Message::Tick(now) => {
-self.theme_shell.tick(now);
+                self.theme_shell.tick(now);
 
-            self.now = now;
-            self.state.tick(now, &self.props);
+                self.now = now;
+                self.state.tick(now, &self.props);
             }
         }
         Task::none()
@@ -74,6 +73,11 @@ self.theme_shell.tick(now);
 
     fn view(&self) -> Element<'_, Message> {
         let body = comic_text("BOOM!", &self.state, self.now, &self.props);
-        _shared::themed_shell("Comic Text", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Comic Text",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

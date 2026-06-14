@@ -46,7 +46,7 @@ impl AnimatedBeamMultipleOutputsExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               started_at,
+                started_at,
                 elapsed: Duration::ZERO,
                 measurements: None,
                 remeasure: AnchorRemeasure::new(),
@@ -59,8 +59,7 @@ impl AnimatedBeamMultipleOutputsExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -91,12 +90,7 @@ impl AnimatedBeamMultipleOutputsExample {
 
         _shared::themed_shell(
             "Animated Beam Multiple Outputs",
-            column![
-                container(scene)
-                    .width(Length::Fill)
-                    .center_x(Length::Fill),
-            ]
-            .spacing(20),
+            column![container(scene).width(Length::Fill).center_x(Length::Fill),].spacing(20),
             &self.theme_shell,
             Message::ToggleTheme,
         )

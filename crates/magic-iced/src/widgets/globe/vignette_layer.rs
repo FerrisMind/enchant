@@ -4,8 +4,8 @@
 
 use super::DEMO_CARD_INNER_RADIUS;
 use iced::advanced::layout::{self, Layout};
-use iced::advanced::renderer::{self, Quad};
 use iced::advanced::overlay;
+use iced::advanced::renderer::{self, Quad};
 use iced::advanced::widget::{Operation, Tree, Widget};
 use iced::advanced::{Clipboard, Renderer as AdvancedRenderer, Shell};
 use iced::gradient::{self, Gradient};
@@ -68,7 +68,7 @@ impl<Message> Widget<Message, iced::Theme, Renderer> for GlobeVignetteLayer {
             Quad {
                 bounds,
                 border: Border {
-                    radius: iced::border::radius(DEMO_CARD_INNER_RADIUS).into(),
+                    radius: iced::border::radius(DEMO_CARD_INNER_RADIUS),
                     ..Border::default()
                 },
                 shadow: Shadow::default(),

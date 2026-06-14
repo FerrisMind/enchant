@@ -150,14 +150,8 @@ impl<Message> EffectProgram<Message> for AuroraTextProgram {
 
         for column in 0..column_count {
             let x = column as f32 + 0.5;
-            let color = aurora_color_at(
-                x,
-                text_height * 0.5,
-                text_width,
-                text_height,
-                phase,
-                &stops,
-            );
+            let color =
+                aurora_color_at(x, text_height * 0.5, text_width, text_height, phase, &stops);
 
             let strip = Rectangle::new(
                 Point::new(self.prefix_width + x - 0.5, 0.0),
@@ -371,7 +365,10 @@ mod tests {
     fn aurora_stops_loop_first_color_at_end() {
         let stops = aurora_stops(&AuroraTextProps::new().colors);
 
-        assert_eq!(stops.first().map(|(_, color)| color), stops.last().map(|(_, color)| color));
+        assert_eq!(
+            stops.first().map(|(_, color)| color),
+            stops.last().map(|(_, color)| color)
+        );
         assert!(stops.len() >= 5);
     }
 
@@ -390,7 +387,8 @@ mod tests {
 
         let step = aurora_color_at(50.0, height / 2.0, width, height, phase, &stops);
         let next = aurora_color_at(51.0, height / 2.0, width, height, phase, &stops);
-        let channel_delta = (step.r - next.r).abs() + (step.g - next.g).abs() + (step.b - next.b).abs();
+        let channel_delta =
+            (step.r - next.r).abs() + (step.g - next.g).abs() + (step.b - next.b).abs();
 
         assert!(
             channel_delta < 0.2,
@@ -406,9 +404,18 @@ mod tests {
         let mid = aurora_phase(Duration::from_secs_f32(duration * 0.5), 1.0);
         let late = aurora_phase(Duration::from_secs_f32(duration * 0.88), 1.0);
 
-        assert!((early - start).abs() > 0.02, "phase should move in the first quarter");
-        assert!((mid - early).abs() > 0.02, "phase should move in the middle");
-        assert!((late - mid).abs() > 0.02, "phase should move in the last quarter");
+        assert!(
+            (early - start).abs() > 0.02,
+            "phase should move in the first quarter"
+        );
+        assert!(
+            (mid - early).abs() > 0.02,
+            "phase should move in the middle"
+        );
+        assert!(
+            (late - mid).abs() > 0.02,
+            "phase should move in the last quarter"
+        );
     }
 
     #[test]

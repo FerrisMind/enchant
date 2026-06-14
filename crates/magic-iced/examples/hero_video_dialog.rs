@@ -1,10 +1,10 @@
 mod _shared;
 
 use iced::time::{Duration, Instant};
+use iced::widget::text;
 use iced::widget::{column, container, image};
 use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, Theme, button_content};
-use iced::widget::text;
 use magic_iced::{HeroVideoDialogProps, HeroVideoDialogState, hero_video_dialog};
 
 fn hero_light_handle() -> image::Handle {
@@ -62,8 +62,7 @@ impl HeroVideoDialogExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -139,7 +138,11 @@ impl HeroVideoDialogExample {
             self.theme_shell.theme(),
         );
 
-        _shared::themed_shell("Hero Video Dialog", column![light, dark].spacing(16), &self.theme_shell, Message::ToggleTheme,
+        _shared::themed_shell(
+            "Hero Video Dialog",
+            column![light, dark].spacing(16),
+            &self.theme_shell,
+            Message::ToggleTheme,
         )
     }
 }

@@ -3,7 +3,7 @@ use crate::primitives::{
     effect_canvas, point_at,
 };
 use iced::widget::canvas::{self, LineCap, Stroke};
-use iced::{Color, Element, Length, Point, Rectangle, Renderer};
+use iced::{Color, Element, Length, Rectangle, Renderer};
 use std::time::Duration;
 
 /// Matches `animated-beam.tsx` transition ease: cubic-bezier(0.16, 1, 0.3, 1).
@@ -206,8 +206,15 @@ fn beam_motion_phase(elapsed: Duration, props: &AnimatedBeamProps) -> Option<f32
 }
 
 fn beam_eased_progress(elapsed: Duration, props: &AnimatedBeamProps) -> Option<f32> {
-    beam_motion_phase(elapsed, props)
-        .map(|linear| cubic_bezier_ease(linear, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2))
+    beam_motion_phase(elapsed, props).map(|linear| {
+        cubic_bezier_ease(
+            linear,
+            BEAM_EASE_X1,
+            BEAM_EASE_Y1,
+            BEAM_EASE_X2,
+            BEAM_EASE_Y2,
+        )
+    })
 }
 
 /// `userSpaceOnUse` gradient endpoints from `animated-beam.tsx`.
@@ -220,13 +227,7 @@ fn gradient_endpoints(reverse: bool, eased: f32, width: f32) -> (f32, f32) {
 }
 
 /// Samples the animated beam gradient at a container-space X coordinate.
-fn sample_beam_gradient(
-    x: f32,
-    grad_x1: f32,
-    grad_x2: f32,
-    start: Color,
-    stop: Color,
-) -> Color {
+fn sample_beam_gradient(x: f32, grad_x1: f32, grad_x2: f32, start: Color, stop: Color) -> Color {
     let span = grad_x2 - grad_x1;
     if span.abs() < f32::EPSILON {
         return Color::TRANSPARENT;
@@ -245,10 +246,7 @@ fn sample_beam_gradient(
 
     if t < 1.0 {
         let fade = 1.0 - ((t - BEAM_GRADIENT_STOP_MID) / (1.0 - BEAM_GRADIENT_STOP_MID));
-        return Color {
-            a: fade,
-            ..stop
-        };
+        return Color { a: fade, ..stop };
     }
 
     Color::TRANSPARENT
@@ -306,6 +304,7 @@ fn mix_color(from: Color, to: Color, progress: f32) -> Color {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use iced::Point;
 
     #[test]
     fn animated_beam_defaults_are_stable() {
@@ -333,9 +332,10 @@ mod tests {
 
     #[test]
     fn beam_easing_matches_reference_curve() {
-        assert!((cubic_bezier_ease(0.0, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2))
-            .abs()
-            < f32::EPSILON);
+        assert!(
+            (cubic_bezier_ease(0.0, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2)).abs()
+                < f32::EPSILON
+        );
         assert!(
             (cubic_bezier_ease(1.0, BEAM_EASE_X1, BEAM_EASE_Y1, BEAM_EASE_X2, BEAM_EASE_Y2) - 1.0)
                 .abs()
@@ -367,15 +367,9 @@ mod tests {
         let start = Color::from_rgb8(0xFF, 0xAA, 0x40);
         let stop = Color::from_rgb8(0x9C, 0x40, 0xFF);
 
-        assert_eq!(
-            sample_beam_gradient(0.0, 0.0, 100.0, start, stop),
-            start
-        );
+        assert_eq!(sample_beam_gradient(0.0, 0.0, 100.0, start, stop), start);
         assert!(sample_beam_gradient(-1.0, 0.0, 100.0, start, stop).a < f32::EPSILON);
-        assert_eq!(
-            sample_beam_gradient(32.5, 0.0, 100.0, start, stop),
-            stop
-        );
+        assert_eq!(sample_beam_gradient(32.5, 0.0, 100.0, start, stop), stop);
         assert!(sample_beam_gradient(100.0, 0.0, 100.0, start, stop).a < f32::EPSILON);
     }
 

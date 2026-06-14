@@ -278,9 +278,7 @@ impl<Message> EffectProgram<Message> for MagicCardProgram {
                     return Some(canvas::Action::request_redraw());
                 }
             }
-            canvas::Event::Mouse(mouse::Event::CursorLeft)
-                if state.cursor.take().is_some() =>
-            {
+            canvas::Event::Mouse(mouse::Event::CursorLeft) if state.cursor.take().is_some() => {
                 return Some(canvas::Action::request_redraw());
             }
             _ => {}

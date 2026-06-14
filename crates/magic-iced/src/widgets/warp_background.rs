@@ -266,6 +266,7 @@ fn wall_point_beam(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_wall_grid(
     frame: &mut canvas::Frame,
     wall: Wall,
@@ -300,6 +301,7 @@ fn draw_wall_grid(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_beam(
     frame: &mut canvas::Frame,
     wall: Wall,

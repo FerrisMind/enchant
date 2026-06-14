@@ -20,7 +20,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(NoiseTextureExample::subscription)
-        
     .run()
 }
 
@@ -54,8 +53,7 @@ impl NoiseTextureExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -69,7 +67,6 @@ impl NoiseTextureExample {
         }
         Task::none()
     }
-
 
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
@@ -89,8 +86,12 @@ impl NoiseTextureExample {
             _ => self.search_field(),
         };
 
-        _shared::themed_shell("Noise Texture", column![tabs, _shared::stage(body)].spacing(24),
-            &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Noise Texture",
+            column![tabs, _shared::stage(body)].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 
     fn radial_panel(&self) -> Element<'_, Message> {

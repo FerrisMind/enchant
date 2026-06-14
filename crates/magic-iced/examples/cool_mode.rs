@@ -7,14 +7,18 @@ use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, Theme, button_content}
 use magic_iced::{CoolModeAction, CoolModeProps, CoolModeState, cool_mode};
 
 pub fn main() -> iced::Result {
-    iced::application(CoolModeExample::new, CoolModeExample::update, CoolModeExample::view)
-        .title("Cool Mode")
-        .window(iced::window::Settings {
-            size: Size::new(900.0, 360.0),
-            ..Default::default()
-        })
-        .subscription(CoolModeExample::subscription)
-        .run()
+    iced::application(
+        CoolModeExample::new,
+        CoolModeExample::update,
+        CoolModeExample::view,
+    )
+    .title("Cool Mode")
+    .window(iced::window::Settings {
+        size: Size::new(900.0, 360.0),
+        ..Default::default()
+    })
+    .subscription(CoolModeExample::subscription)
+    .run()
 }
 
 struct CoolModeExample {
@@ -48,8 +52,7 @@ impl CoolModeExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -82,6 +85,11 @@ impl CoolModeExample {
         );
 
         let body = cool_mode(trigger, &self.state, &self.props, Message::CoolMode);
-        _shared::themed_shell("Cool Mode", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Cool Mode",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

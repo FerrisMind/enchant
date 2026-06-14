@@ -1,10 +1,10 @@
 mod _shared;
 
-use iced::widget::{column, text};
 use iced::time::Instant;
-use std::time::Duration;
+use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
 use magic_iced::{TweetAsset, TweetAuthor, TweetCardData, TweetCardProps, TweetMedia, tweet_card};
+use std::time::Duration;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -18,7 +18,6 @@ pub fn main() -> iced::Result {
         ..Default::default()
     })
     .subscription(TweetCardExample::subscription)
-        
     .run()
 }
 
@@ -49,8 +48,7 @@ impl TweetCardExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -64,7 +62,6 @@ impl TweetCardExample {
         Task::none()
     }
 
-
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
@@ -77,13 +74,17 @@ impl TweetCardExample {
             self.theme_shell.theme(),
         );
 
-        _shared::themed_shell("Tweet Card", column![
+        _shared::themed_shell(
+            "Tweet Card",
+            column![
                 _shared::tabs(&labels, self.active, Message::Select),
                 card,
                 text("Server-side card surface.")
             ]
             .spacing(20),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }
 

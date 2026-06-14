@@ -4,8 +4,8 @@ use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Color, Element, Size, Subscription, Task};
 use magic_iced::{
-    Text3DFlipAction, Text3DFlipDirection, Text3DFlipProps, Text3DFlipStaggerFrom,
-    Text3DFlipState, text_3d_flip,
+    Text3DFlipAction, Text3DFlipDirection, Text3DFlipProps, Text3DFlipStaggerFrom, Text3DFlipState,
+    text_3d_flip,
 };
 
 pub fn main() -> iced::Result {
@@ -65,8 +65,7 @@ impl Text3dFlipExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -95,6 +94,11 @@ impl Text3dFlipExample {
             self.props,
             Message::Flip,
         );
-        _shared::themed_shell("Text 3D Flip", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
+        _shared::themed_shell(
+            "Text 3D Flip",
+            column![body].spacing(24),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

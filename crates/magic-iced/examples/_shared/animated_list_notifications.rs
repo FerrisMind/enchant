@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use iced::widget::{column, container, row, text, Space};
+use iced::widget::{Space, column, container, row, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Shadow, Vector};
 use iced_shadcn::Theme;
 
@@ -92,15 +92,21 @@ pub fn notification_card<'a, Message: 'a>(
         });
 
     let title = row![
-        text(item.name).size(16).style(move |_| iced::widget::text::Style {
-            color: Some(title_color),
-        }),
-        text(" · ").size(14).style(move |_| iced::widget::text::Style {
-            color: Some(title_color),
-        }),
-        text(item.time).size(12).style(move |_| iced::widget::text::Style {
-            color: Some(time_color),
-        }),
+        text(item.name)
+            .size(16)
+            .style(move |_| iced::widget::text::Style {
+                color: Some(title_color),
+            }),
+        text(" · ")
+            .size(14)
+            .style(move |_| iced::widget::text::Style {
+                color: Some(title_color),
+            }),
+        text(item.time)
+            .size(12)
+            .style(move |_| iced::widget::text::Style {
+                color: Some(time_color),
+            }),
     ]
     .spacing(0)
     .align_y(Alignment::Center);
@@ -109,9 +115,11 @@ pub fn notification_card<'a, Message: 'a>(
         icon_badge,
         column![
             title,
-            text(item.description).size(14).style(move |_| iced::widget::text::Style {
-                color: Some(description_color),
-            }),
+            text(item.description)
+                .size(14)
+                .style(move |_| iced::widget::text::Style {
+                    color: Some(description_color),
+                }),
         ]
         .spacing(4)
         .width(Length::Fill),

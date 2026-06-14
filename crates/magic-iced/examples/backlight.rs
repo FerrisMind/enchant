@@ -3,9 +3,9 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::{column, container, image, row, svg, text};
 use iced::{Alignment, ContentFit, Element, Length, Size, Task};
+use magic_iced::primitives::glow_from_svg_bytes;
 use magic_iced::theme::MagicTheme;
 use magic_iced::{BacklightProps, backlight};
-use magic_iced::primitives::glow_from_svg_bytes;
 
 const IMAGE_WIDTH: f32 = 480.0;
 const IMAGE_HEIGHT: f32 = 320.0;
@@ -109,8 +109,7 @@ impl BacklightExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -128,17 +127,11 @@ impl BacklightExample {
 
     fn image_demo(&self) -> Element<'_, Message> {
         let image_card = container(
-            image(
-                self.image_props
-                    .glow_source
-                    .as_ref()
-                    .expect("hero")
-                    .clone(),
-            )
-            .width(Length::Fixed(IMAGE_WIDTH))
-            .height(Length::Fixed(IMAGE_HEIGHT))
-            .content_fit(ContentFit::Cover)
-            .border_radius(16.0),
+            image(self.image_props.glow_source.as_ref().expect("hero").clone())
+                .width(Length::Fixed(IMAGE_WIDTH))
+                .height(Length::Fixed(IMAGE_HEIGHT))
+                .content_fit(ContentFit::Cover)
+                .border_radius(16.0),
         )
         .width(Length::Fixed(IMAGE_WIDTH))
         .height(Length::Fixed(IMAGE_HEIGHT));
@@ -156,10 +149,7 @@ impl BacklightExample {
             .map(|icon| self.svg_icon(icon))
             .collect::<Vec<_>>();
 
-        row(icons)
-            .spacing(64)
-            .align_y(Alignment::Center)
-            .into()
+        row(icons).spacing(64).align_y(Alignment::Center).into()
     }
 
     fn svg_icon(&self, icon: SvgIconSpec) -> Element<'_, Message> {

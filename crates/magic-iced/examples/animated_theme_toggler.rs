@@ -1,10 +1,10 @@
 use iced::time::{Duration, Instant};
+use iced::widget::Id;
 use iced::widget::{container, stack};
 use iced::{Background, Element, Length, Size, Subscription, Task};
-use iced::widget::Id;
 use magic_iced::{
-    anchor, measure_anchors, AnimatedThemeTogglerController, AnimatedThemeTogglerProps,
-    animated_theme_toggler_with_controller, theme_transition_overlay,
+    AnimatedThemeTogglerController, AnimatedThemeTogglerProps, anchor,
+    animated_theme_toggler_with_controller, measure_anchors, theme_transition_overlay,
 };
 
 const TOGGLER_ANCHOR: &str = "theme-toggler";
@@ -54,8 +54,7 @@ impl AnimatedThemeTogglerExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return measure_anchors([Id::new(TOGGLER_ANCHOR)])
-                    .map(Message::AnchorsMeasured);
+                return measure_anchors([Id::new(TOGGLER_ANCHOR)]).map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 if let Some(bounds) = measurements.get(0) {
@@ -105,9 +104,7 @@ impl AnimatedThemeTogglerExample {
             .center_y(Length::Fill);
 
         let mut layers = vec![background.into()];
-        if let Some(overlay) =
-            theme_transition_overlay(&self.controller, self.now, &self.props)
-        {
+        if let Some(overlay) = theme_transition_overlay(&self.controller, self.now, &self.props) {
             layers.push(overlay);
         }
         layers.push(toggler_layer.into());

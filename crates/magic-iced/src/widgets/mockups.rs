@@ -201,7 +201,13 @@ pub fn iphone<'a, Message: Clone + 'a + 'static>(
     container(mockup_frame_with_props(
         props.frame_kind(),
         space().width(Length::Fill).height(Length::Fill),
-        &to_frame_props(props.chrome_label, false, props.screen_media, props.media_bytes, props.media_mime),
+        &to_frame_props(
+            props.chrome_label,
+            false,
+            props.screen_media,
+            props.media_bytes,
+            props.media_mime,
+        ),
         theme,
     ))
     .width(props.width)

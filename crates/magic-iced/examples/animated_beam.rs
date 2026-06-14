@@ -48,7 +48,7 @@ impl AnimatedBeamExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               active: 0,
+                active: 0,
                 started_at,
                 elapsed: Duration::ZERO,
                 measurements: None,
@@ -70,8 +70,7 @@ impl AnimatedBeamExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
@@ -114,18 +113,22 @@ impl AnimatedBeamExample {
             _ => beam_demo::multiple_inputs_scene(self.elapsed, measurements),
         };
 
-        _shared::themed_shell("AnimatedBeam", column![
+        _shared::themed_shell(
+            "AnimatedBeam",
+            column![
                 _shared::tabs(&labels, self.active, Message::Select),
-                container(scene)
-                    .width(Length::Fill)
-                    .center_x(Length::Fill),
+                container(scene).width(Length::Fill).center_x(Length::Fill),
             ]
             .spacing(20),
-            &self.theme_shell, Message::ToggleTheme)
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }
 
 fn measure_scene(active: usize) -> Task<Message> {
-    measure_anchors(beam_demo::measure_ids(AnimatedBeamExample::scene_kind(active)))
-        .map(Message::Measured)
+    measure_anchors(beam_demo::measure_ids(AnimatedBeamExample::scene_kind(
+        active,
+    )))
+    .map(Message::Measured)
 }

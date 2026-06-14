@@ -133,9 +133,7 @@ impl<Message> EffectProgram<Message> for AnimatedGridPatternProgram {
                 let start = layout
                     .transform
                     .map_point(Point::new(x + 0.5, y + spec.cell_height));
-                let corner = layout
-                    .transform
-                    .map_point(Point::new(x + 0.5, y + 0.5));
+                let corner = layout.transform.map_point(Point::new(x + 0.5, y + 0.5));
                 let end = layout
                     .transform
                     .map_point(Point::new(x + spec.cell_width, y + 0.5));
@@ -241,10 +239,7 @@ impl PatternLayout {
 }
 
 fn pattern_tone_color() -> Color {
-    Color {
-        a: 0.3,
-        ..GRAY_400
-    }
+    Color { a: 0.3, ..GRAY_400 }
 }
 
 fn square_fill_color() -> Color {

@@ -315,7 +315,10 @@ mod tests {
         assert_eq!(props.subscribed_label, "Subscribed");
         assert_eq!(props.height, 40.0);
         assert_eq!(props.radius, 8.0);
-        assert_eq!(props.exit_motion.duration, TransitionDuration::CustomMs(100));
+        assert_eq!(
+            props.exit_motion.duration,
+            TransitionDuration::CustomMs(100)
+        );
     }
 
     #[test]
@@ -341,8 +344,8 @@ mod tests {
         let mut state = AnimatedSubscribeButtonState::new(&props);
         let start = Instant::now();
 
-        let controlled = AnimatedSubscribeButtonProps::new("Subscribe", "Subscribed")
-            .subscribe_status(true);
+        let controlled =
+            AnimatedSubscribeButtonProps::new("Subscribe", "Subscribed").subscribe_status(true);
         state.tick(start, &controlled);
         state.tick(start + Duration::from_millis(320), &controlled);
         assert!(state.is_subscribed());

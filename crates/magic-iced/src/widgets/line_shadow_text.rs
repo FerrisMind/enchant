@@ -103,9 +103,7 @@ pub fn line_shadow_text<'a, Message: 'a>(
     let prefix_font = line_shadow_prefix_font(props.semibold);
     let content_font = line_shadow_content_font(props.italic, props.semibold);
     let layout = measure_line_shadow_layout(prefix, content, font_size, prefix_font, content_font);
-    let text_color = props
-        .text_color
-        .unwrap_or(theme.palette.foreground);
+    let text_color = props.text_color.unwrap_or(theme.palette.foreground);
     let shadow_color = props
         .shadow_color
         .unwrap_or_else(|| line_shadow_color_for_mode(theme.variant().is_dark()));
@@ -222,8 +220,7 @@ impl<Message> EffectProgram<Message> for LineShadowTextProgram {
                     Point::new(layer_origin.x + cmin_x, layer_origin.y + cmin_y),
                     Size::new(layer_w + shadow_offset, layer_h + shadow_offset),
                 );
-                let progress =
-                    (self.elapsed.as_secs_f32() / self.speed.max(0.05)).rem_euclid(1.0);
+                let progress = (self.elapsed.as_secs_f32() / self.speed.max(0.05)).rem_euclid(1.0);
                 let (bg_x, bg_y) =
                     line_shadow_background_position(progress, layer_w, layer_h, cell);
                 draw_striped_shadow_paths(
@@ -275,6 +272,7 @@ fn line_shadow_canvas_text(
 }
 
 /// Paint shadow glyphs where the tiled `linear-gradient(45deg, …)` is opaque.
+#[allow(clippy::too_many_arguments)]
 fn draw_striped_shadow_paths(
     frame: &mut canvas::Frame,
     paths: &[canvas::Path],
@@ -326,12 +324,7 @@ fn draw_striped_shadow_paths(
     }
 }
 
-fn shadow_paths_cache_key(
-    content: &str,
-    font_size: f32,
-    font: Font,
-    origin: Point,
-) -> String {
+fn shadow_paths_cache_key(content: &str, font_size: f32, font: Font, origin: Point) -> String {
     format!(
         "{content}|{font_size:.3}|{:?}|{:?}|{:.3},{:.3}",
         font.weight, font.style, origin.x, origin.y
@@ -369,11 +362,7 @@ fn line_shadow_content_font(italic: bool, semibold: bool) -> Font {
         } else {
             Weight::Normal
         },
-        style: if italic {
-            Style::Italic
-        } else {
-            Style::Normal
-        },
+        style: if italic { Style::Italic } else { Style::Normal },
         ..Font::DEFAULT
     }
 }
@@ -434,9 +423,7 @@ fn outline_bounds(content: &str, font_size: f32, font: Font) -> Option<(f32, f32
     let paragraph = line_shadow_paragraph(content, font_size, font);
     let buffer = paragraph.buffer();
     let mut swash_cache = cosmic_text::SwashCache::new();
-    let mut font_system = gfx_text::font_system()
-        .write()
-        .expect("Write font system");
+    let mut font_system = gfx_text::font_system().write().expect("Write font system");
     let mut min_x = f32::INFINITY;
     let mut min_y = f32::INFINITY;
     let mut max_x = f32::NEG_INFINITY;
@@ -447,14 +434,13 @@ fn outline_bounds(content: &str, font_size: f32, font: Font) -> Option<(f32, f32
         for glyph in run.glyphs.iter() {
             let physical_glyph = glyph.physical((0.0, 0.0), 1.0);
             let offset = Vector::new(glyph.x + glyph.x_offset, glyph.y_offset + run.line_y);
-            let Some(commands) = swash_cache.get_outline_commands(
-                font_system.raw(),
-                physical_glyph.cache_key,
-            ) else {
+            let Some(commands) =
+                swash_cache.get_outline_commands(font_system.raw(), physical_glyph.cache_key)
+            else {
                 continue;
             };
 
-            let (left, top, right, bottom) = outline_command_bounds(&commands, offset);
+            let (left, top, right, bottom) = outline_command_bounds(commands, offset);
             min_x = min_x.min(left);
             min_y = min_y.min(top);
             max_x = max_x.max(right);
@@ -523,17 +509,11 @@ fn line_shadow_gradient_visible(local_x: f32, local_y: f32, cell: f32) -> bool {
     let u = (local_x / cell).rem_euclid(1.0);
     let v = (local_y / cell).rem_euclid(1.0);
     let t = ((1.0 - u) + v) * 0.5;
-    t >= SHADOW_BAND_START && t < SHADOW_BAND_END
+    (SHADOW_BAND_START..SHADOW_BAND_END).contains(&t)
 }
 
 /// Repeating `background-size: 0.06em` field shifted by animated `background-position`.
-fn line_shadow_sample_visible(
-    layer_x: f32,
-    layer_y: f32,
-    bg_x: f32,
-    bg_y: f32,
-    cell: f32,
-) -> bool {
+fn line_shadow_sample_visible(layer_x: f32, layer_y: f32, bg_x: f32, bg_y: f32, cell: f32) -> bool {
     let sample_x = (layer_x - bg_x).rem_euclid(cell);
     let sample_y = (layer_y - bg_y).rem_euclid(cell);
     line_shadow_gradient_visible(sample_x, sample_y, cell)
@@ -630,10 +610,7 @@ mod tests {
         let cell = 4.0;
         let w = 100.0;
         let h = 50.0;
-        assert_eq!(
-            line_shadow_background_position(0.0, w, h, cell),
-            (0.0, 0.0)
-        );
+        assert_eq!(line_shadow_background_position(0.0, w, h, cell), (0.0, 0.0));
         assert_eq!(
             line_shadow_background_position(1.0, w, h, cell),
             (w - cell, -(h - cell))
@@ -674,7 +651,8 @@ mod tests {
         let font_size = 72.0;
         let prefix_font = line_shadow_prefix_font(true);
         let content_font = line_shadow_content_font(true, true);
-        let layout = measure_line_shadow_layout("Ship", "Fast", font_size, prefix_font, content_font);
+        let layout =
+            measure_line_shadow_layout("Ship", "Fast", font_size, prefix_font, content_font);
         let (_, _, content_max_x, _) = glyph_layout_bounds("Fast", font_size, content_font);
 
         assert!(
@@ -690,7 +668,8 @@ mod tests {
         let font_size = 72.0;
         let prefix_font = line_shadow_prefix_font(true);
         let content_font = line_shadow_content_font(true, true);
-        let layout = measure_line_shadow_layout("Ship", "Fast", font_size, prefix_font, content_font);
+        let layout =
+            measure_line_shadow_layout("Ship", "Fast", font_size, prefix_font, content_font);
 
         assert!(layout.y_offset >= 0.0);
         assert!(layout.height >= font_size);

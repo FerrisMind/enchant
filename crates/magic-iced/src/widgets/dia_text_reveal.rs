@@ -1,4 +1,6 @@
-use crate::primitives::{AnimatedValue, EffectCanvasProps, EffectProgram, effect_canvas, MotionSpec};
+use crate::primitives::{
+    AnimatedValue, EffectCanvasProps, EffectProgram, MotionSpec, effect_canvas,
+};
 use iced::advanced::graphics::text::Paragraph as GraphicsParagraph;
 use iced::advanced::text::{
     self as text_layout, Alignment, LineHeight, Paragraph as TextParagraph, Shaping, Wrapping,
@@ -246,21 +248,27 @@ impl DiaTextRevealState {
                 }
             }
             PlayPhase::Delaying => {
-                if now.saturating_duration_since(self.phase_started_at).as_secs_f32()
+                if now
+                    .saturating_duration_since(self.phase_started_at)
+                    .as_secs_f32()
                     >= props.delay_secs
                 {
                     self.begin_sweep(now, props);
                 }
             }
             PlayPhase::Sweeping => {
-                if now.saturating_duration_since(self.phase_started_at).as_secs_f32()
+                if now
+                    .saturating_duration_since(self.phase_started_at)
+                    .as_secs_f32()
                     >= props.duration_secs
                 {
                     self.complete_sweep(now, props);
                 }
             }
             PlayPhase::RepeatPause => {
-                if now.saturating_duration_since(self.phase_started_at).as_secs_f32()
+                if now
+                    .saturating_duration_since(self.phase_started_at)
+                    .as_secs_f32()
                     >= props.repeat_delay_secs
                 {
                     self.advance_text(now, props);
@@ -327,11 +335,7 @@ pub fn dia_text_reveal<'a, Message: 'a>(
     theme: &Theme,
 ) -> Element<'a, Message> {
     let text_color = props.text_color.unwrap_or(theme.palette.foreground);
-    let active_text = props
-        .texts
-        .get(state.active_index)
-        .copied()
-        .unwrap_or("");
+    let active_text = props.texts.get(state.active_index).copied().unwrap_or("");
     let prefix = props.prefix.unwrap_or("");
     let prefix_metrics = measure_text_size(prefix, props.font_size as f32);
     let metrics = measure_text_size(active_text, props.font_size as f32);
@@ -412,10 +416,7 @@ impl<Message> EffectProgram<Message> for DiaTextRevealProgram {
 
         let animated_text = dia_canvas_text(
             &self.content,
-            Point::new(
-                self.prefix_width,
-                content_top_pad + DIA_REFERENCE_Y_NUDGE,
-            ),
+            Point::new(self.prefix_width, content_top_pad + DIA_REFERENCE_Y_NUDGE),
             self.font_size,
             self.text_size.width,
         );
@@ -440,12 +441,8 @@ impl<Message> EffectProgram<Message> for DiaTextRevealProgram {
         frame.with_clip(animated_clip, |frame| {
             for column in 0..column_count {
                 let pct = (column as f32 + 0.5) / text_width * 100.0;
-                let color = reference_sweep_color_at_pct(
-                    pct,
-                    self.sweep_pos,
-                    self.colors,
-                    self.text_color,
-                );
+                let color =
+                    reference_sweep_color_at_pct(pct, self.sweep_pos, self.colors, self.text_color);
 
                 if color.a <= f32::EPSILON {
                     continue;
@@ -468,12 +465,7 @@ impl<Message> EffectProgram<Message> for DiaTextRevealProgram {
     }
 }
 
-fn dia_canvas_text(
-    content: &str,
-    position: Point,
-    font_size: f32,
-    max_width: f32,
-) -> canvas::Text {
+fn dia_canvas_text(content: &str, position: Point, font_size: f32, max_width: f32) -> canvas::Text {
     canvas::Text {
         content: content.to_owned(),
         position,
@@ -517,8 +509,7 @@ fn reference_sweep_color_at_pct(
         count => {
             let mut stop_pcts = Vec::with_capacity(count);
             for (index, &color) in colors.iter().enumerate() {
-                let stop_pct =
-                    band_start + (index as f32 / (count as f32 - 1.0)) * BAND_HALF * 2.0;
+                let stop_pct = band_start + (index as f32 / (count as f32 - 1.0)) * BAND_HALF * 2.0;
                 stop_pcts.push((stop_pct, color));
             }
 
@@ -631,7 +622,9 @@ fn fingerprint(props: &DiaTextRevealProps) -> DiaTextRevealFingerprint {
 }
 
 fn hash_texts(texts: &[&str]) -> u64 {
-    texts.iter().fold(0_u64, |acc, text| hash_text_with_seed(acc, text))
+    texts
+        .iter()
+        .fold(0_u64, |acc, text| hash_text_with_seed(acc, text))
 }
 
 fn hash_text(text: &str) -> u64 {
@@ -704,20 +697,20 @@ mod tests {
     fn sweep_past_right_edge_reveals_text_before_settling() {
         let text_color = Color::WHITE;
         let mid = reference_sweep_color_at_pct(50.0, 110.0, DEFAULT_DIA_COLORS, text_color);
-        let settled =
-            reference_sweep_color_at_pct(50.0, SWEEP_END, DEFAULT_DIA_COLORS, text_color);
+        let settled = reference_sweep_color_at_pct(50.0, SWEEP_END, DEFAULT_DIA_COLORS, text_color);
         assert_eq!(settled, text_color);
         assert!(mid.a > 0.0);
     }
 
     #[test]
     fn repeat_cycles_active_index() {
-        let props = DiaTextRevealProps::from_texts(&["build faster", "ship smarter", "scale easier"])
-            .repeat(true)
-            .repeat_delay_secs(0.1)
-            .duration_secs(0.1)
-            .start_on_view(false)
-            .visible(true);
+        let props =
+            DiaTextRevealProps::from_texts(&["build faster", "ship smarter", "scale easier"])
+                .repeat(true)
+                .repeat_delay_secs(0.1)
+                .duration_secs(0.1)
+                .start_on_view(false)
+                .visible(true);
         let mut state = DiaTextRevealState::new(&props);
         let start = Instant::now();
 

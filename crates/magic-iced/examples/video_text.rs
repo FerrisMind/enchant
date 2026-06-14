@@ -43,7 +43,7 @@ impl VideoTextExample {
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-               active: 0,
+                active: 0,
                 now,
                 state: VideoTextState::new(),
                 props: Self::props_for(0),
@@ -55,8 +55,7 @@ impl VideoTextExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor()
-                    .map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
             }
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);

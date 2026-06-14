@@ -101,12 +101,8 @@ impl<Message> EffectProgram<Message> for ShineBorderProgram {
             let p0 = track.sample(t0).point;
             let p1 = track.sample(t1).point;
             let mid = track.sample((t0 + t1) * 0.5);
-            let (u, v) = element_to_gradient_uv(
-                mid.point.x / width,
-                mid.point.y / height,
-                pos_x,
-                pos_y,
-            );
+            let (u, v) =
+                element_to_gradient_uv(mid.point.x / width, mid.point.y / height, pos_x, pos_y);
             let color = sample_shine_radial(radial_distance(u, v), &stops);
 
             if color.a <= f32::EPSILON {
@@ -198,7 +194,10 @@ fn sample_shine_radial(distance: f32, stops: &[(f32, Color)]) -> Color {
         }
     }
 
-    stops.last().map(|(_, color)| *color).unwrap_or(Color::TRANSPARENT)
+    stops
+        .last()
+        .map(|(_, color)| *color)
+        .unwrap_or(Color::TRANSPARENT)
 }
 
 fn blend_colors(from: Color, to: Color, progress: f32) -> Color {

@@ -40,10 +40,7 @@ impl PatternTransform {
     ) -> Self {
         Self {
             offset_y,
-            origin: Point::new(
-                bounds_width / 2.0,
-                pattern_height * 0.5 + offset_y,
-            ),
+            origin: Point::new(bounds_width / 2.0, pattern_height * 0.5 + offset_y),
             skew_axis,
             skew_tan: (degrees * PI / 180.0).tan(),
         }

@@ -171,9 +171,11 @@ impl<Message> EffectProgram<Message> for SpinningTextProgram {
                 frame.translate(Vector::new(0.0, -self.orbit_radius));
                 frame.translate(offset);
 
-                spinning_canvas_text(*letter, Point::ORIGIN, self.font_size).draw_with(|path, _| {
-                    frame.fill(&path, self.color);
-                });
+                spinning_canvas_text(*letter, Point::ORIGIN, self.font_size).draw_with(
+                    |path, _| {
+                        frame.fill(&path, self.color);
+                    },
+                );
             });
         }
 
