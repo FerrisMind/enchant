@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::{column, container, stack, text};
 use iced::{Alignment, Border, Color, Element, Length, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{RetroGridProps, retro_grid};
 use std::time::Duration;
 
@@ -23,13 +22,15 @@ pub fn main() -> iced::Result {
 }
 
 struct RetroGridExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -38,7 +39,7 @@ impl RetroGridExample {
         let start = Instant::now();
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 start,
                 elapsed: Duration::ZERO,
             },
@@ -48,6 +49,14 @@ impl RetroGridExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => self.elapsed = now.duration_since(self.start),
         }
         Task::none()
@@ -66,7 +75,7 @@ impl RetroGridExample {
                     height: Length::Fill,
                     ..RetroGridProps::new()
                 },
-                &self.theme,
+                self.theme_shell.theme(),
             ))
             .width(Length::Fill)
             .height(Length::Fill)
@@ -95,6 +104,6 @@ impl RetroGridExample {
             ..container::Style::default()
         });
 
-        _shared::shell("Retro Grid", column![stage].spacing(24).align_x(Alignment::Center))
+        _shared::themed_shell("Retro Grid", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
     }
 }

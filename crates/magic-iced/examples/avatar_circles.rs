@@ -1,5 +1,8 @@
 mod _shared;
 
+use iced::time::Instant;
+use std::time::Duration;
+
 use iced::widget::column;
 use iced::{Color, Element, Size, Task};
 use iced_shadcn::{AvatarVariant, Theme};
@@ -16,16 +19,22 @@ pub fn main() -> iced::Result {
         size: Size::new(900.0, 320.0),
         ..Default::default()
     })
+    .subscription(AvatarCirclesExample::subscription)
+        
     .run()
 }
 
 struct AvatarCirclesExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     props: AvatarCirclesProps<'static>,
 }
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    ToggleTheme,
+    Tick(Instant),
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
+}
 
 impl AvatarCirclesExample {
     fn new() -> (Self, Task<Message>) {
@@ -43,7 +52,7 @@ impl AvatarCirclesExample {
 
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 props,
             },
             Task::none(),
@@ -54,8 +63,13 @@ impl AvatarCirclesExample {
         Task::none()
     }
 
+
+    fn subscription(&self) -> iced::Subscription<Message> {
+        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
+    }
+
     fn view(&self) -> Element<'_, Message> {
-        let body = avatar_circles(&self.props, &self.theme);
-        _shared::shell("Avatar Circles", column![body].spacing(24))
+        let body = avatar_circles(&self.props, self.theme_shell.theme());
+        _shared::themed_shell("Avatar Circles", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

@@ -22,6 +22,7 @@ pub fn main() -> iced::Result {
 }
 
 struct VideoTextExample {
+    theme_shell: _shared::ThemeShell,
     active: usize,
     now: Instant,
     state: VideoTextState,
@@ -30,6 +31,8 @@ struct VideoTextExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Select(usize),
     Tick(Instant),
 }
@@ -39,7 +42,8 @@ impl VideoTextExample {
         let now = Instant::now();
         (
             Self {
-                active: 0,
+                theme_shell: _shared::ThemeShell::new(),
+               active: 0,
                 now,
                 state: VideoTextState::new(),
                 props: Self::props_for(0),
@@ -50,6 +54,14 @@ impl VideoTextExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Select(index) => {
                 self.active = index.min(1);
                 self.now = Instant::now();
@@ -57,6 +69,7 @@ impl VideoTextExample {
                 self.props = Self::props_for(self.active);
             }
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 self.state.tick(now);
             }
@@ -71,15 +84,13 @@ impl VideoTextExample {
     fn view(&self) -> Element<'_, Message> {
         let labels = ["Frames", "Image"];
 
-        _shared::shell(
-            "Video Text",
-            column![
+        _shared::themed_shell("Video Text", column![
                 _shared::tabs(&labels, self.active, Message::Select),
                 video_text(&self.state, self.now, &self.props),
                 text("The top label and background source can be swapped without losing frame parity."),
             ]
             .spacing(20),
-        )
+            &self.theme_shell, Message::ToggleTheme)
     }
 }
 

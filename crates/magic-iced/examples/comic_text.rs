@@ -21,6 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct ComicTextExample {
+    theme_shell: _shared::ThemeShell,
     state: ComicTextState,
     props: ComicTextProps,
     now: Instant,
@@ -28,6 +29,8 @@ struct ComicTextExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -37,7 +40,8 @@ impl ComicTextExample {
         let now = Instant::now();
         (
             Self {
-                state: ComicTextState::new(&props),
+                theme_shell: _shared::ThemeShell::new(),
+               state: ComicTextState::new(&props),
                 props,
                 now,
             },
@@ -46,9 +50,20 @@ impl ComicTextExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.now = now;
             self.state.tick(now, &self.props);
+            }
         }
         Task::none()
     }
@@ -59,6 +74,6 @@ impl ComicTextExample {
 
     fn view(&self) -> Element<'_, Message> {
         let body = comic_text("BOOM!", &self.state, self.now, &self.props);
-        _shared::shell("Comic Text", column![body].spacing(24))
+        _shared::themed_shell("Comic Text", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

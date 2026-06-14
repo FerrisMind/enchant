@@ -1,5 +1,8 @@
 mod _shared;
 
+use iced::time::Instant;
+use std::time::Duration;
+
 use iced::widget::{column, container, stack, text, text_input};
 use iced::{Element, Length, Size, Task};
 use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, Theme, button_content};
@@ -16,17 +19,22 @@ pub fn main() -> iced::Result {
         size: Size::new(1100.0, 760.0),
         ..Default::default()
     })
+    .subscription(NoiseTextureExample::subscription)
+        
     .run()
 }
 
 struct NoiseTextureExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     active_tab: usize,
     search: String,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    Tick(Instant),
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     SelectTab(usize),
     SearchChanged(String),
 }
@@ -35,7 +43,7 @@ impl NoiseTextureExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 active_tab: 0,
                 search: String::new(),
             },
@@ -45,10 +53,26 @@ impl NoiseTextureExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::SelectTab(index) => self.active_tab = index,
             Message::SearchChanged(value) => self.search = value,
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+            }
         }
         Task::none()
+    }
+
+
+    fn subscription(&self) -> iced::Subscription<Message> {
+        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -65,10 +89,8 @@ impl NoiseTextureExample {
             _ => self.search_field(),
         };
 
-        _shared::shell(
-            "Noise Texture",
-            column![tabs, _shared::stage(body)].spacing(24),
-        )
+        _shared::themed_shell("Noise Texture", column![tabs, _shared::stage(body)].spacing(24),
+            &self.theme_shell, Message::ToggleTheme)
     }
 
     fn radial_panel(&self) -> Element<'_, Message> {
@@ -109,7 +131,7 @@ impl NoiseTextureExample {
                     ButtonProps::new()
                         .variant(ButtonVariant::Default)
                         .size(ButtonSize::Size2),
-                    &self.theme,
+                    self.theme_shell.theme(),
                 ),
             ]
             .spacing(12)

@@ -18,6 +18,7 @@ pub fn main() -> iced::Result {
 }
 
 struct GlobeExample {
+    theme_shell: _shared::ThemeShell,
     state: GlobeState,
     props: GlobeProps,
     start: Instant,
@@ -25,6 +26,8 @@ struct GlobeExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Globe(GlobeAction),
     Tick(Instant),
 }
@@ -44,7 +47,8 @@ impl GlobeExample {
         let state = GlobeState::new(&props);
         (
             Self {
-                state,
+                theme_shell: _shared::ThemeShell::new(),
+               state,
                 props,
                 start: Instant::now(),
             },
@@ -54,6 +58,14 @@ impl GlobeExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Globe(action) => self.state.apply_action(&action, &self.props),
             Message::Tick(now) => self.state.tick(now, &self.props),
         }
@@ -88,6 +100,6 @@ impl GlobeExample {
             ..container::Style::default()
         });
 
-        _shared::shell("Globe", column![stage].spacing(24).align_x(Alignment::Center))
+        _shared::themed_shell("Globe", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
     }
 }

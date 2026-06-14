@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Color, Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{
     AnimatedCircularProgressBarProps, AnimatedCircularProgressBarState,
     animated_circular_progress_bar,
@@ -25,7 +24,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedCircularProgressBarExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     value: f32,
     last_step: Instant,
     props: AnimatedCircularProgressBarProps,
@@ -35,6 +34,8 @@ struct AnimatedCircularProgressBarExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -47,7 +48,7 @@ impl AnimatedCircularProgressBarExample {
         let state = AnimatedCircularProgressBarState::new(&props);
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 value: 0.0,
                 last_step: Instant::now(),
                 props,
@@ -59,8 +60,17 @@ impl AnimatedCircularProgressBarExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
-            self.now = now;
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+                self.now = now;
             if now.duration_since(self.last_step) >= Duration::from_secs(2) {
                 self.value = if self.value >= 100.0 {
                     0.0
@@ -75,6 +85,7 @@ impl AnimatedCircularProgressBarExample {
                 };
             }
             self.state.tick(now, &self.props);
+            }
         }
         Task::none()
     }
@@ -84,7 +95,14 @@ impl AnimatedCircularProgressBarExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = animated_circular_progress_bar(&self.state, self.now, &self.props, &self.theme);
-        _shared::shell("Animated Circular Progress Bar", column![body].spacing(24))
+        let foreground = self.theme_shell.blended_foreground(self.now);
+        let body = animated_circular_progress_bar(
+            &self.state,
+            self.now,
+            &self.props,
+            self.theme_shell.theme(),
+            Some(foreground),
+        );
+        _shared::themed_shell("Animated Circular Progress Bar", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

@@ -1,9 +1,9 @@
 mod _shared;
 
 use iced::time::Instant;
+use std::time::Duration;
 use iced::widget::{column, container, row, text};
 use iced::{Background, Border, Color, Element, Length, Size, Task};
-use iced_shadcn::Theme;
 use magic_iced::{PointerAction, PointerProps, PointerState, pointer};
 
 pub fn main() -> iced::Result {
@@ -13,17 +13,22 @@ pub fn main() -> iced::Result {
             size: Size::new(900.0, 620.0),
             ..Default::default()
         })
-        .run()
+        .subscription(PointerExample::subscription)
+        
+    .run()
 }
 
 struct PointerExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     states: [PointerState; 4],
     now: Instant,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    Tick(Instant),
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Pointer(usize, PointerAction),
 }
 
@@ -31,7 +36,7 @@ impl PointerExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 states: std::array::from_fn(|_| PointerState::new()),
                 now: Instant::now(),
             },
@@ -40,9 +45,19 @@ impl PointerExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Pointer(index, action) = message {
-            if let Some(state) = self.states.get_mut(index) {
-                state.apply_action(&action, self.now);
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+            }
+            other => {
+                let _ = other;
             }
         }
         Task::none()
@@ -79,6 +94,11 @@ impl PointerExample {
             .into()
     }
 
+
+    fn subscription(&self) -> iced::Subscription<Message> {
+        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
+    }
+
     fn view(&self) -> Element<'_, Message> {
         let grid = column![
             row![
@@ -93,7 +113,7 @@ impl PointerExample {
                             ..PointerProps::new()
                         },
                         |action| Message::Pointer(0, action),
-                        &self.theme,
+                        self.theme_shell.theme(),
                     ),
                 ]
                 .spacing(8)
@@ -110,7 +130,7 @@ impl PointerExample {
                             ..PointerProps::new()
                         },
                         |action| Message::Pointer(1, action),
-                        &self.theme,
+                        self.theme_shell.theme(),
                     ),
                 ]
                 .spacing(8)
@@ -131,7 +151,7 @@ impl PointerExample {
                             ..PointerProps::new()
                         },
                         |action| Message::Pointer(2, action),
-                        &self.theme,
+                        self.theme_shell.theme(),
                     ),
                 ]
                 .spacing(8)
@@ -148,7 +168,7 @@ impl PointerExample {
                             ..PointerProps::new()
                         },
                         |action| Message::Pointer(3, action),
-                        &self.theme,
+                        self.theme_shell.theme(),
                     ),
                 ]
                 .spacing(8)
@@ -159,6 +179,6 @@ impl PointerExample {
         ]
         .spacing(16);
 
-        _shared::shell("Pointer", column![grid].spacing(24))
+        _shared::themed_shell("Pointer", column![grid].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

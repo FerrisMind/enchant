@@ -1,19 +1,21 @@
 mod _shared;
 
 use iced::time::Instant;
-use iced::widget::{column, container, stack, Space};
+use iced::widget::{column, container, scrollable, stack};
+use iced::widget::scrollable::Scrollbar;
 use iced::{Alignment, Element, Length, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{AnimatedListProps, AnimatedListState, animated_list};
 use std::time::Duration;
-use twill::prelude::{SemanticThemeVars, ThemeVariant};
 
 use _shared::animated_list_notifications::{
     bottom_background_fade, notification_card, repeated_notifications,
 };
 
 const STAGE_HEIGHT: f32 = 500.0;
+/// Room for rounded card shadows inside the clipped stage (`blur_radius` + offset).
+const STAGE_PADDING: f32 = 24.0;
 const FADE_HEIGHT: f32 = STAGE_HEIGHT / 4.0;
+const VIEWPORT_HEIGHT: f32 = STAGE_HEIGHT;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -31,7 +33,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedListDemoExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     props: AnimatedListProps,
     state: AnimatedListState,
     now: Instant,
@@ -39,6 +41,8 @@ struct AnimatedListDemoExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -48,10 +52,7 @@ impl AnimatedListDemoExample {
         let now = Instant::now();
         (
             Self {
-                theme: Theme::from_semantic_theme(
-                    SemanticThemeVars::shadcn_neutral(),
-                    ThemeVariant::Dark,
-                ),
+                theme_shell: _shared::ThemeShell::new_dark(),
                 state: AnimatedListState::new(&props),
                 props,
                 now,
@@ -61,9 +62,19 @@ impl AnimatedListDemoExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
-            self.now = now;
-            self.state.tick(now, &self.props);
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+                self.now = now;
+                self.state.tick(now, &self.props);
+            }
         }
         Task::none()
     }
@@ -75,36 +86,46 @@ impl AnimatedListDemoExample {
     fn view(&self) -> Element<'_, Message> {
         let items = repeated_notifications(10)
             .into_iter()
-            .map(|item| notification_card(item, &self.theme))
+            .map(|item| notification_card(item, self.theme_shell.theme()))
             .collect();
 
-        let list = container(animated_list(items, &self.state, self.now, &self.props))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(8)
-            .align_x(Alignment::Center)
-            .align_y(Alignment::Start);
-
-        let fade = container(
-            column![
-                Space::new().height(Length::Fill),
-                bottom_background_fade(FADE_HEIGHT, self.theme.palette.background),
-            ]
-            .width(Length::Fill)
-            .height(Length::Fill),
+        let list = scrollable(
+            container(animated_list(items, &self.state, self.now, &self.props)).padding(STAGE_PADDING),
         )
         .width(Length::Fill)
-        .height(Length::Fill);
+        .height(Length::Fixed(VIEWPORT_HEIGHT))
+        .direction(scrollable::Direction::Vertical(Scrollbar::hidden()));
+
+        let fade = container(bottom_background_fade(
+            FADE_HEIGHT,
+            self.theme_shell.theme().palette.background,
+        ))
+        .width(Length::Fill)
+        .height(Length::Fixed(FADE_HEIGHT));
 
         let stage = container(
-            stack![list, fade]
-                .width(Length::Fill)
-                .height(Length::Fill),
+            stack![
+                container(list)
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+                container(fade)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::End),
+            ]
+            .width(Length::Fill)
+            .height(Length::Fixed(STAGE_HEIGHT)),
         )
         .width(Length::Fill)
         .height(Length::Fixed(STAGE_HEIGHT))
         .clip(true);
 
-        _shared::shell("Animated List Demo", column![stage].align_x(Alignment::Center))
+        _shared::themed_shell(
+            "Animated List Demo",
+            column![stage].spacing(20).align_x(Alignment::Center),
+            &self.theme_shell,
+            Message::ToggleTheme,
+        )
     }
 }

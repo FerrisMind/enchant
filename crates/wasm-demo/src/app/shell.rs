@@ -502,9 +502,9 @@ impl WasmDemoApp {
 
     pub(crate) fn theme_toggle_button(&self) -> Element<'_, Message> {
         let icon = if matches!(self.theme_mode, ThemeMode::Dark) {
-            LucideIcon::Moon
-        } else {
             LucideIcon::Sun
+        } else {
+            LucideIcon::Moon
         };
 
         button_content(

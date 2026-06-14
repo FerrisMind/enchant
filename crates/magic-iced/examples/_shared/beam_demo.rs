@@ -3,7 +3,7 @@
 use super::beam_icons;
 use super::beam_scene::{self, BeamSceneKind, CONTAINER};
 use iced::widget::{column, container, row, space, stack, svg};
-use iced::{Alignment, Background, Border, Color, Element, Length, Point, Rectangle, Shadow, Size};
+use iced::{Alignment, Background, Border, Color, Element, Length, Point, Rectangle, Shadow, Size, Vector};
 use magic_iced::{anchor, AnchorBounds, AnchorMeasurements, AnimatedBeamProps, animated_beam};
 use std::time::Duration;
 
@@ -74,13 +74,18 @@ pub fn beam_avatar<'a, Message: 'a>(
 ) -> Element<'a, Message> {
     let inner = (size - padding * 2.0).max(0.0);
     container(
-        svg(icon)
-            .width(Length::Fixed(inner))
-            .height(Length::Fixed(inner)),
+        container(
+            svg(icon)
+                .width(Length::Fixed(inner))
+                .height(Length::Fixed(inner)),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill),
     )
     .width(Length::Fixed(size))
     .height(Length::Fixed(size))
-    .padding(padding)
     .style(move |_| iced::widget::container::Style {
         background: Some(Background::Color(Color::WHITE)),
         border: Border {
@@ -88,10 +93,11 @@ pub fn beam_avatar<'a, Message: 'a>(
             radius: (size / 2.0).into(),
             color: Color::from_rgba(0.0, 0.0, 0.0, 0.12),
         },
+        // Reference: shadow-[0_0_20px_-12px_rgba(0,0,0,0.8)] — centered halo, no drop offset.
         shadow: Shadow {
-            color: Color::from_rgba(0.0, 0.0, 0.0, 0.18),
-            offset: iced::Vector::new(0.0, 4.0),
-            blur_radius: 12.0,
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.06),
+            offset: Vector::new(0.0, 0.0),
+            blur_radius: 8.0,
         },
         ..iced::widget::container::Style::default()
     })

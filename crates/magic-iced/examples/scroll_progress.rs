@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{ScrollProgressProps, scroll_progress};
 use std::time::Duration;
 
@@ -23,13 +22,15 @@ pub fn main() -> iced::Result {
 }
 
 struct ScrollProgressExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -38,7 +39,7 @@ impl ScrollProgressExample {
         let start = Instant::now();
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 start,
                 elapsed: Duration::ZERO,
             },
@@ -47,8 +48,19 @@ impl ScrollProgressExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.elapsed = now.duration_since(self.start);
+            }
         }
         Task::none()
     }
@@ -64,7 +76,7 @@ impl ScrollProgressExample {
                 height: 3.0,
                 ..ScrollProgressProps::new(progress)
             },
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
         let body = column![
@@ -73,6 +85,6 @@ impl ScrollProgressExample {
         ]
         .spacing(16);
 
-        _shared::shell("Scroll Progress", body)
+        _shared::themed_shell("Scroll Progress", body, &self.theme_shell, Message::ToggleTheme)
     }
 }

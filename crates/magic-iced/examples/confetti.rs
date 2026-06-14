@@ -21,6 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct ConfettiExample {
+    theme_shell: _shared::ThemeShell,
     state: ConfettiState,
     props: ConfettiProps,
     now: Instant,
@@ -28,6 +29,8 @@ struct ConfettiExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Fire(ConfettiAction),
     Tick(Instant),
 }
@@ -39,18 +42,32 @@ impl ConfettiExample {
         let mut state = ConfettiState::new();
         state.apply_action(&ConfettiAction::Fire(None), now, &props);
         (
-            Self { state, props, now },
+            Self {
+                theme_shell: _shared::ThemeShell::new(),
+                state,
+                props,
+                now,
+            },
             Task::none(),
         )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Fire(action) => {
                 self.state
                     .apply_action(&action, self.now, &self.props);
             }
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 self.state.tick(now, &self.props);
             }
@@ -99,6 +116,6 @@ impl ConfettiExample {
             ..container::Style::default()
         });
 
-        _shared::shell("Confetti", column![stage].spacing(24).align_x(Alignment::Center))
+        _shared::themed_shell("Confetti", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
     }
 }

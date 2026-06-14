@@ -290,13 +290,40 @@ impl WasmDemoApp {
     }
 
     pub(crate) fn preview_theme_toggler(&self) -> Element<'_, Message> {
-        centered(animated_theme_toggler_with_controller(
+        let props = theme_toggler_props();
+        let now = Instant::now();
+        let display_theme = self.theme_toggler.display_theme(now);
+        let icon_theme = self.theme_toggler.icon_theme();
+        let toggler = animated_theme_toggler_with_controller(
             &self.theme_toggler,
-            Instant::now(),
+            now,
             Message::ToggleTheme,
-            theme_toggler_props(),
-            &self.theme,
-        ))
+            props,
+            &icon_theme,
+        );
+
+        let background = container(Space::new())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |_| iced::widget::container::Style {
+                background: Some(Background::Color(display_theme.palette.background)),
+                ..iced::widget::container::Style::default()
+            });
+
+        let mut layers = vec![background.into()];
+        if let Some(overlay) = theme_transition_overlay(&self.theme_toggler, now, &props) {
+            layers.push(overlay);
+        }
+        layers.push(centered(toggler).into());
+
+        container(
+            stack(layers)
+                .width(Length::Fill)
+                .height(Length::Fixed(160.0)),
+        )
+        .width(Length::Fill)
+        .height(Length::Fixed(160.0))
+        .into()
     }
 
     pub(crate) fn preview_globe(&self) -> Element<'_, Message> {

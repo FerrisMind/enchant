@@ -22,6 +22,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AuroraTextExample {
+    theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
     props: AuroraTextProps,
@@ -29,6 +30,8 @@ struct AuroraTextExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -37,7 +40,8 @@ impl AuroraTextExample {
         let start = Instant::now();
         (
             Self {
-                start,
+                theme_shell: _shared::ThemeShell::new(),
+               start,
                 elapsed: Duration::ZERO,
                 props: AuroraTextProps::new()
                     .prefix("Ship ")
@@ -49,7 +53,16 @@ impl AuroraTextExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.elapsed = now.duration_since(self.start);
             }
         }
@@ -65,6 +78,6 @@ impl AuroraTextExample {
             .spacing(24)
             .align_x(iced::Alignment::Center);
 
-        _shared::shell("Aurora Text", body)
+        _shared::themed_shell("Aurora Text", body, &self.theme_shell, Message::ToggleTheme)
     }
 }

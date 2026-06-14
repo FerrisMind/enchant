@@ -31,7 +31,7 @@ pub fn main() -> iced::Result {
 }
 
 struct HeroVideoDialogExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     state: HeroVideoDialogState,
     props: HeroVideoDialogProps,
     now: Instant,
@@ -39,6 +39,8 @@ struct HeroVideoDialogExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Open,
     Close,
     Tick(Instant),
@@ -48,7 +50,7 @@ impl HeroVideoDialogExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 state: HeroVideoDialogState::new(),
                 props: HeroVideoDialogProps::new(),
                 now: Instant::now(),
@@ -59,9 +61,18 @@ impl HeroVideoDialogExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Open => self.state.set_open(true, self.now, &self.props),
             Message::Close => self.state.set_open(false, self.now, &self.props),
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 self.state.tick(now);
             }
@@ -82,7 +93,7 @@ impl HeroVideoDialogExample {
             ButtonProps::new()
                 .variant(ButtonVariant::Ghost)
                 .size(ButtonSize::Size2),
-            &self.theme,
+            self.theme_shell.theme(),
         )
         .into()
     }
@@ -97,7 +108,7 @@ impl HeroVideoDialogExample {
                 ButtonProps::new()
                     .variant(ButtonVariant::Outline)
                     .size(ButtonSize::Size2),
-                &self.theme,
+                self.theme_shell.theme(),
             ),
         ]
         .spacing(12)
@@ -114,7 +125,7 @@ impl HeroVideoDialogExample {
             Message::Open,
             Message::Close,
             self.props,
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
         let dark = hero_video_dialog(
@@ -125,12 +136,10 @@ impl HeroVideoDialogExample {
             Message::Open,
             Message::Close,
             self.props,
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
-        _shared::shell(
-            "Hero Video Dialog",
-            column![light, dark].spacing(16),
+        _shared::themed_shell("Hero Video Dialog", column![light, dark].spacing(16), &self.theme_shell, Message::ToggleTheme,
         )
     }
 }

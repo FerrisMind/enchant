@@ -22,12 +22,15 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedGradientTextExample {
+    theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -36,7 +39,8 @@ impl AnimatedGradientTextExample {
         let start = Instant::now();
         (
             Self {
-                start,
+                theme_shell: _shared::ThemeShell::new(),
+               start,
                 elapsed: Duration::ZERO,
             },
             Task::none(),
@@ -44,8 +48,19 @@ impl AnimatedGradientTextExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.elapsed = now.duration_since(self.start);
+            }
         }
         Task::none()
     }
@@ -61,6 +76,6 @@ impl AnimatedGradientTextExample {
             AnimatedGradientTextProps::new().font_size(20),
         );
 
-        _shared::shell("Animated Gradient Text", column![body].spacing(24))
+        _shared::themed_shell("Animated Gradient Text", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

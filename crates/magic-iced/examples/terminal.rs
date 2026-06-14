@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Color, Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{TerminalLine, TerminalProps, TerminalSegment, TerminalState, terminal};
 
 pub fn main() -> iced::Result {
@@ -22,7 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct TerminalExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     lines: Vec<TerminalLine>,
     props: TerminalProps,
     state: TerminalState,
@@ -31,6 +30,8 @@ struct TerminalExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -88,7 +89,7 @@ impl TerminalExample {
         let state = TerminalState::new(&lines, &props);
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 lines,
                 props,
                 state,
@@ -99,9 +100,20 @@ impl TerminalExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.now = now;
             self.state.tick(now, &self.lines, &self.props);
+            }
         }
         Task::none()
     }
@@ -111,7 +123,7 @@ impl TerminalExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = terminal(&self.state, &self.lines, &self.props, &self.theme);
-        _shared::shell("Terminal", column![body].spacing(24))
+        let body = terminal(&self.state, &self.lines, &self.props, self.theme_shell.theme());
+        _shared::themed_shell("Terminal", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

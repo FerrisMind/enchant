@@ -37,7 +37,7 @@ fn example_inventory_matches_official_registry() {
 
     let missing_official_binaries = official
         .keys()
-        .filter(|component| !example_binaries.contains(component.as_str()))
+        .filter(|component| !example_covers_component(component, &example_binaries))
         .cloned()
         .collect::<Vec<_>>();
 
@@ -48,7 +48,7 @@ fn example_inventory_matches_official_registry() {
 
     let internal_examples = example_binaries
         .difference(&public_components)
-        .filter(|name| !official.contains_key(name.as_str()))
+        .filter(|name| !official.contains_key(example_owned_component(name)))
         .cloned()
         .collect::<Vec<_>>();
 
@@ -241,4 +241,13 @@ fn local_example_binaries() -> BTreeSet<String> {
                 .map(|stem| stem.to_string())
         })
         .collect()
+}
+
+fn example_covers_component(component: &str, example_binaries: &BTreeSet<String>) -> bool {
+    example_binaries.contains(component)
+        || example_binaries.contains(&format!("{component}_demo"))
+}
+
+fn example_owned_component(name: &str) -> &str {
+    name.strip_suffix("_demo").unwrap_or(name)
 }

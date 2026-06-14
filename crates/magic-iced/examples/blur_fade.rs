@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container, row, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::primitives::MotionSpec;
 use magic_iced::{BlurFadeProps, BlurFadeState, blur_fade};
 use twill::prelude::TransitionDuration;
@@ -19,7 +18,7 @@ struct TileConfig {
 }
 
 struct BlurFadeExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     now: Instant,
     states: [BlurFadeState; TILE_COUNT],
     tiles: [TileConfig; TILE_COUNT],
@@ -27,6 +26,8 @@ struct BlurFadeExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -109,7 +110,7 @@ impl BlurFadeExample {
 
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 now: Instant::now(),
                 states,
                 tiles,
@@ -119,15 +120,25 @@ impl BlurFadeExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
-            self.now = now;
-            for (index, state) in self.states.iter_mut().enumerate() {
-                let props = BlurFadeProps::new().motion(
-                    MotionSpec::new()
-                        .duration(TransitionDuration::CustomMs(400))
-                        .delay(TransitionDuration::CustomMs(self.tiles[index].delay_ms)),
-                );
-                state.tick(now, &props);
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+                self.now = now;
+                for (index, state) in self.states.iter_mut().enumerate() {
+                    let props = BlurFadeProps::new().motion(
+                        MotionSpec::new()
+                            .duration(TransitionDuration::CustomMs(400))
+                            .delay(TransitionDuration::CustomMs(self.tiles[index].delay_ms)),
+                    );
+                    state.tick(now, &props);
+                }
             }
         }
         Task::none()
@@ -158,7 +169,7 @@ impl BlurFadeExample {
                 ..container::Style::default()
             });
 
-        blur_fade(content, &self.states[index], self.now, &props, &self.theme)
+        blur_fade(content, &self.states[index], self.now, &props, self.theme_shell.theme())
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -170,7 +181,7 @@ impl BlurFadeExample {
         .spacing(16)
         .align_x(Alignment::Center);
 
-        _shared::shell("Blur Fade", column![grid].spacing(24))
+        _shared::themed_shell("Blur Fade", column![grid].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }
 

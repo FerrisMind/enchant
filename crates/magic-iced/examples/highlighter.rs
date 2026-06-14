@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::{column, row, text};
 use iced::{Color, Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{
     HighlighterAction, HighlighterProps, HighlighterState, highlighter,
 };
@@ -24,7 +23,7 @@ pub fn main() -> iced::Result {
 }
 
 struct HighlighterExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     underline_state: HighlighterState,
     highlight_state: HighlighterState,
     underline_props: HighlighterProps,
@@ -34,6 +33,8 @@ struct HighlighterExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -51,7 +52,7 @@ impl HighlighterExample {
         };
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 underline_state: HighlighterState::new(&underline_props),
                 highlight_state: HighlighterState::new(&highlight_props),
                 underline_props,
@@ -63,10 +64,21 @@ impl HighlighterExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.now = now;
             self.underline_state.tick(now, &self.underline_props);
             self.highlight_state.tick(now, &self.highlight_props);
+            }
         }
         Task::none()
     }
@@ -83,7 +95,7 @@ impl HighlighterExample {
                 &self.underline_state,
                 self.now,
                 &self.underline_props,
-                &self.theme,
+                self.theme_shell.theme(),
             ),
             text(" makes important "),
             highlighter(
@@ -91,12 +103,12 @@ impl HighlighterExample {
                 &self.highlight_state,
                 self.now,
                 &self.highlight_props,
-                &self.theme,
+                self.theme_shell.theme(),
             ),
             text(" effortlessly."),
         ]
         .spacing(4);
 
-        _shared::shell("Highlighter", column![body].spacing(24))
+        _shared::themed_shell("Highlighter", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

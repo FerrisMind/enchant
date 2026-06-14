@@ -1,8 +1,10 @@
 mod _shared;
 
+use iced::time::Instant;
+use std::time::Duration;
+
 use iced::widget::{column, container, image, text};
 use iced::{Border, Element, Length, Size, Task};
-use iced_shadcn::Theme;
 use magic_iced::{BacklightProps, backlight};
 
 fn hero_image() -> image::Handle {
@@ -34,23 +36,34 @@ pub fn main() -> iced::Result {
         size: Size::new(900.0, 520.0),
         ..Default::default()
     })
+    .subscription(BacklightExample::subscription)
+        
     .run()
 }
 
 struct BacklightExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
 }
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    ToggleTheme,
+    Tick(Instant),
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
+}
 
 impl BacklightExample {
     fn new() -> (Self, Task<Message>) {
-        (Self { theme: Theme::default() }, Task::none())
+        (Self { theme_shell: _shared::ThemeShell::new() }, Task::none())
     }
 
     fn update(&mut self, _message: Message) -> Task<Message> {
         Task::none()
+    }
+
+
+    fn subscription(&self) -> iced::Subscription<Message> {
+        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -65,11 +78,9 @@ impl BacklightExample {
                 ..container::Style::default()
             });
 
-        let body = backlight(image_card, BacklightProps::new(), &self.theme);
+        let body = backlight(image_card, BacklightProps::new(), self.theme_shell.theme());
 
-        _shared::shell(
-            "Backlight",
-            column![body, text("Fancy gradient backlight around media").size(14)].spacing(16),
-        )
+        _shared::themed_shell("Backlight", column![body, text("Fancy gradient backlight around media").size(14)].spacing(16),
+            &self.theme_shell, Message::ToggleTheme)
     }
 }

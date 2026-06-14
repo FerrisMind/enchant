@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container, row, stack, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Padding, Point, Rectangle, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{
     animated_beam, bento_grid, marquee_indexed, number_ticker, AnchorBounds,
     AnimatedBeamProps, BentoCardProps, BentoGridProps, MarqueeOrientation, MarqueeProps,
@@ -31,7 +30,7 @@ struct FileItem {
 }
 
 struct BentoGridExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     started_at: Instant,
     elapsed: Duration,
     ticker_state: NumberTickerState,
@@ -42,6 +41,8 @@ struct BentoGridExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
     MarqueeHover(bool),
 }
@@ -75,7 +76,7 @@ impl BentoGridExample {
         ];
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 started_at: now,
                 elapsed: Duration::ZERO,
                 ticker_state,
@@ -89,7 +90,16 @@ impl BentoGridExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 self.elapsed = now.duration_since(self.started_at);
                 self.ticker_state.tick(now, &self.ticker_props);
@@ -109,10 +119,10 @@ impl BentoGridExample {
             container(
                 column![
                     text(file.name).size(12).style(|_: &iced::Theme| text::Style {
-                        color: Some(self.theme.palette.foreground),
+                        color: Some(self.theme_shell.theme().palette.foreground),
                     }),
                     text(file.body).size(9).style(|_: &iced::Theme| text::Style {
-                        color: Some(Color { a: 0.6, ..self.theme.palette.foreground }),
+                        color: Some(Color { a: 0.6, ..self.theme_shell.theme().palette.foreground }),
                     }),
                 ]
                 .spacing(4)
@@ -121,11 +131,11 @@ impl BentoGridExample {
             .height(Length::Fixed(80.0))
             .padding(10)
             .style(|_: &iced::Theme| container::Style {
-                background: Some(Background::Color(Color { a: 0.05, ..self.theme.palette.foreground })),
+                background: Some(Background::Color(Color { a: 0.05, ..self.theme_shell.theme().palette.foreground })),
                 border: Border {
-                    color: Color { a: 0.1, ..self.theme.palette.foreground },
+                    color: Color { a: 0.1, ..self.theme_shell.theme().palette.foreground },
                     width: 1.0,
-                    radius: self.theme.radius.sm.into(),
+                    radius: self.theme_shell.theme().radius.sm.into(),
                 },
                 ..Default::default()
             })
@@ -148,7 +158,7 @@ impl BentoGridExample {
                 padding: 4.0,
                 edge_fade: false,
             },
-            &self.theme,
+            self.theme_shell.theme(),
             |_| Message::MarqueeHover(false),
         );
 
@@ -163,9 +173,9 @@ impl BentoGridExample {
             .width(36.0)
             .height(36.0)
             .style(|_: &iced::Theme| container::Style {
-                background: Some(Background::Color(self.theme.palette.card)),
+                background: Some(Background::Color(self.theme_shell.theme().palette.card)),
                 border: Border {
-                    color: Color { a: 0.15, ..self.theme.palette.foreground },
+                    color: Color { a: 0.15, ..self.theme_shell.theme().palette.foreground },
                     width: 1.0,
                     radius: 18.0.into(),
                 },
@@ -176,9 +186,9 @@ impl BentoGridExample {
             .width(36.0)
             .height(36.0)
             .style(|_: &iced::Theme| container::Style {
-                background: Some(Background::Color(self.theme.palette.card)),
+                background: Some(Background::Color(self.theme_shell.theme().palette.card)),
                 border: Border {
-                    color: Color { a: 0.15, ..self.theme.palette.foreground },
+                    color: Color { a: 0.15, ..self.theme_shell.theme().palette.foreground },
                     width: 1.0,
                     radius: 18.0.into(),
                 },
@@ -211,9 +221,9 @@ impl BentoGridExample {
         let ticker_bg = container(
             row![
                 text("$").size(24).style(|_: &iced::Theme| text::Style {
-                    color: Some(self.theme.palette.foreground),
+                    color: Some(self.theme_shell.theme().palette.foreground),
                 }),
-                number_ticker(&self.ticker_state, self.now, &self.ticker_props, &self.theme),
+                number_ticker(&self.ticker_state, self.now, &self.ticker_props, self.theme_shell.theme()),
             ]
             .align_y(Alignment::Center)
         )
@@ -231,7 +241,7 @@ impl BentoGridExample {
                         .width(32.0)
                         .height(32.0)
                         .style(|_: &iced::Theme| container::Style {
-                            background: Some(Background::Color(Color { a: 0.1, ..self.theme.palette.primary })),
+                            background: Some(Background::Color(Color { a: 0.1, ..self.theme_shell.theme().palette.primary })),
                             border: Border {
                                 radius: 16.0.into(),
                                 ..Default::default()
@@ -240,10 +250,10 @@ impl BentoGridExample {
                         }),
                     column![
                         text("Magic UI").size(13).style(|_: &iced::Theme| text::Style {
-                            color: Some(self.theme.palette.foreground),
+                            color: Some(self.theme_shell.theme().palette.foreground),
                         }),
                         text("@magicui_io").size(10).style(|_: &iced::Theme| text::Style {
-                            color: Some(Color { a: 0.5, ..self.theme.palette.foreground }),
+                            color: Some(Color { a: 0.5, ..self.theme_shell.theme().palette.foreground }),
                         }),
                     ]
                     .spacing(2)
@@ -253,7 +263,7 @@ impl BentoGridExample {
                 text("Bento grids are excellent for displaying component catalogs and feature lists side-by-side.")
                     .size(11)
                     .style(|_: &iced::Theme| text::Style {
-                        color: Some(Color { a: 0.82, ..self.theme.palette.foreground }),
+                        color: Some(Color { a: 0.82, ..self.theme_shell.theme().palette.foreground }),
                     }),
             ]
             .spacing(12)
@@ -308,14 +318,12 @@ impl BentoGridExample {
             },
         ];
 
-        _shared::shell(
-            "Bento Grid",
-            column![
+        _shared::themed_shell("Bento Grid", column![
                 text("One section, multiple cells").size(14),
-                bento_grid(cards, BentoGridProps::new(), &self.theme),
+                bento_grid(cards, BentoGridProps::new(), self.theme_shell.theme()),
             ]
             .spacing(16)
             .align_x(Alignment::Start),
-        )
+            &self.theme_shell, Message::ToggleTheme)
     }
 }

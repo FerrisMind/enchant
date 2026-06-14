@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{RippleProps, ripple};
 use std::time::Duration;
 
@@ -24,13 +23,15 @@ pub fn main() -> iced::Result {
 
 struct RippleExample {
     active: usize,
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     started_at: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Select(usize),
     Tick(Instant),
 }
@@ -41,7 +42,7 @@ impl RippleExample {
         (
             Self {
                 active: 0,
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 started_at,
                 elapsed: Duration::ZERO,
             },
@@ -51,8 +52,19 @@ impl RippleExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Select(index) => self.active = index.min(1),
-            Message::Tick(now) => self.elapsed = now.duration_since(self.started_at),
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+                self.elapsed = now.duration_since(self.started_at);
+            }
         }
         Task::none()
     }
@@ -81,14 +93,12 @@ impl RippleExample {
             }
         };
 
-        _shared::shell(
-            "Ripple",
-            column![
+        _shared::themed_shell("Ripple", column![
                 _shared::tabs(&labels, self.active, Message::Select),
-                ripple(self.elapsed, props, &self.theme),
+                ripple(self.elapsed, props, self.theme_shell.theme()),
                 text("A concentric background effect for hero surfaces."),
             ]
             .spacing(20),
-        )
+            &self.theme_shell, Message::ToggleTheme)
     }
 }

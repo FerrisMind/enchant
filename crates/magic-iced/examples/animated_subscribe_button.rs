@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::{button, column, text};
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{
     AnimatedSubscribeButtonProps, AnimatedSubscribeButtonState, animated_subscribe_button,
 };
@@ -25,7 +24,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedSubscribeButtonExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     uncontrolled: AnimatedSubscribeButtonState,
     controlled: AnimatedSubscribeButtonState,
     controlled_subscribed: bool,
@@ -35,6 +34,8 @@ struct AnimatedSubscribeButtonExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
     PressUncontrolled,
     ToggleControlled,
@@ -49,7 +50,7 @@ impl AnimatedSubscribeButtonExample {
             AnimatedSubscribeButtonProps::new("Subscribe", "Subscribed").subscribe_status(false);
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 uncontrolled: AnimatedSubscribeButtonState::new(&uncontrolled_props),
                 controlled: AnimatedSubscribeButtonState::new(&controlled_props),
                 controlled_subscribed: false,
@@ -62,7 +63,16 @@ impl AnimatedSubscribeButtonExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 let uncontrolled_props = AnimatedSubscribeButtonProps::new("Subscribe", "Subscribed");
                 self.uncontrolled.tick(now, &uncontrolled_props);
@@ -103,7 +113,7 @@ impl AnimatedSubscribeButtonExample {
                     self.now,
                     &props,
                     Some(Message::PressUncontrolled),
-                    &self.theme,
+                    self.theme_shell.theme(),
                 ),
                 text("Tap the button to toggle between Subscribe and Subscribed."),
             ]
@@ -112,7 +122,7 @@ impl AnimatedSubscribeButtonExample {
             let props = AnimatedSubscribeButtonProps::new("Subscribe", "Subscribed")
                 .subscribe_status(self.controlled_subscribed);
             column![
-                animated_subscribe_button(&self.controlled, self.now, &props, None, &self.theme),
+                animated_subscribe_button(&self.controlled, self.now, &props, None, self.theme_shell.theme()),
                 button(text("Toggle subscribe_status")).on_press(Message::ToggleControlled),
                 text(format!(
                     "subscribe_status = {}",
@@ -126,9 +136,7 @@ impl AnimatedSubscribeButtonExample {
             .spacing(20)
         };
 
-        _shared::shell(
-            "Animated Subscribe Button",
-            column![tabs, body].spacing(24),
+        _shared::themed_shell("Animated Subscribe Button", column![tabs, body].spacing(24), &self.theme_shell, Message::ToggleTheme,
         )
     }
 }

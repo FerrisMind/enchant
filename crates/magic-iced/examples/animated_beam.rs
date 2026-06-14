@@ -25,6 +25,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedBeamExample {
+    theme_shell: _shared::ThemeShell,
     active: usize,
     started_at: Instant,
     elapsed: Duration,
@@ -34,6 +35,8 @@ struct AnimatedBeamExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Select(usize),
     Tick(Instant),
     Measured(AnchorMeasurements),
@@ -44,7 +47,8 @@ impl AnimatedBeamExample {
         let started_at = Instant::now();
         (
             Self {
-                active: 0,
+                theme_shell: _shared::ThemeShell::new(),
+               active: 0,
                 started_at,
                 elapsed: Duration::ZERO,
                 measurements: None,
@@ -65,27 +69,35 @@ impl AnimatedBeamExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
             Message::Select(index) => {
                 self.active = index.min(3);
                 self.started_at = Instant::now();
                 self.elapsed = Duration::ZERO;
                 self.measurements = None;
                 self.remeasure.schedule();
-                measure_scene(self.active)
+                return measure_scene(self.active);
             }
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.elapsed = now.duration_since(self.started_at);
-                if self.remeasure.take() {
+                return if self.remeasure.take() {
                     measure_scene(self.active)
                 } else {
                     Task::none()
-                }
+                };
             }
             Message::Measured(measurements) => {
                 self.measurements = Some(measurements);
-                Task::none()
             }
         }
+        Task::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -102,16 +114,14 @@ impl AnimatedBeamExample {
             _ => beam_demo::multiple_inputs_scene(self.elapsed, measurements),
         };
 
-        _shared::shell(
-            "AnimatedBeam",
-            column![
+        _shared::themed_shell("AnimatedBeam", column![
                 _shared::tabs(&labels, self.active, Message::Select),
                 container(scene)
                     .width(Length::Fill)
                     .center_x(Length::Fill),
             ]
             .spacing(20),
-        )
+            &self.theme_shell, Message::ToggleTheme)
     }
 }
 

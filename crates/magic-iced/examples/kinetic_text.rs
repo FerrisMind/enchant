@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{KineticTextProps, KineticTextState, kinetic_text};
 
 pub fn main() -> iced::Result {
@@ -22,13 +21,15 @@ pub fn main() -> iced::Result {
 }
 
 struct KineticTextExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     state: KineticTextState,
     now: Instant,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -36,7 +37,7 @@ impl KineticTextExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 state: KineticTextState::new(),
                 now: Instant::now(),
             },
@@ -46,6 +47,14 @@ impl KineticTextExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => self.now = now,
         }
         Task::none()
@@ -61,9 +70,9 @@ impl KineticTextExample {
             &self.state,
             self.now,
             &KineticTextProps::new().font_size(96),
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
-        _shared::shell("Kinetic Text", column![body].spacing(24))
+        _shared::themed_shell("Kinetic Text", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

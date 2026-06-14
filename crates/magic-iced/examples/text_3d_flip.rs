@@ -24,6 +24,7 @@ pub fn main() -> iced::Result {
 }
 
 struct Text3dFlipExample {
+    theme_shell: _shared::ThemeShell,
     state: Text3DFlipState,
     props: Text3DFlipProps,
     now: Instant,
@@ -31,6 +32,8 @@ struct Text3dFlipExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Flip(Text3DFlipAction),
     Tick(Instant),
 }
@@ -49,15 +52,29 @@ impl Text3dFlipExample {
         let now = Instant::now();
         state.apply_action(&Text3DFlipAction::Trigger, now);
         (
-            Self { state, props, now },
+            Self {
+                theme_shell: _shared::ThemeShell::new(),
+                state,
+                props,
+                now,
+            },
             Task::none(),
         )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Flip(action) => self.state.apply_action(&action, self.now),
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 self.state
                     .tick(now, "Stay hungry, stay foolish", &self.props);
@@ -78,6 +95,6 @@ impl Text3dFlipExample {
             self.props,
             Message::Flip,
         );
-        _shared::shell("Text 3D Flip", column![body].spacing(24))
+        _shared::themed_shell("Text 3D Flip", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

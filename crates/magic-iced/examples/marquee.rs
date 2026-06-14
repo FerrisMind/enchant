@@ -1,3 +1,7 @@
+mod _shared;
+
+use iced::time::Instant;
+
 use iced::advanced::Clipboard;
 use iced::advanced::Renderer as _;
 use iced::advanced::Shell;
@@ -14,7 +18,7 @@ use iced_shadcn::{CardProps, CardSize, DecorativeSurfaceProps, Theme, card, deco
 use magic_iced::{MagicTheme, MarqueeItem, MarqueeOrientation, MarqueeProps, marquee_indexed};
 use std::path::PathBuf;
 use std::sync::LazyLock;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use twill::backends::iced::styled_container_with_semantic_theme;
 use twill::prelude::{BackgroundColor, SemanticColor, SemanticThemeVars, Style as TwillStyle};
 
@@ -39,7 +43,7 @@ pub fn main() -> iced::Result {
 }
 
 struct MarqueeDemo {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     started_at: Instant,
     elapsed: [Duration; 2],
     paused_total: [Duration; 2],
@@ -50,6 +54,8 @@ struct MarqueeDemo {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
     Hover(usize, bool),
     CardHover(usize, Option<(usize, usize)>),
@@ -58,7 +64,7 @@ enum Message {
 impl Default for MarqueeDemo {
     fn default() -> Self {
         Self {
-            theme: MagicTheme::dark(),
+            theme_shell: _shared::ThemeShell::new_dark(),
             started_at: Instant::now(),
             elapsed: [Duration::ZERO; 2],
             paused_total: [Duration::ZERO; 2],
@@ -76,6 +82,14 @@ impl MarqueeDemo {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => self.tick_at(now),
             Message::Hover(row, entered) => self.set_hover(row, entered, Instant::now()),
             Message::CardHover(row, card) => self.set_card_hover(row, card),
@@ -100,7 +114,7 @@ impl MarqueeDemo {
         .align_x(Alignment::Center);
 
         let preview = decorative_surface(
-            HorizontalFadeMask::new(rows.into(), self.theme.palette.background, FADE_WIDTH_RATIO),
+            HorizontalFadeMask::new(rows.into(), self.theme_shell.theme().palette.background, FADE_WIDTH_RATIO),
             Vec::new(),
             Vec::new(),
             DecorativeSurfaceProps::new()
@@ -108,29 +122,22 @@ impl MarqueeDemo {
                 .padding(PREVIEW_PADDING)
                 .radius(16.0)
                 .clip(true)
-                .background(self.theme.palette.background)
-                .border_color(self.theme.palette.border)
+                .background(self.theme_shell.theme().palette.background)
+                .border_color(self.theme_shell.theme().palette.border)
                 .border_width(1.0),
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
-        styled_container_with_semantic_theme(
-            column![
-                container(preview)
-                    .width(Length::Fill)
-                    .center_x(Length::Fill)
-            ]
-            .width(Length::Fill)
-            .align_x(Alignment::Center)
-            .padding([40.0, 0.0])
-            .into(),
-            &page_shell_style(),
-            SemanticThemeVars::shadcn_neutral(),
-            self.theme.variant(),
-        )
+        let body = column![
+            container(preview)
+                .width(Length::Fill)
+                .center_x(Length::Fill)
+        ]
         .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+        .align_x(Alignment::Center)
+        .padding([40.0, 0.0]);
+
+        _shared::themed_shell("Marquee", body, &self.theme_shell, Message::ToggleTheme)
     }
 
     fn marquee_row<'a>(
@@ -139,30 +146,30 @@ impl MarqueeDemo {
         reverse: bool,
         row_index: usize,
     ) -> Element<'a, Message> {
-        let title_color = self.theme.palette.foreground;
+        let title_color = self.theme_shell.theme().palette.foreground;
         let subtitle_color = Color {
             a: 0.40,
-            ..self.theme.palette.foreground
+            ..self.theme_shell.theme().palette.foreground
         };
         let body_color = Color {
             a: 0.82,
-            ..self.theme.palette.foreground
+            ..self.theme_shell.theme().palette.foreground
         };
         let card_background = Color {
             a: 0.10,
-            ..self.theme.palette.foreground
+            ..self.theme_shell.theme().palette.foreground
         };
         let card_border = Color {
             a: 0.14,
-            ..self.theme.palette.foreground
+            ..self.theme_shell.theme().palette.foreground
         };
         let hovered_background = Color {
             a: 0.15,
-            ..self.theme.palette.foreground
+            ..self.theme_shell.theme().palette.foreground
         };
         let hovered_border = Color {
             a: 0.20,
-            ..self.theme.palette.foreground
+            ..self.theme_shell.theme().palette.foreground
         };
         let hovered_card = self.hovered_card[row_index];
 
@@ -215,14 +222,14 @@ impl MarqueeDemo {
                             .spacing(8)
                             .width(Length::Fill),
                             review_card_props(
-                                &self.theme,
+                                self.theme_shell.theme(),
                                 is_hovered,
                                 card_background,
                                 card_border,
                                 hovered_background,
                                 hovered_border,
                             ),
-                            &self.theme,
+                            self.theme_shell.theme(),
                         )
                         .width(Length::Fill)
                         .height(Length::Fill),
@@ -243,12 +250,13 @@ impl MarqueeDemo {
             render_item,
             self.elapsed[row_index],
             marquee_props(reverse),
-            &self.theme,
+            self.theme_shell.theme(),
             move |entered| Message::Hover(row_index, entered),
         )
     }
 
     fn tick_at(&mut self, now: Instant) {
+        self.theme_shell.tick(now);
         for row in 0..self.elapsed.len() {
             self.elapsed[row] = if self.hover_depth[row] > 0 {
                 self.pause_started_at[row]

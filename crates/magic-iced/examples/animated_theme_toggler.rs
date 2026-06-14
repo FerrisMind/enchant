@@ -1,13 +1,13 @@
-mod _shared;
-
 use iced::time::{Duration, Instant};
-use iced::widget::column;
-use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
+use iced::widget::{container, stack};
+use iced::{Background, Element, Length, Size, Subscription, Task};
+use iced::widget::Id;
 use magic_iced::{
-    AnimatedThemeTogglerController, AnimatedThemeTogglerProps,
-    animated_theme_toggler_with_controller,
+    anchor, measure_anchors, AnimatedThemeTogglerController, AnimatedThemeTogglerProps,
+    animated_theme_toggler_with_controller, theme_transition_overlay,
 };
+
+const TOGGLER_ANCHOR: &str = "theme-toggler";
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -25,8 +25,6 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedThemeTogglerExample {
-    theme: Theme,
-    dark_mode: bool,
     props: AnimatedThemeTogglerProps,
     controller: AnimatedThemeTogglerController,
     now: Instant,
@@ -35,17 +33,16 @@ struct AnimatedThemeTogglerExample {
 #[derive(Debug, Clone)]
 enum Message {
     ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
 impl AnimatedThemeTogglerExample {
     fn new() -> (Self, Task<Message>) {
         let props = AnimatedThemeTogglerProps::new();
-        let controller = AnimatedThemeTogglerController::new(true, &props);
+        let controller = AnimatedThemeTogglerController::new(false, &props);
         (
             Self {
-                theme: Theme::default(),
-                dark_mode: true,
                 props,
                 controller,
                 now: Instant::now(),
@@ -57,8 +54,14 @@ impl AnimatedThemeTogglerExample {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
+                return measure_anchors([Id::new(TOGGLER_ANCHOR)])
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                if let Some(bounds) = measurements.get(0) {
+                    self.controller.set_origin(bounds.center);
+                }
                 self.controller.toggle(self.now, &self.props);
-                self.dark_mode = self.controller.dark_mode();
             }
             Message::Tick(now) => {
                 self.now = now;
@@ -73,13 +76,46 @@ impl AnimatedThemeTogglerExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = animated_theme_toggler_with_controller(
-            &self.controller,
-            self.now,
-            Message::ToggleTheme,
-            self.props,
-            &self.theme,
+        let display_theme = self.controller.display_theme(self.now);
+        let icon_theme = self.controller.icon_theme();
+
+        let toggler = anchor(
+            TOGGLER_ANCHOR,
+            animated_theme_toggler_with_controller(
+                &self.controller,
+                self.now,
+                Message::ToggleTheme,
+                self.props,
+                &icon_theme,
+            ),
         );
-        _shared::shell("Animated Theme Toggler", column![body].spacing(24))
+
+        // Background uses the old theme during the reveal; toggler stays above the overlay.
+        let background = container(iced::widget::Space::new())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |_| iced::widget::container::Style {
+                background: Some(Background::Color(display_theme.palette.background)),
+                ..iced::widget::container::Style::default()
+            });
+
+        let toggler_layer = container(container(toggler).padding(24))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill);
+
+        let mut layers = vec![background.into()];
+        if let Some(overlay) =
+            theme_transition_overlay(&self.controller, self.now, &self.props)
+        {
+            layers.push(overlay);
+        }
+        layers.push(toggler_layer.into());
+
+        container(stack(layers).width(Length::Fill).height(Length::Fill))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 }

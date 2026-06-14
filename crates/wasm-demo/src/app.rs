@@ -25,7 +25,7 @@ use magic_iced::{
     WordRotateProps, WordRotateState, animated_gradient_text,
     animated_theme_toggler_with_controller, dock, dock_icon, globe, hero_video_dialog, icon_cloud,
     magic_card, marquee, number_ticker, shimmer_button, sparkles_text, terminal, text_reveal,
-    tweet_card, video_text, word_rotate,
+    theme_transition_overlay, tweet_card, video_text, word_rotate,
 };
 use previews::*;
 pub(crate) use shared::*;
@@ -169,6 +169,7 @@ impl WasmDemoApp {
                 self.number_ticker_state
                     .tick(now, &self.number_ticker_props);
                 self.theme_toggler.tick(now, &theme_toggler_props());
+                self.theme = self.theme_toggler.display_theme(now);
                 self.globe_state.tick(now, &self.globe_props);
                 self.icon_cloud_state.tick(now, &self.icon_cloud_props);
                 self.video_text_state.tick(now);
@@ -257,13 +258,11 @@ impl WasmDemoApp {
     fn toggle_theme(&mut self) {
         let now = Instant::now();
         self.theme_toggler.toggle(now, &theme_toggler_props());
-        self.theme_mode = match self.theme_mode {
-            ThemeMode::Light => ThemeMode::Dark,
-            ThemeMode::Dark => ThemeMode::Light,
+        self.theme_mode = if self.theme_toggler.dark_mode() {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
         };
-        self.theme = theme_for_mode(self.theme_mode);
-        self.theme_toggler
-            .sync(matches!(self.theme_mode, ThemeMode::Dark));
     }
 
     fn reset_demos(&mut self) {

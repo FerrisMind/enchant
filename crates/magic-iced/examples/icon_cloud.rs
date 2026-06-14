@@ -21,6 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct IconCloudExample {
+    theme_shell: _shared::ThemeShell,
     state: IconCloudState,
     props: IconCloudProps,
     start: Instant,
@@ -28,6 +29,8 @@ struct IconCloudExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     IconCloud(IconCloudAction),
     Tick(Instant),
 }
@@ -50,7 +53,8 @@ impl IconCloudExample {
         let state = IconCloudState::new(&props);
         (
             Self {
-                state,
+                theme_shell: _shared::ThemeShell::new(),
+               state,
                 props,
                 start: Instant::now(),
             },
@@ -60,8 +64,17 @@ impl IconCloudExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::IconCloud(action) => self.state.apply_action(&action, &self.props),
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 let _ = now.duration_since(self.start);
             }
         }
@@ -74,6 +87,6 @@ impl IconCloudExample {
 
     fn view(&self) -> Element<'_, Message> {
         let body = icon_cloud(&self.state, &self.props, Message::IconCloud);
-        _shared::shell("Icon Cloud", column![body].spacing(24))
+        _shared::themed_shell("Icon Cloud", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

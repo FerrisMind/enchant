@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{TypingAnimationProps, TypingAnimationState, typing_animation};
 
 pub fn main() -> iced::Result {
@@ -22,7 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct TypingAnimationExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     state: TypingAnimationState,
     props: TypingAnimationProps,
     now: Instant,
@@ -30,6 +29,8 @@ struct TypingAnimationExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -39,7 +40,7 @@ impl TypingAnimationExample {
         let now = Instant::now();
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 state: TypingAnimationState::new(&props),
                 props,
                 now,
@@ -49,9 +50,20 @@ impl TypingAnimationExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.now = now;
             self.state.tick(now, &self.props);
+            }
         }
         Task::none()
     }
@@ -61,7 +73,7 @@ impl TypingAnimationExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let body = typing_animation(&self.state, self.now, &self.props, &self.theme);
-        _shared::shell("Typing Animation", column![body].spacing(24))
+        let body = typing_animation(&self.state, self.now, &self.props, self.theme_shell.theme());
+        _shared::themed_shell("Typing Animation", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

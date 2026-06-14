@@ -1,5 +1,8 @@
 mod _shared;
 
+use iced::time::Instant;
+use std::time::Duration;
+
 use iced::widget::{column, container, image, text};
 use iced::{Element, Length, Size, Task};
 use magic_iced::{LensAction, LensProps, LensState, lens};
@@ -11,15 +14,21 @@ pub fn main() -> iced::Result {
             size: Size::new(900.0, 520.0),
             ..Default::default()
         })
-        .run()
+        .subscription(LensExample::subscription)
+        
+    .run()
 }
 
 struct LensExample {
+    theme_shell: _shared::ThemeShell,
     state: LensState,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    Tick(Instant),
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Lens(LensAction),
 }
 
@@ -37,14 +46,34 @@ fn sample_image() -> image::Handle {
 
 impl LensExample {
     fn new() -> (Self, Task<Message>) {
-        (Self { state: LensState::new() }, Task::none())
+        (Self {
+            theme_shell: _shared::ThemeShell::new(),
+            state: LensState::new(),
+        }, Task::none())
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Lens(action) = message {
-            self.state.apply_action(&action);
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+            }
+            Message::Lens(action) => {
+                self.state.apply_action(&action);
+            }
         }
         Task::none()
+    }
+
+
+    fn subscription(&self) -> iced::Subscription<Message> {
+        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -71,6 +100,6 @@ impl LensExample {
             Message::Lens,
         );
 
-        _shared::shell("Lens", column![body].spacing(24))
+        _shared::themed_shell("Lens", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

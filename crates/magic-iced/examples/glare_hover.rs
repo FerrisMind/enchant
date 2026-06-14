@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::{Duration, Instant};
 use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{GlareHoverAction, GlareHoverProps, GlareHoverState, glare_hover};
 
 pub fn main() -> iced::Result {
@@ -22,13 +21,15 @@ pub fn main() -> iced::Result {
 }
 
 struct GlareHoverExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     state: GlareHoverState,
     now: Instant,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Glare(GlareHoverAction),
     Tick(Instant),
     GetStarted,
@@ -38,7 +39,7 @@ impl GlareHoverExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 state: GlareHoverState::new(),
                 now: Instant::now(),
             },
@@ -48,6 +49,14 @@ impl GlareHoverExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Glare(action) => self.state.apply_action(&action, self.now),
             Message::Tick(now) => self.now = now,
             Message::GetStarted => {}
@@ -60,7 +69,7 @@ impl GlareHoverExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let pricing = _shared::shadcn_forms::pricing_card_pro(Some(Message::GetStarted), &self.theme);
+        let pricing = _shared::shadcn_forms::pricing_card_pro(Some(Message::GetStarted), self.theme_shell.theme());
 
         let card = glare_hover(
             pricing,
@@ -71,12 +80,10 @@ impl GlareHoverExample {
                 ..GlareHoverProps::new()
             },
             Message::Glare,
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
-        _shared::shell(
-            "Glare Hover",
-            column![text("Pro pricing with glare hover").size(14), card].spacing(24),
-        )
+        _shared::themed_shell("Glare Hover", column![text("Pro pricing with glare hover").size(14), card].spacing(24),
+            &self.theme_shell, Message::ToggleTheme)
     }
 }

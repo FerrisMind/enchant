@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{
     ScrollVelocityContainerProps, ScrollVelocityDirection, ScrollVelocityItem,
     ScrollVelocityRowProps, ScrollVelocityRowState, scroll_velocity_container,
@@ -27,7 +26,7 @@ pub fn main() -> iced::Result {
 }
 
 struct ScrollBasedVelocityExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     forward_state: ScrollVelocityRowState,
     reverse_state: ScrollVelocityRowState,
     start: Instant,
@@ -36,6 +35,8 @@ struct ScrollBasedVelocityExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -44,7 +45,7 @@ impl ScrollBasedVelocityExample {
         let start = Instant::now();
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 forward_state: ScrollVelocityRowState::new(),
                 reverse_state: ScrollVelocityRowState::new(),
                 start,
@@ -55,10 +56,21 @@ impl ScrollBasedVelocityExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.elapsed = now.duration_since(self.start);
             self.forward_state.tick();
             self.reverse_state.tick();
+            }
         }
         Task::none()
     }
@@ -85,18 +97,18 @@ impl ScrollBasedVelocityExample {
                     &self.forward_state,
                     self.elapsed,
                     &Self::row_props(ScrollVelocityDirection::Forward),
-                    &self.theme,
+                    self.theme_shell.theme(),
                 ),
                 scroll_velocity_row(
                     &self.reverse_state,
                     self.elapsed,
                     &Self::row_props(ScrollVelocityDirection::Reverse),
-                    &self.theme,
+                    self.theme_shell.theme(),
                 ),
             ],
             ScrollVelocityContainerProps::new(),
         );
 
-        _shared::shell("Scroll Based Velocity", column![rows].spacing(24))
+        _shared::themed_shell("Scroll Based Velocity", column![rows].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Color, Element, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{RippleButtonAction, RippleButtonProps, RippleButtonState, ripple_button};
 use std::time::Duration;
 
@@ -23,7 +22,7 @@ pub fn main() -> iced::Result {
 }
 
 struct RippleButtonExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     state: RippleButtonState,
     props: RippleButtonProps,
     now: Instant,
@@ -31,6 +30,8 @@ struct RippleButtonExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
     Action(RippleButtonAction),
 }
@@ -44,7 +45,7 @@ impl RippleButtonExample {
         };
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 state: RippleButtonState::new(),
                 props,
                 now,
@@ -55,7 +56,16 @@ impl RippleButtonExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 self.state.tick(now, &self.props);
             }
@@ -77,9 +87,9 @@ impl RippleButtonExample {
             self.now,
             self.props,
             Message::Action,
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
-        _shared::shell("Ripple Button", column![body].spacing(24))
+        _shared::themed_shell("Ripple Button", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

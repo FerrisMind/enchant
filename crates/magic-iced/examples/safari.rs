@@ -1,8 +1,10 @@
 mod _shared;
 
+use iced::time::Instant;
+use std::time::Duration;
+
 use iced::widget::{column, container};
 use iced::{Element, Length, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{SafariMode, SafariProps, safari};
 
 pub fn main() -> iced::Result {
@@ -22,11 +24,13 @@ pub fn main() -> iced::Result {
 
 struct SafariExample {
     active: usize,
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
 }
 
 #[derive(Debug, Clone)]
-enum Message {
+enum Message {    Tick(Instant),
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Select(usize),
 }
 
@@ -35,7 +39,7 @@ impl SafariExample {
         (
             Self {
                 active: 0,
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
             },
             Task::none(),
         )
@@ -43,13 +47,24 @@ impl SafariExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Select(index) => self.active = index.min(3),
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+            }
         }
         Task::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        Subscription::none()
+        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -65,7 +80,7 @@ impl SafariExample {
                     .width(Length::Fixed(680.0))
                     .chrome_label("magicui.design")
                     .screen_media(false),
-                &self.theme,
+                self.theme_shell.theme(),
             ),
             1 => safari(
                 SafariProps::new()
@@ -73,7 +88,7 @@ impl SafariExample {
                     .chrome_label("magicui.design")
                     .screen_media(true)
                     .media(include_bytes!("assets/hero-light.png"), "image/png"),
-                &self.theme,
+                self.theme_shell.theme(),
             ),
             2 => safari(
                 SafariProps::new()
@@ -81,7 +96,7 @@ impl SafariExample {
                     .chrome_label("magicui.design")
                     .screen_media(true)
                     .media(include_bytes!("assets/hero-dark.png"), "image/png"),
-                &self.theme,
+                self.theme_shell.theme(),
             ),
             _ => safari(
                 SafariProps::new()
@@ -90,17 +105,15 @@ impl SafariExample {
                     .mode(SafariMode::Simple)
                     .screen_media(true)
                     .media(include_bytes!("assets/hero-light.png"), "image/png"),
-                &self.theme,
+                self.theme_shell.theme(),
             ),
         };
 
-        _shared::shell(
-            "Safari",
-            column![
+        _shared::themed_shell("Safari", column![
                 _shared::tabs(&labels, self.active, Message::Select),
                 container(content).center_x(Length::Fill)
             ]
             .spacing(20),
-        )
+            &self.theme_shell, Message::ToggleTheme)
     }
 }

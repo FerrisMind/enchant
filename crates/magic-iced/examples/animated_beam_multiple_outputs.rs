@@ -25,6 +25,7 @@ pub fn main() -> iced::Result {
 }
 
 struct AnimatedBeamMultipleOutputsExample {
+    theme_shell: _shared::ThemeShell,
     started_at: Instant,
     elapsed: Duration,
     measurements: Option<AnchorMeasurements>,
@@ -33,6 +34,8 @@ struct AnimatedBeamMultipleOutputsExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
     Measured(AnchorMeasurements),
 }
@@ -42,7 +45,8 @@ impl AnimatedBeamMultipleOutputsExample {
         let started_at = Instant::now();
         (
             Self {
-                started_at,
+                theme_shell: _shared::ThemeShell::new(),
+               started_at,
                 elapsed: Duration::ZERO,
                 measurements: None,
                 remeasure: AnchorRemeasure::new(),
@@ -54,20 +58,28 @@ impl AnimatedBeamMultipleOutputsExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.elapsed = now.duration_since(self.started_at);
-                if self.remeasure.take() {
+                return if self.remeasure.take() {
                     measure_anchors(beam_demo::measure_ids(BeamSceneKind::MultipleOutputs))
                         .map(Message::Measured)
                 } else {
                     Task::none()
-                }
+                };
             }
             Message::Measured(measurements) => {
                 self.measurements = Some(measurements);
-                Task::none()
             }
         }
+        Task::none()
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -77,9 +89,16 @@ impl AnimatedBeamMultipleOutputsExample {
     fn view(&self) -> Element<'_, Message> {
         let scene = beam_demo::multiple_outputs_scene(self.elapsed, self.measurements.as_ref());
 
-        _shared::shell(
+        _shared::themed_shell(
             "Animated Beam Multiple Outputs",
-            column![container(scene).width(Length::Fill).center_x(Length::Fill)].spacing(20),
+            column![
+                container(scene)
+                    .width(Length::Fill)
+                    .center_x(Length::Fill),
+            ]
+            .spacing(20),
+            &self.theme_shell,
+            Message::ToggleTheme,
         )
     }
 }

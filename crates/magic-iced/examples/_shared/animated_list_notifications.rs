@@ -5,6 +5,7 @@ use iced::{Alignment, Background, Border, Color, Element, Length, Shadow, Vector
 use iced_shadcn::Theme;
 
 const GRAY_500: Color = Color::from_rgb8(0x6B, 0x72, 0x80);
+const CARD_RADIUS: f32 = 16.0;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NotificationItem {
@@ -119,58 +120,61 @@ pub fn notification_card<'a, Message: 'a>(
     .align_y(Alignment::Center)
     .width(Length::Fill);
 
-    let page_background = theme.palette.background;
-
     container(body)
         .width(Length::Fill)
         .padding(16)
-        .style(move |_| notification_figure_style(dark, page_background))
+        .style(move |_| {
+            if dark {
+                dark_figure_style()
+            } else {
+                light_figure_style()
+            }
+        })
         .into()
 }
 
-fn notification_figure_style(dark: bool, page_background: Color) -> container::Style {
-    if dark {
-        container::Style {
-            background: Some(Background::Color(Color { a: 0.0, ..page_background })),
-            border: Border {
-                width: 1.0,
-                color: Color {
-                    a: 0.1,
-                    ..Color::WHITE
-                },
-                radius: 16.0.into(),
+fn dark_figure_style() -> container::Style {
+    container::Style {
+        // `dark:bg-transparent` — gaps between cards show the stage background.
+        background: None,
+        border: Border {
+            width: 1.0,
+            color: Color {
+                a: 0.1,
+                ..Color::WHITE
             },
-            shadow: Shadow {
-                color: Color {
-                    a: 0.12,
-                    ..Color::WHITE
-                },
-                offset: Vector::new(0.0, -20.0),
-                blur_radius: 80.0,
+            radius: CARD_RADIUS.into(),
+        },
+        // Rounded outer glow on all sides; positive Y offset weights it toward the bottom.
+        shadow: Shadow {
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.32),
+            offset: Vector::new(0.0, 12.0),
+            blur_radius: 32.0,
+        },
+        ..container::Style::default()
+    }
+}
+
+fn light_figure_style() -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::WHITE)),
+        border: Border {
+            width: 1.0,
+            color: Color {
+                a: 0.03,
+                ..Color::BLACK
             },
-            ..container::Style::default()
-        }
-    } else {
-        container::Style {
-            background: Some(Background::Color(Color::WHITE)),
-            border: Border {
-                width: 1.0,
-                color: Color {
-                    a: 0.03,
-                    ..Color::BLACK
-                },
-                radius: 16.0.into(),
+            radius: CARD_RADIUS.into(),
+        },
+        shadow: Shadow {
+            color: Color {
+                a: 0.05,
+                ..Color::BLACK
             },
-            shadow: Shadow {
-                color: Color {
-                    a: 0.05,
-                    ..Color::BLACK
-                },
-                offset: Vector::new(0.0, 12.0),
-                blur_radius: 24.0,
-            },
-            ..container::Style::default()
-        }
+            offset: Vector::new(0.0, 12.0),
+            blur_radius: 24.0,
+        },
+        ..container::Style::default()
     }
 }
 

@@ -1,8 +1,10 @@
 mod _shared;
 
+use iced::time::Instant;
+use std::time::Duration;
+
 use iced::widget::{column, container, scrollable, stack, text};
 use iced::{Alignment, Border, Element, Length, Size, Task};
-use iced_shadcn::Theme;
 use magic_iced::{ProgressiveBlurPosition, ProgressiveBlurProps, progressive_blur};
 
 pub fn main() -> iced::Result {
@@ -16,23 +18,34 @@ pub fn main() -> iced::Result {
         size: Size::new(900.0, 620.0),
         ..Default::default()
     })
+    .subscription(ProgressiveBlurExample::subscription)
+        
     .run()
 }
 
 struct ProgressiveBlurExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
 }
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    ToggleTheme,
+    Tick(Instant),
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
+}
 
 impl ProgressiveBlurExample {
     fn new() -> (Self, Task<Message>) {
-        (Self { theme: Theme::default() }, Task::none())
+        (Self { theme_shell: _shared::ThemeShell::new() }, Task::none())
     }
 
     fn update(&mut self, _message: Message) -> Task<Message> {
         Task::none()
+    }
+
+
+    fn subscription(&self) -> iced::Subscription<Message> {
+        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -60,7 +73,7 @@ impl ProgressiveBlurExample {
                     position: ProgressiveBlurPosition::Bottom,
                     ..ProgressiveBlurProps::new()
                 },
-                &self.theme,
+                self.theme_shell.theme(),
             ))
             .width(Length::Fill)
             .height(Length::Fill),
@@ -76,9 +89,7 @@ impl ProgressiveBlurExample {
             ..container::Style::default()
         });
 
-        _shared::shell(
-            "Progressive Blur",
-            column![stage].spacing(24).align_x(Alignment::Center),
+        _shared::themed_shell("Progressive Blur", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme,
         )
     }
 }

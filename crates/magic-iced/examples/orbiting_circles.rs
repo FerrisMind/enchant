@@ -26,12 +26,15 @@ pub fn main() -> iced::Result {
 }
 
 struct OrbitingCirclesExample {
+    theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -40,7 +43,8 @@ impl OrbitingCirclesExample {
         let start = Instant::now();
         (
             Self {
-                start,
+                theme_shell: _shared::ThemeShell::new(),
+               start,
                 elapsed: Duration::ZERO,
             },
             Task::none(),
@@ -49,6 +53,14 @@ impl OrbitingCirclesExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => self.elapsed = now.duration_since(self.start),
         }
         Task::none()
@@ -113,9 +125,7 @@ impl OrbitingCirclesExample {
         .width(Length::Fixed(720.0))
         .height(Length::Fixed(500.0));
 
-        _shared::shell(
-            "Orbiting Circles",
-            column![stage].spacing(24).align_x(Alignment::Center),
+        _shared::themed_shell("Orbiting Circles", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme,
         )
     }
 }

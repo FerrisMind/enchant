@@ -21,12 +21,15 @@ pub fn main() -> iced::Result {
 }
 
 struct SmoothCursorExample {
+    theme_shell: _shared::ThemeShell,
     state: SmoothCursorState,
     now: Instant,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Cursor(SmoothCursorAction),
     Tick(Instant),
 }
@@ -35,7 +38,8 @@ impl SmoothCursorExample {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                state: SmoothCursorState::new(),
+                theme_shell: _shared::ThemeShell::new(),
+               state: SmoothCursorState::new(),
                 now: Instant::now(),
             },
             Task::none(),
@@ -44,11 +48,20 @@ impl SmoothCursorExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Cursor(action) => {
                 let props = SmoothCursorProps::<()>::new();
                 self.state.apply_action(&action, self.now, &props);
             }
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 let props = SmoothCursorProps::<()>::new();
                 self.state.tick(now, &props);
@@ -78,6 +91,6 @@ impl SmoothCursorExample {
         let overlay = smooth_cursor(&self.state, self.now, props, Message::Cursor);
         let body = stack![stage, overlay];
 
-        _shared::shell("Smooth Cursor", column![body].spacing(24))
+        _shared::themed_shell("Smooth Cursor", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

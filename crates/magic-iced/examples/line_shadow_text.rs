@@ -23,12 +23,15 @@ pub fn main() -> iced::Result {
 }
 
 struct LineShadowTextExample {
+    theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -37,7 +40,8 @@ impl LineShadowTextExample {
         let start = Instant::now();
         (
             Self {
-                start,
+                theme_shell: _shared::ThemeShell::new(),
+               start,
                 elapsed: Duration::ZERO,
             },
             Task::none(),
@@ -45,8 +49,19 @@ impl LineShadowTextExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.elapsed = now.duration_since(self.start);
+            }
         }
         Task::none()
     }
@@ -72,6 +87,6 @@ impl LineShadowTextExample {
         .spacing(0)
         .align_y(Vertical::Bottom);
 
-        _shared::shell("Line Shadow Text", column![headline].spacing(24))
+        _shared::themed_shell("Line Shadow Text", column![headline].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

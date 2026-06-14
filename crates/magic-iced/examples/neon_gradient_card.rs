@@ -3,7 +3,6 @@ mod _shared;
 use iced::time::Instant;
 use iced::widget::column;
 use iced::{Color, Element, Length, Size, Subscription, Task};
-use iced_shadcn::Theme;
 use magic_iced::{
     AnimatedGradientTextProps, NeonColors, NeonGradientCardProps, animated_gradient_text,
     neon_gradient_card,
@@ -26,13 +25,15 @@ pub fn main() -> iced::Result {
 }
 
 struct NeonGradientCardExample {
-    theme: Theme,
+    theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -41,7 +42,7 @@ impl NeonGradientCardExample {
         let start = Instant::now();
         (
             Self {
-                theme: Theme::default(),
+                theme_shell: _shared::ThemeShell::new(),
                 start,
                 elapsed: Duration::ZERO,
             },
@@ -50,8 +51,19 @@ impl NeonGradientCardExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.elapsed = now.duration_since(self.start);
+            }
         }
         Task::none()
     }
@@ -82,9 +94,9 @@ impl NeonGradientCardExample {
                 }),
                 ..NeonGradientCardProps::new()
             },
-            &self.theme,
+            self.theme_shell.theme(),
         );
 
-        _shared::shell("Neon Gradient Card", column![card].spacing(24))
+        _shared::themed_shell("Neon Gradient Card", column![card].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

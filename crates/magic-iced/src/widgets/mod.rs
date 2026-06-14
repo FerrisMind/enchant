@@ -88,7 +88,7 @@ pub use animated_list::{AnimatedListProps, AnimatedListState, animated_list};
 pub use animated_shiny_text::{AnimatedShinyTextProps, animated_shiny_text};
 pub use animated_theme_toggler::{
     AnimatedThemeTogglerController, AnimatedThemeTogglerProps, animated_theme_toggler,
-    animated_theme_toggler_with_controller,
+    animated_theme_toggler_with_controller, theme_transition_overlay,
 };
 pub use aurora_text::{AuroraTextProps, aurora_text};
 pub use avatar_circles::{AvatarCircleEntry, AvatarCirclesProps, avatar_circles};

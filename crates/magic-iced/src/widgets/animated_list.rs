@@ -21,7 +21,7 @@ impl Default for AnimatedListProps {
             delay_ms: 1000,
             gap: 16.0,
             scale_from: 0.0,
-            item_height: 76.0,
+            item_height: 80.0,
             width: Length::Fill,
             max_width: 400.0,
         }
@@ -147,8 +147,7 @@ pub fn animated_list<'a, Message: 'a>(
     for (display_index, item) in items.into_iter().take(visible).rev().enumerate() {
         let item = container(item)
             .width(props.width)
-            .max_width(props.max_width)
-            .height(Length::Fixed(props.item_height));
+            .max_width(props.max_width);
 
         let child: Element<'a, Message> = if display_index == 0 {
             let scale = newest_scale.max(f32::EPSILON);
@@ -196,7 +195,7 @@ mod tests {
         assert_eq!(props.delay_ms, 1000);
         assert_eq!(props.scale_from, 0.0);
         assert_eq!(props.gap, 16.0);
-        assert_eq!(props.item_height, 76.0);
+        assert_eq!(props.item_height, 80.0);
     }
 
     #[test]

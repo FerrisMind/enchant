@@ -5,9 +5,12 @@ pub mod beam_demo;
 pub mod beam_icons;
 pub mod beam_scene;
 pub mod shadcn_forms;
+pub mod theme_shell;
 
 use iced::widget::{button, column, container, row, text};
 use iced::{Alignment, Element, Length};
+
+pub use theme_shell::{ThemeShell, themed_shell};
 
 pub fn shell<'a, Message>(
     title: impl Into<String>,

@@ -21,6 +21,7 @@ pub fn main() -> iced::Result {
 }
 
 struct HyperTextExample {
+    theme_shell: _shared::ThemeShell,
     state: HyperTextState,
     props: HyperTextProps,
     now: Instant,
@@ -28,6 +29,8 @@ struct HyperTextExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
     Hyper(HyperTextAction),
 }
@@ -42,7 +45,8 @@ impl HyperTextExample {
         let now = Instant::now();
         (
             Self {
-                state: HyperTextState::new(&props),
+                theme_shell: _shared::ThemeShell::new(),
+               state: HyperTextState::new(&props),
                 props,
                 now,
             },
@@ -52,7 +56,16 @@ impl HyperTextExample {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+
             Message::Tick(now) => {
+                self.theme_shell.tick(now);
                 self.now = now;
                 self.state.tick(now, &self.props);
             }
@@ -76,6 +89,6 @@ impl HyperTextExample {
             Message::Hyper,
         );
 
-        _shared::shell("Hyper Text", column![body].spacing(24))
+        _shared::themed_shell("Hyper Text", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)
     }
 }

@@ -23,6 +23,7 @@ pub fn main() -> iced::Result {
 }
 
 struct DottedMapExample {
+    theme_shell: _shared::ThemeShell,
     props: DottedMapProps,
     state: DottedMapState,
     now: Instant,
@@ -30,6 +31,8 @@ struct DottedMapExample {
 
 #[derive(Debug, Clone)]
 enum Message {
+    ToggleTheme,
+    AnchorsMeasured(magic_iced::AnchorMeasurements),
     Tick(Instant),
 }
 
@@ -66,7 +69,8 @@ impl DottedMapExample {
         let state = DottedMapState::new(&props);
         (
             Self {
-                props,
+                theme_shell: _shared::ThemeShell::new(),
+               props,
                 state,
                 now: Instant::now(),
             },
@@ -75,9 +79,20 @@ impl DottedMapExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if let Message::Tick(now) = message {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor()
+                    .map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+self.theme_shell.tick(now);
+
             self.now = now;
             self.state.tick(now, &self.props);
+            }
         }
         Task::none()
     }
@@ -99,6 +114,6 @@ impl DottedMapExample {
                 ..container::Style::default()
             });
 
-        _shared::shell("Dotted Map", column![stage].spacing(24).align_x(Alignment::Center))
+        _shared::themed_shell("Dotted Map", column![stage].spacing(24).align_x(Alignment::Center), &self.theme_shell, Message::ToggleTheme)
     }
 }
