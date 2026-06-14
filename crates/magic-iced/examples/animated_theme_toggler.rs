@@ -77,7 +77,6 @@ impl AnimatedThemeTogglerExample {
 
     fn view(&self) -> Element<'_, Message> {
         let display_theme = self.controller.display_theme(self.now);
-        let icon_theme = self.controller.icon_theme();
 
         let toggler = anchor(
             TOGGLER_ANCHOR,
@@ -86,7 +85,7 @@ impl AnimatedThemeTogglerExample {
                 self.now,
                 Message::ToggleTheme,
                 self.props,
-                &icon_theme,
+                &display_theme,
             ),
         );
 

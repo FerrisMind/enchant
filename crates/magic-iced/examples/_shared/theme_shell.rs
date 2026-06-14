@@ -47,12 +47,43 @@ impl ThemeShell {
 
     /// Smooth foreground during circle-reveal so labels do not pop at transition end.
     pub fn blended_foreground(&self, now: Instant) -> Color {
-        let target = theme_for_mode(self.controller.dark_mode()).palette.foreground;
+        self.blended_palette_color(now, |palette| palette.foreground)
+    }
+
+    /// Smooth border color during circle-reveal so grid lines do not flash on the new background.
+    pub fn blended_border(&self, now: Instant) -> Color {
+        let target_theme = theme_for_mode(self.controller.dark_mode());
+        if !self.controller.is_transition_active(now) {
+            return apparent_border_on_background(
+                target_theme.palette.border,
+                target_theme.palette.background,
+            );
+        }
+
+        let source_theme = theme_for_mode(!self.controller.dark_mode());
+        let reveal = self.controller.reveal_at(now);
+        let from = apparent_border_on_background(
+            source_theme.palette.border,
+            source_theme.palette.background,
+        );
+        let to = apparent_border_on_background(
+            target_theme.palette.border,
+            target_theme.palette.background,
+        );
+        blend_colors(from, to, reveal)
+    }
+
+    fn blended_palette_color(
+        &self,
+        now: Instant,
+        selector: impl Fn(&iced_shadcn::Palette) -> Color,
+    ) -> Color {
+        let target = selector(&theme_for_mode(self.controller.dark_mode()).palette);
         if !self.controller.is_transition_active(now) {
             return target;
         }
 
-        let source = theme_for_mode(!self.controller.dark_mode()).palette.foreground;
+        let source = selector(&theme_for_mode(!self.controller.dark_mode()).palette);
         blend_colors(source, target, self.controller.reveal_at(now))
     }
 
@@ -87,7 +118,6 @@ pub fn themed_shell<'a, Message: Clone + 'a>(
     on_toggle: Message,
 ) -> Element<'a, Message> {
     let display_theme = theme_shell.theme().clone();
-    let icon_theme = theme_shell.controller.icon_theme();
     let title = title.into();
     let body = body.into();
 
@@ -98,7 +128,7 @@ pub fn themed_shell<'a, Message: Clone + 'a>(
             theme_shell.now,
             on_toggle,
             theme_shell.props,
-            &icon_theme,
+            &display_theme,
         ),
     );
 
@@ -160,5 +190,16 @@ fn blend_colors(from: Color, to: Color, progress: f32) -> Color {
         g: from.g + (to.g - from.g) * t,
         b: from.b + (to.b - from.b) * t,
         a: from.a + (to.a - from.a) * t,
+    }
+}
+
+/// Canvas strokes are opaque; resolve semi-transparent theme borders against their background.
+fn apparent_border_on_background(border: Color, background: Color) -> Color {
+    let a = border.a.clamp(0.0, 1.0);
+    Color {
+        r: border.r * a + background.r * (1.0 - a),
+        g: border.g * a + background.g * (1.0 - a),
+        b: border.b * a + background.b * (1.0 - a),
+        a: 1.0,
     }
 }
