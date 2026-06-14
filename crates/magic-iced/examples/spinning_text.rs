@@ -74,6 +74,7 @@ self.theme_shell.tick(now);
             "learn more • earn more • grow more •",
             self.elapsed,
             SpinningTextProps::new(),
+            self.theme_shell.theme(),
         );
 
         _shared::themed_shell("Spinning Text", column![body].spacing(24), &self.theme_shell, Message::ToggleTheme)

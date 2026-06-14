@@ -75,6 +75,7 @@ self.theme_shell.tick(now);
             self.elapsed,
             SparklesTextProps {
                 font_size: 48,
+                text_color: Some(self.theme_shell.blended_foreground(self.theme_shell.now)),
                 ..SparklesTextProps::new()
             },
             self.theme_shell.theme(),

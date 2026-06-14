@@ -118,6 +118,7 @@ pub fn themed_shell<'a, Message: Clone + 'a>(
     on_toggle: Message,
 ) -> Element<'a, Message> {
     let display_theme = theme_shell.theme().clone();
+    let title_color = theme_shell.blended_foreground(theme_shell.now);
     let title = title.into();
     let body = body.into();
 
@@ -133,7 +134,12 @@ pub fn themed_shell<'a, Message: Clone + 'a>(
     );
 
     let header = row![
-        text(title).size(28),
+        text(title)
+            .size(28)
+            .style({
+                let color = title_color;
+                move |_| iced::widget::text::Style { color: Some(color) }
+            }),
         Space::new().width(Length::Fill),
         toggler,
     ]

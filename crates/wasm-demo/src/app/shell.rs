@@ -506,9 +506,11 @@ impl WasmDemoApp {
         } else {
             LucideIcon::Moon
         };
+        let icon_theme = self.theme_toggler.icon_theme();
+        let icon_color = icon_theme.palette.foreground;
 
         button_content(
-            container(lucide(icon, 16, self.theme.palette.foreground))
+            container(lucide(icon, 16, icon_color))
                 .width(Length::Fixed(32.0))
                 .height(Length::Fixed(32.0))
                 .center_x(Length::Fixed(32.0))
@@ -517,7 +519,7 @@ impl WasmDemoApp {
             ButtonProps::new()
                 .variant(ButtonVariant::Ghost)
                 .size(ButtonSize::Size1),
-            &self.theme,
+            &icon_theme,
         )
         .into()
     }

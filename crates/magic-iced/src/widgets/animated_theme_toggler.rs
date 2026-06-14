@@ -143,9 +143,11 @@ pub fn animated_theme_toggler_with_controller<'a, Message: Clone + 'a>(
     _now: Instant,
     on_toggle: Message,
     props: AnimatedThemeTogglerProps,
-    theme: &Theme,
+    _theme: &Theme,
 ) -> Element<'a, Message> {
-    animated_theme_toggler(controller.dark_mode(), on_toggle, props, theme)
+    // Match Magic UI: icon flips with the target theme immediately inside the transition.
+    let icon_theme = controller.icon_theme();
+    animated_theme_toggler(controller.dark_mode(), on_toggle, props, &icon_theme)
 }
 
 /// Circle reveal for the new theme (`::view-transition-new(root)`, circle variant).
@@ -325,6 +327,23 @@ mod tests {
         assert!(
             controller
                 .display_theme(now + Duration::from_millis(500))
+                .variant()
+                .is_dark()
+        );
+    }
+
+    #[test]
+    fn icon_theme_uses_target_mode_during_transition() {
+        let props = AnimatedThemeTogglerProps::new();
+        let mut controller = AnimatedThemeTogglerController::new(false, &props);
+        let now = Instant::now();
+
+        controller.toggle(now, &props);
+
+        assert!(controller.icon_theme().variant().is_dark());
+        assert!(
+            !controller
+                .display_theme(now + Duration::from_millis(100))
                 .variant()
                 .is_dark()
         );
