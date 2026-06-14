@@ -23,8 +23,8 @@ use magic_iced::{
     TerminalProps, TerminalSegment, TerminalState, TextRevealProps, TweetAsset, TweetAuthor,
     TweetCardData, TweetCardProps, TweetMedia, VideoTextProps, VideoTextSource, VideoTextState,
     WordRotateProps, WordRotateState, animated_gradient_text,
-    animated_theme_toggler_with_controller, dock, dock_icon, globe, hero_video_dialog, icon_cloud,
-    magic_card, marquee, number_ticker, shimmer_button, sparkles_text, terminal, text_reveal,
+    animated_theme_toggler_with_controller, dock, dock_icon, globe_demo, hero_video_dialog,
+    icon_cloud, magic_card, marquee, number_ticker, shimmer_button, sparkles_text, terminal, text_reveal,
     theme_transition_overlay, tweet_card, video_text, word_rotate,
 };
 use previews::*;

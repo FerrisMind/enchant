@@ -116,7 +116,11 @@ pub use file_tree::{
 };
 pub use flickering_grid::{FlickeringGridProps, flickering_grid};
 pub use glare_hover::{GlareHoverAction, GlareHoverProps, GlareHoverState, glare_hover};
-pub use globe::{GlobeAction, GlobeMarker, GlobeProps, GlobeState, globe};
+pub use globe::{
+    GlobeAction, GlobeDemoColors, GlobeMarker, GlobeProps, GlobeState, blend_globe_demo_colors,
+    globe, globe_demo, globe_demo_colors_blended, globe_demo_colors_for_controller,
+    globe_demo_colors_for_mode, globe_demo_colors_from_theme,
+};
 pub use grid_pattern::{GridPatternProps, grid_pattern};
 pub use hero_video_dialog::{
     HeroVideoAnimationStyle, HeroVideoDialogProps, HeroVideoDialogState, hero_video_dialog,

@@ -517,6 +517,23 @@ pub(crate) fn initial_preview_tab() -> PreviewTab {
     }
 }
 
+pub(crate) fn blended_globe_demo_colors(
+    controller: &AnimatedThemeTogglerController,
+    now: Instant,
+) -> magic_iced::GlobeDemoColors {
+    magic_iced::globe_demo_colors_for_controller(controller, now)
+}
+
+fn blend_palette_colors(from: Color, to: Color, progress: f32) -> Color {
+    let t = progress.clamp(0.0, 1.0);
+    Color {
+        r: from.r + (to.r - from.r) * t,
+        g: from.g + (to.g - from.g) * t,
+        b: from.b + (to.b - from.b) * t,
+        a: from.a + (to.a - from.a) * t,
+    }
+}
+
 pub(crate) fn initial_query_param(key: &str) -> Option<String> {
     #[cfg(target_arch = "wasm32")]
     {

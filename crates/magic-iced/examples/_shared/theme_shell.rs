@@ -4,7 +4,8 @@ use iced::widget::Id;
 use iced::{Alignment, Background, Color, Element, Length, Task};
 use iced_shadcn::{Palette, Theme};
 use magic_iced::{
-    anchor, measure_anchors, AnimatedThemeTogglerController, AnimatedThemeTogglerProps,
+    anchor, measure_anchors, globe_demo_colors_blended,
+    AnimatedThemeTogglerController, AnimatedThemeTogglerProps, GlobeDemoColors,
     animated_theme_toggler_with_controller, theme_transition_overlay, AnchorMeasurements,
 };
 use magic_iced::theme::MagicTheme;
@@ -137,6 +138,11 @@ impl ThemeShell {
             target_theme.palette.background,
         );
         blend_colors(from, to, reveal)
+    }
+
+    /// Globe demo shell colors — blended in sync with the page reveal (globe canvas stays fixed).
+    pub fn blended_globe_demo_colors(&self, now: Instant) -> GlobeDemoColors {
+        globe_demo_colors_blended(&self.controller, now, theme_for_mode)
     }
 
     fn blended_palette_color(

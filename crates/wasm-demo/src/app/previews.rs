@@ -327,7 +327,14 @@ impl WasmDemoApp {
     }
 
     pub(crate) fn preview_globe(&self) -> Element<'_, Message> {
-        globe(&self.globe_state, &self.globe_props, Message::Globe)
+        let now = Instant::now();
+        let colors = blended_globe_demo_colors(&self.theme_toggler, now);
+        globe_demo(
+            &self.globe_state,
+            &self.globe_props,
+            colors,
+            Message::Globe,
+        )
     }
 
     pub(crate) fn preview_icon_cloud(&self) -> Element<'_, Message> {
