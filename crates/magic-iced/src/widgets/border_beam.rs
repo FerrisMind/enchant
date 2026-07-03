@@ -5,10 +5,14 @@ use iced::Length;
 use iced::Rectangle;
 use iced::Renderer;
 use iced::mouse;
-use iced::widget::canvas::{self, Stroke};
+use iced::widget::canvas::{self, LineCap, Stroke};
 use std::time::Duration;
 
 use crate::primitives::{EffectCanvasProps, EffectProgram, effect_canvas};
+
+const BEAM_SEGMENTS: usize = 180;
+/// Second gradient stop offset from `animated-beam.tsx` / Magic UI border beam.
+const BEAM_GRADIENT_STOP_MID: f32 = 0.325;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BorderBeamProps {
@@ -21,6 +25,10 @@ pub struct BorderBeamProps {
     pub initial_offset: f32,
     pub border_width: f32,
     pub radius: f32,
+    /// Optional static border stroke (e.g. theme border). When `None`, only the beam is drawn.
+    pub track_color: Option<Color>,
+    /// When false, animated beam is hidden (use during theme transitions).
+    pub beam_enabled: bool,
 }
 
 impl Default for BorderBeamProps {
@@ -35,6 +43,8 @@ impl Default for BorderBeamProps {
             initial_offset: 0.0,
             border_width: 1.0,
             radius: 20.0,
+            track_color: None,
+            beam_enabled: true,
         }
     }
 }
@@ -51,6 +61,16 @@ impl BorderBeamProps {
 
     pub fn initial_offset(mut self, initial_offset: f32) -> Self {
         self.initial_offset = initial_offset;
+        self
+    }
+
+    pub fn track_color(mut self, color: Color) -> Self {
+        self.track_color = Some(color);
+        self
+    }
+
+    pub fn beam_enabled(mut self, enabled: bool) -> Self {
+        self.beam_enabled = enabled;
         self
     }
 }
@@ -86,39 +106,104 @@ impl<Message> EffectProgram<Message> for BorderBeamProgram {
     ) -> Vec<canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
         let track = RoundedRectTrack::new(bounds.size(), self.props.radius);
-        let head = beam_phase(self.elapsed, self.props);
 
-        frame.stroke(
-            &track.path(iced::Point::ORIGIN),
-            Stroke::default()
-                .with_width(self.props.border_width)
-                .with_color(Color {
-                    a: 0.16,
-                    ..self.props.color_to
-                }),
-        );
-
-        for index in (0..14).rev() {
-            let factor = index as f32 / 13.0;
-            let progress = if self.props.reverse {
-                head + factor * 0.07
-            } else {
-                head - factor * 0.07
-            };
-            let sample = track.sample(progress);
-            let color = mix_color(self.props.color_from, self.props.color_to, 1.0 - factor);
-            let radius = 2.0 + (1.0 - factor) * (self.props.size * 0.08);
-            frame.fill(
-                &canvas::Path::circle(sample.point, radius),
-                Color {
-                    a: 0.12 + (1.0 - factor) * 0.6,
-                    ..color
-                },
+        if let Some(track_color) = self.props.track_color {
+            frame.stroke(
+                &track.path(iced::Point::ORIGIN),
+                Stroke::default()
+                    .with_width(self.props.border_width)
+                    .with_color(track_color),
             );
+        }
+
+        if self.props.beam_enabled {
+            draw_gradient_beam(&mut frame, &track, self.elapsed, self.props);
         }
 
         vec![frame.into_geometry()]
     }
+}
+
+fn draw_gradient_beam(
+    frame: &mut canvas::Frame,
+    track: &RoundedRectTrack,
+    elapsed: Duration,
+    props: BorderBeamProps,
+) {
+    let head = beam_phase(elapsed, props);
+    let perimeter = track.perimeter().max(1.0);
+    let beam_span = (props.size / perimeter).clamp(0.005, 1.0);
+    let last = BEAM_SEGMENTS.saturating_sub(1);
+
+    for index in 0..BEAM_SEGMENTS {
+        let t0 = index as f32 / BEAM_SEGMENTS as f32;
+        let t1 = (index + 1) as f32 / BEAM_SEGMENTS as f32;
+        let mid_t = (t0 + t1) * 0.5;
+        let dist = distance_behind_head(mid_t, head, props.reverse);
+
+        if dist > beam_span {
+            continue;
+        }
+
+        let along_beam = 1.0 - dist / beam_span;
+        let color = sample_border_beam_gradient(
+            along_beam,
+            props.color_from,
+            props.color_to,
+        );
+
+        if color.a <= 0.01 {
+            continue;
+        }
+
+        let p0 = track.sample(t0).point;
+        let p1 = track.sample(t1).point;
+        let segment = canvas::Path::line(p0, p1);
+        let line_cap = if index == 0 || index == last {
+            LineCap::Round
+        } else {
+            LineCap::Butt
+        };
+
+        frame.stroke(
+            &segment,
+            Stroke::default()
+                .with_width(props.border_width)
+                .with_line_cap(line_cap)
+                .with_color(color),
+        );
+    }
+}
+
+/// Distance along the track behind the beam head, in progress units `[0, 1)`.
+fn distance_behind_head(progress: f32, head: f32, reverse: bool) -> f32 {
+    if reverse {
+        (head - progress).rem_euclid(1.0)
+    } else {
+        (progress - head).rem_euclid(1.0)
+    }
+}
+
+/// Gradient along the beam window — same stop layout as `animated_beam`.
+fn sample_border_beam_gradient(t: f32, from: Color, to: Color) -> Color {
+    if t < 0.0 {
+        return Color::TRANSPARENT;
+    }
+
+    if t <= BEAM_GRADIENT_STOP_MID {
+        let local = (t / BEAM_GRADIENT_STOP_MID).clamp(0.0, 1.0);
+        return mix_color(from, to, local);
+    }
+
+    if t < 1.0 {
+        let fade = 1.0 - ((t - BEAM_GRADIENT_STOP_MID) / (1.0 - BEAM_GRADIENT_STOP_MID));
+        return Color {
+            a: fade * to.a.max(from.a),
+            ..to
+        };
+    }
+
+    Color::TRANSPARENT
 }
 
 fn beam_phase(elapsed: Duration, props: BorderBeamProps) -> f32 {
@@ -161,6 +246,8 @@ mod tests {
         assert_eq!(props.duration_secs, 6.0);
         assert_eq!(props.border_width, 1.0);
         assert_eq!(props.radius, 20.0);
+        assert!(props.beam_enabled);
+        assert!(props.track_color.is_none());
     }
 
     #[test]
@@ -175,5 +262,24 @@ mod tests {
         assert!((0.0..1.0).contains(&normal));
         assert!((0.0..1.0).contains(&reversed));
         assert!((offset - 0.25).abs() < 0.001);
+    }
+
+    #[test]
+    fn gradient_matches_animated_beam_stop_layout() {
+        let from = Color::from_rgb8(0xFF, 0xAA, 0x40);
+        let to = Color::from_rgb8(0x9C, 0x40, 0xFF);
+
+        assert_eq!(sample_border_beam_gradient(0.0, from, to), from);
+        assert_eq!(sample_border_beam_gradient(0.325, from, to), to);
+        assert!(sample_border_beam_gradient(1.0, from, to).a < 0.01);
+    }
+
+    #[test]
+    fn distance_behind_head_wraps_clockwise() {
+        let behind = distance_behind_head(0.1, 0.0, false);
+        assert!((behind - 0.1).abs() < 0.001);
+
+        let wrapped = distance_behind_head(0.05, 0.95, false);
+        assert!((wrapped - 0.1).abs() < 0.001);
     }
 }

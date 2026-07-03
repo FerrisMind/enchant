@@ -64,7 +64,10 @@ impl BorderBeamExample {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
 
-            Message::Tick(now) => self.elapsed = now.duration_since(self.start),
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+                self.elapsed = now.duration_since(self.start);
+            }
             Message::EmailChanged(value) => self.email = value,
             Message::PasswordChanged(value) => self.password = value,
             Message::Register | Message::Login => {}
@@ -77,6 +80,8 @@ impl BorderBeamExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let now = self.theme_shell.now;
+        let transition = self.theme_shell.controller.is_transition_active(now);
         let login = _shared::shadcn_forms::login_card_dual_footer(
             &self.email,
             &self.password,
@@ -84,7 +89,7 @@ impl BorderBeamExample {
             Some(Message::PasswordChanged),
             Some(Message::Register),
             Some(Message::Login),
-            self.theme_shell.theme(),
+            self.theme_shell.blended_theme(),
         );
 
         let card = container(stack(vec![
@@ -95,6 +100,7 @@ impl BorderBeamExample {
                     size: 100.0,
                     duration_secs: 8.0,
                     radius: 12.0,
+                    beam_enabled: !transition,
                     ..BorderBeamProps::new()
                 },
             ))
@@ -103,7 +109,8 @@ impl BorderBeamExample {
             .into(),
         ]))
         .width(Length::Fixed(350.0))
-        .height(Length::Fixed(380.0));
+        .height(Length::Fixed(380.0))
+        .clip(true);
 
         _shared::themed_shell(
             "Border Beam",

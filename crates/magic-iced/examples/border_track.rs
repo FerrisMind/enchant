@@ -69,9 +69,16 @@ impl BorderTrackExample {
     }
 
     fn tracked_card(&self, label: &'static str, radius: f32) -> Element<'static, Message> {
+        let now = self.theme_shell.now;
+        let transition = self.theme_shell.controller.is_transition_active(now);
+        let border_color = self.theme_shell.blended_border(now);
+        let label_color = self.theme_shell.blended_foreground(now);
         let border_radius = radius;
         container(stack(vec![
-            container(text(label).size(16))
+            container(text(label).size(16).style({
+                let color = label_color;
+                move |_| iced::widget::text::Style { color: Some(color) }
+            }))
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .center_x(Length::Fill)
@@ -83,6 +90,7 @@ impl BorderTrackExample {
                     radius,
                     size: 80.0,
                     duration_secs: 6.0,
+                    beam_enabled: !transition,
                     ..BorderBeamProps::new()
                 },
             ))
@@ -96,7 +104,7 @@ impl BorderTrackExample {
             border: Border {
                 width: 1.0,
                 radius: border_radius.into(),
-                ..Border::default()
+                color: border_color,
             },
             ..container::Style::default()
         })
@@ -104,8 +112,14 @@ impl BorderTrackExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let muted = self.theme_shell.blended_theme().palette.muted_foreground;
         let body = column![
-            text("Rounded-rect perimeter sampling powers Border Beam and Shine Border.").size(14),
+            text("Rounded-rect perimeter sampling powers Border Beam and Shine Border.")
+                .size(14)
+                .style({
+                    let color = muted;
+                    move |_| iced::widget::text::Style { color: Some(color) }
+                }),
             column![
                 self.tracked_card("radius 12", 12.0),
                 self.tracked_card("radius 24", 24.0),
