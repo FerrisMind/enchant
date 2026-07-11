@@ -28,3 +28,4 @@ trunk serve crates/wasm-demo/index.html
 
 - Legacy `phase0..5_showcase` examples and capture artifacts were removed from the workspace root.
 - The demo shell is built with `magic-iced`, `iced-shadcn`, Lucide, and twill.
+- Magic UI build inputs for the demo live in `crates/wasm-demo/upstream/magicui-www/` (minimal snapshot; sync from `magic-refs` via `scripts/sync-magicui-snapshot.ps1`). The project does not depend on `magic-refs` at build time.

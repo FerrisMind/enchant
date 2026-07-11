@@ -280,7 +280,7 @@ pub fn blend_globe_demo_colors(
     }
 }
 
-/// COBE globe rendered via iced `widget::shader` + WGSL (ported from `magic-iced_refs/cobe`).
+/// COBE globe rendered via iced `widget::shader` + WGSL (ported from upstream cobe).
 pub fn globe<'a, Message: Clone + 'static>(
     state: &'a GlobeState,
     props: &'a GlobeProps,

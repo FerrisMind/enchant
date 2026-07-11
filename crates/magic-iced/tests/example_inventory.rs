@@ -108,7 +108,7 @@ fn example_inventory_matches_official_registry() {
 
 fn official_inventory() -> BTreeMap<String, Vec<OfficialScenario>> {
     let registry_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../magic-iced_refs/magicui/apps/www/registry/registry-examples.ts");
+        .join("tests/fixtures/registry-examples.ts");
     let registry = fs::read_to_string(&registry_path)
         .unwrap_or_else(|err| panic!("read {}: {}", registry_path.display(), err));
 

@@ -34,3 +34,4 @@ scripts/__pycache__/
 *.exe
 *.log
 *.pid
+crates/wasm-demo/generated/
