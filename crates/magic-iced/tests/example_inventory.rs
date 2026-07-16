@@ -7,6 +7,7 @@ const INTERNAL_HELPER_EXAMPLES: &[&str] = &["animated_subscribe_button", "border
 const HELPER_EXPORTS: &[&str] = &[
     "animated_subscribe_button",
     "animated_theme_toggler_with_controller",
+    "bento_card",
     "confetti_button",
     "dia_text_reveal_companion",
     "dock_icon",
@@ -248,5 +249,7 @@ fn example_covers_component(component: &str, example_binaries: &BTreeSet<String>
 }
 
 fn example_owned_component(name: &str) -> &str {
-    name.strip_suffix("_demo").unwrap_or(name)
+    name.strip_suffix("_demo")
+        .or_else(|| name.strip_suffix("_vertical"))
+        .unwrap_or(name)
 }

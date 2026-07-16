@@ -24,6 +24,7 @@ pub mod file_tree;
 pub mod flickering_grid;
 pub mod glare_hover;
 pub mod globe;
+pub mod glyph_matrix;
 pub mod grid_pattern;
 pub mod hero_video_dialog;
 pub mod hexagon_pattern;
@@ -124,6 +125,7 @@ pub use globe::{
     globe, globe_demo, globe_demo_colors_blended, globe_demo_colors_for_controller,
     globe_demo_colors_for_mode, globe_demo_colors_from_theme,
 };
+pub use glyph_matrix::{GlyphMatrixProps, glyph_matrix};
 pub use grid_pattern::{GridPatternProps, grid_pattern};
 pub use hero_video_dialog::{
     HeroVideoAnimationStyle, HeroVideoDialogProps, HeroVideoDialogState, hero_video_dialog,

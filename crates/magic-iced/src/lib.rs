@@ -19,7 +19,10 @@ pub use primitives::{
     sample_confetti_particle, segment_progress, stable_grid_cell, stable_noise, stagger_offset,
     world_point_cloud,
 };
-pub use sections::{BentoCardProps, BentoGridProps, bento_grid};
+pub use sections::{
+    BENTO_COLUMNS, BENTO_GAP, BENTO_ROW_HEIGHT, BentoCardProps, BentoGridProps, bento_card,
+    bento_grid,
+};
 pub use theme::MagicTheme;
 pub use widgets::{
     AndroidProps, AnimatedBeamProps, AnimatedCircularProgressBarProps,
@@ -81,3 +84,4 @@ pub use widgets::{
     terminal, text_3d_flip, text_animate, text_reveal, theme_transition_overlay, tweet_card,
     typing_animation, video_text, warp_background, word_rotate,
 };
+pub use widgets::{GlyphMatrixProps, glyph_matrix};

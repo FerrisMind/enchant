@@ -19,8 +19,9 @@ tweet-adapter = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 iced = { version = "0.14", features = ["advanced", "canvas", "image", "svg", "tokio", "wgpu"] }
 bytemuck = { version = "1.24", features = ["derive"] }
 iced_runtime = "0.14.0"
-iced-shadcn = { git = "https://github.com/FerrisMind/shadcn-rs", rev = "3a50642e18d5c79c9e7ab5993c2325605ed18858", default-features = false }
+iced-shadcn = { git = "https://github.com/FerrisMind/shadcn-rs", rev = "3a50642e18d5c79c9e7ab5993c2325605ed18858", default-features = false, features = ["chrono"] }
 lucide-icons = "0.575.0"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 twill = { git = "https://github.com/FerrisMind/twill.git", rev = "d3419a53af2b20f7c1f7e4532a5ef3afa866229f", default-features = false, features = ["iced"] }
 unicode-segmentation = "1.12"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
@@ -30,6 +31,7 @@ serde_json = { version = "1.0", optional = true }
 lyon_path = "1.0"
 resvg = "0.45"
 base64 = "0.22"
+swash = "0.2.9"
 
 [package.metadata.docs.rs]
 all-features = true
