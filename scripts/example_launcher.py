@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GUI launcher for magic-iced examples with parity checkboxes."""
+"""GUI launcher for enchant-iced examples with parity checkboxes."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def repo_root() -> Path:
 
 
 def examples_dir() -> Path:
-    return repo_root() / "crates" / "magic-iced" / "examples"
+    return repo_root() / "crates" / "enchant-iced" / "examples"
 
 
 def logs_dir() -> Path:
@@ -164,7 +164,7 @@ class ExampleRunner:
                 except subprocess.TimeoutExpired:
                     self.process.kill()
 
-            cmd = ["cargo", "run", "-p", "magic-iced", "--example", name]
+            cmd = ["cargo", "run", "-p", "enchant-iced", "--example", name]
             try:
                 self.process = subprocess.Popen(
                     cmd,

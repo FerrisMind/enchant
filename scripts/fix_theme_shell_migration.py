@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Fix broken theme_shell migration in magic-iced examples."""
+"""Fix broken theme_shell migration in enchant-iced examples."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "crates/magic-iced/examples"
+EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "crates/enchant-iced/examples"
 SKIP = {"animated_theme_toggler.rs", "_shared"}
 
 
@@ -194,7 +194,7 @@ def ensure_message_variants(content: str) -> str:
     if "ToggleTheme" not in body:
         additions.append("    ToggleTheme,")
     if "AnchorsMeasured" not in body:
-        additions.append("    AnchorsMeasured(magic_iced::AnchorMeasurements),")
+        additions.append("    AnchorsMeasured(enchant_iced::AnchorMeasurements),")
     if "Tick(Instant)" not in body and "subscription" in content:
         additions.append("    Tick(Instant),")
 

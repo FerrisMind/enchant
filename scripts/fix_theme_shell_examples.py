@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "crates/magic-iced/examples"
+EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "crates/enchant-iced/examples"
 SKIP = {"animated_theme_toggler.rs"}
 
 

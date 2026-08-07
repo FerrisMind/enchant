@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path $PSScriptRoot -Parent
 $SourceRoot = Join-Path (Split-Path $Root -Parent) "magic-refs\magicui\apps\www"
 $DestRoot = Join-Path $Root "crates\wasm-demo\upstream\magicui-www"
-$FixtureDest = Join-Path $Root "crates\magic-iced\tests\fixtures\registry-examples.ts"
+$FixtureDest = Join-Path $Root "crates\enchant-iced\tests\fixtures\registry-examples.ts"
 
 if (-not (Test-Path $SourceRoot)) {
     throw "magic-refs snapshot missing: $SourceRoot`nRun magic-refs\clone-refs.ps1 and sync-stable.ps1 first."
@@ -60,7 +60,7 @@ Sync-Tree "public/r"
 
 New-Item -ItemType Directory -Force -Path (Split-Path $FixtureDest -Parent) | Out-Null
 Copy-Item (Join-Path $SourceRoot "registry/registry-examples.ts") $FixtureDest -Force
-Write-Host "synced: crates/magic-iced/tests/fixtures/registry-examples.ts"
+Write-Host "synced: crates/enchant-iced/tests/fixtures/registry-examples.ts"
 
 $ref = Push-Location (Join-Path (Split-Path $Root -Parent) "magic-refs\magicui"); git rev-parse HEAD; Pop-Location
 @"
@@ -83,7 +83,7 @@ included:
   content/docs/components/
   content/showcase/
   public/r/
-  crates/magic-iced/tests/fixtures/registry-examples.ts
+  crates/enchant-iced/tests/fixtures/registry-examples.ts
 "@ | Set-Content (Join-Path $DestRoot "SOURCE.txt")
 
 Write-Host "`nDone. Rebuild wasm-demo to regenerate reference-data.json."

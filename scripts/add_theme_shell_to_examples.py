@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Add ThemeShell + themed_shell to magic-iced examples."""
+"""Add ThemeShell + themed_shell to enchant-iced examples."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "crates/magic-iced/examples"
+EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "crates/enchant-iced/examples"
 SKIP = {"animated_theme_toggler.rs"}
 
 THEME_MSG_VARIANTS = """    ToggleTheme,
-    AnchorsMeasured(magic_iced::AnchorMeasurements),"""
+    AnchorsMeasured(enchant_iced::AnchorMeasurements),"""
 
 
 def ensure_mod_shared(content: str) -> str:
@@ -260,7 +260,7 @@ def remove_unused_theme_import(content: str) -> str:
     if "Theme::" not in content and "&Theme" not in content and ": Theme" not in content:
         content = re.sub(r"^use iced_shadcn::Theme;\n", "", content, flags=re.M)
     if "MagicTheme" not in content:
-        content = re.sub(r"^use magic_iced::\{([^}]*?)MagicTheme, ?", r"use magic_iced::{\1", content)
+        content = re.sub(r"^use enchant_iced::\{([^}]*?)MagicTheme, ?", r"use enchant_iced::{\1", content)
         content = re.sub(r", MagicTheme", "", content)
     return content
 
