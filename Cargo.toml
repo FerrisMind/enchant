@@ -1,6 +1,21 @@
 [workspace]
-members = ["crates/magic-iced"]
+members = [
+    "crates/enchant-iced",
+]
 resolver = "2"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.93"
+license = "MIT OR Apache-2.0"
+version = "0.2.0"
+authors = ["FerrisMind"]
+homepage = "https://github.com/FerrisMind/enchant"
+repository = "https://github.com/FerrisMind/enchant"
+description = "Magic UI-inspired premium interaction layer for iced"
+
+[workspace.dependencies]
+enchant-iced = { path = "crates/enchant-iced", version = "0.2.0" }
 
 [profile.dev]
 incremental = true
