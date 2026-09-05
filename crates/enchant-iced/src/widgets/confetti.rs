@@ -65,7 +65,7 @@ impl fmt::Debug for Confetti {
             .field("stage_height", &self.stage_height)
             .field("stage_width", &self.stage_width)
             .field("destroy_after_done", &self.destroy_after_done)
-            .field("colors", &self.colors())
+            .field("colors", &self.palette())
             .field("width", &self.width)
             .field("height", &self.height)
             .field("seed", &self.seed)
@@ -104,56 +104,56 @@ impl Confetti {
 
     /// Sets the number of particles, clamped to at least one.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_particle_count(mut self, particle_count: usize) -> Self {
+    pub fn particle_count(mut self, particle_count: usize) -> Self {
         self.particle_count = particle_count.max(1);
         self
     }
 
     /// Sets the particle shape.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_particle_shape(mut self, particle_shape: ConfettiParticleShape) -> Self {
+    pub fn particle_shape(mut self, particle_shape: ConfettiParticleShape) -> Self {
         self.particle_shape = particle_shape;
         self
     }
 
     /// Sets the particle size in logical pixels.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_particle_size(mut self, particle_size: f32) -> Self {
+    pub fn particle_size(mut self, particle_size: f32) -> Self {
         self.particle_size = finite_or(particle_size, 1.0).max(1.0);
         self
     }
 
     /// Sets the burst duration in milliseconds.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_duration_ms(mut self, duration_ms: u64) -> Self {
+    pub fn duration_ms(mut self, duration_ms: u64) -> Self {
         self.duration_ms = duration_ms.max(1);
         self
     }
 
     /// Sets the force in the inclusive range `0..=1`.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_force(mut self, force: f32) -> Self {
+    pub fn force(mut self, force: f32) -> Self {
         self.force = finite_or(force, 0.0).clamp(0.0, 1.0);
         self
     }
 
     /// Sets the stage height in logical pixels.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_stage_height(mut self, stage_height: f32) -> Self {
+    pub fn stage_height(mut self, stage_height: f32) -> Self {
         self.stage_height = finite_or(stage_height, 1.0).max(1.0);
         self
     }
 
     /// Sets the stage width in logical pixels.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_stage_width(mut self, stage_width: f32) -> Self {
+    pub fn stage_width(mut self, stage_width: f32) -> Self {
         self.stage_width = finite_or(stage_width, 1.0).max(1.0);
         self
     }
 
     /// Controls whether a finished burst is removed during [`ConfettiState::tick`].
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_destroy_after_done(mut self, destroy_after_done: bool) -> Self {
+    pub fn destroy_after_done(mut self, destroy_after_done: bool) -> Self {
         self.destroy_after_done = destroy_after_done;
         self
     }
@@ -162,7 +162,7 @@ impl Confetti {
     ///
     /// An empty slice leaves the current palette unchanged.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_colors(mut self, colors: &[Color]) -> Self {
+    pub fn colors(mut self, colors: &[Color]) -> Self {
         if colors.is_empty() {
             return self;
         }
@@ -175,83 +175,27 @@ impl Confetti {
 
     /// Sets the canvas width.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_width(mut self, width: impl Into<Length>) -> Self {
+    pub fn width(mut self, width: impl Into<Length>) -> Self {
         self.width = width.into();
         self
     }
 
     /// Sets the canvas height.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_height(mut self, height: impl Into<Length>) -> Self {
+    pub fn height(mut self, height: impl Into<Length>) -> Self {
         self.height = height.into();
         self
     }
 
     /// Sets the deterministic particle seed.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_seed(mut self, seed: u64) -> Self {
+    pub fn seed(mut self, seed: u64) -> Self {
         self.seed = seed;
         self
     }
 
-    /// Returns the configured particle count.
-    pub fn particle_count(self) -> usize {
-        self.particle_count
-    }
-
-    /// Returns the configured particle shape.
-    pub fn particle_shape(self) -> ConfettiParticleShape {
-        self.particle_shape
-    }
-
-    /// Returns the configured particle size.
-    pub fn particle_size(self) -> f32 {
-        self.particle_size
-    }
-
-    /// Returns the configured duration in milliseconds.
-    pub fn duration_ms(self) -> u64 {
-        self.duration_ms
-    }
-
-    /// Returns the configured force.
-    pub fn force(self) -> f32 {
-        self.force
-    }
-
-    /// Returns the configured stage height.
-    pub fn stage_height(self) -> f32 {
-        self.stage_height
-    }
-
-    /// Returns the configured stage width.
-    pub fn stage_width(self) -> f32 {
-        self.stage_width
-    }
-
-    /// Returns whether finished bursts are destroyed.
-    pub fn destroy_after_done(self) -> bool {
-        self.destroy_after_done
-    }
-
-    /// Returns the active particle palette.
-    pub fn colors(&self) -> &[Color] {
+    fn palette(&self) -> &[Color] {
         &self.colors[..usize::from(self.color_len)]
-    }
-
-    /// Returns the canvas width.
-    pub fn width(self) -> Length {
-        self.width
-    }
-
-    /// Returns the canvas height.
-    pub fn height(self) -> Length {
-        self.height
-    }
-
-    /// Returns the deterministic particle seed.
-    pub fn seed(self) -> u64 {
-        self.seed
     }
 
     /// Builds the confetti canvas for the supplied state and clock.
@@ -363,7 +307,7 @@ struct Particle {
     height: f32,
     rotation_transform: u8,
     rotation_duration_ms: f32,
-    color_index: usize,
+    color: Color,
     is_circle: bool,
 }
 
@@ -441,7 +385,7 @@ fn spawn_particle(index: usize, config: Confetti, rng: &mut StableRng) -> Partic
         },
         rotation_transform,
         rotation_duration_ms: rng.range_f32(ROTATION_SPEED_MIN_MS, ROTATION_SPEED_MAX_MS),
-        color_index: index % config.colors().len(),
+        color: config.palette()[index % config.palette().len().max(1)],
         is_circle,
     }
 }
@@ -545,7 +489,7 @@ impl<Message> EffectProgram<Message> for ConfettiProgram<'_> {
             for particle in &burst.particles {
                 let fraction = elapsed_ms as f32 / particle.duration_ms as f32;
                 let sample = sample_neoconfetti(particle, fraction, self.config.stage_height);
-                let color = self.config.colors()[particle.color_index];
+                let color = particle.color;
                 let position =
                     Point::new(origin.x + sample.position.x, origin.y + sample.position.y);
 
@@ -580,40 +524,40 @@ mod tests {
     fn confetti_defaults_match_animations_wrapper() {
         let confetti = Confetti::new();
 
-        assert_eq!(confetti.particle_count(), 40);
-        assert!((confetti.force() - 0.5).abs() < f32::EPSILON);
-        assert_eq!(confetti.particle_size(), 12.0);
-        assert_eq!(confetti.duration_ms(), 3500);
-        assert_eq!(confetti.stage_height(), 800.0);
-        assert_eq!(confetti.stage_width(), 1600.0);
-        assert!(confetti.destroy_after_done());
-        assert_eq!(confetti.particle_shape(), ConfettiParticleShape::Mix);
-        assert_eq!(confetti.colors().len(), 4);
-        assert_eq!(confetti.colors()[0], Color::from_rgb8(0xFF, 0xC7, 0x00));
+        assert_eq!(confetti.particle_count, 40);
+        assert!((confetti.force - 0.5).abs() < f32::EPSILON);
+        assert_eq!(confetti.particle_size, 12.0);
+        assert_eq!(confetti.duration_ms, 3500);
+        assert_eq!(confetti.stage_height, 800.0);
+        assert_eq!(confetti.stage_width, 1600.0);
+        assert!(confetti.destroy_after_done);
+        assert_eq!(confetti.particle_shape, ConfettiParticleShape::Mix);
+        assert_eq!(confetti.palette().len(), 4);
+        assert_eq!(confetti.palette()[0], Color::from_rgb8(0xFF, 0xC7, 0x00));
     }
 
     #[test]
     fn setters_validate_ranges() {
         let confetti = Confetti::new()
-            .with_particle_count(0)
-            .with_force(2.0)
-            .with_particle_size(-1.0)
-            .with_duration_ms(0)
-            .with_stage_height(0.0);
+            .particle_count(0)
+            .force(2.0)
+            .particle_size(-1.0)
+            .duration_ms(0)
+            .stage_height(0.0);
 
-        assert!(confetti.particle_count() >= 1);
-        assert!((0.0..=1.0).contains(&confetti.force()));
-        assert!(confetti.particle_size() > 0.0);
-        assert!(confetti.duration_ms() >= 1);
-        assert!(confetti.stage_height() >= 1.0);
+        assert!(confetti.particle_count >= 1);
+        assert!((0.0..=1.0).contains(&confetti.force));
+        assert!(confetti.particle_size > 0.0);
+        assert!(confetti.duration_ms >= 1);
+        assert!(confetti.stage_height >= 1.0);
     }
 
     #[test]
     fn fire_adds_burst_and_destroy_clears_after_duration() {
         let mut state = ConfettiState::new();
         let confetti = Confetti::new()
-            .with_duration_ms(100)
-            .with_destroy_after_done(true);
+            .duration_ms(100)
+            .destroy_after_done(true);
         let started_at = Instant::now();
 
         state.fire(started_at, &confetti);
@@ -640,7 +584,7 @@ mod tests {
             height: 12.0,
             rotation_transform: 0,
             rotation_duration_ms: 500.0,
-            color_index: 0,
+            color: Color::WHITE,
             is_circle: true,
         };
 
@@ -649,5 +593,20 @@ mod tests {
 
         assert!(at_start.position.y.abs() < 40.0);
         assert!(later.position.y > at_start.position.y);
+    }
+
+    #[test]
+    fn particle_color_baked_at_fire_time() {
+        let mut state = ConfettiState::new();
+        let fire_config = Confetti::new().colors(&[Color::WHITE]);
+        let started_at = Instant::now();
+
+        state.fire(started_at, &fire_config);
+        let baked_color = state.bursts[0].particles[0].color;
+
+        let shrunk_config = Confetti::new().colors(&[]);
+        assert_eq!(baked_color, Color::WHITE);
+        assert_eq!(shrunk_config.palette().len(), 4);
+        assert_eq!(state.bursts[0].particles[0].color, baked_color);
     }
 }
