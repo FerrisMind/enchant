@@ -1,8 +1,9 @@
 use crate::primitives::{EffectCanvasProps, EffectProgram, StableRng, effect_canvas};
 use iced::mouse;
 use iced::time::Instant;
+use iced::widget::button;
 use iced::widget::canvas;
-use iced::{Color, Element, Length, Point, Rectangle, Renderer, Size, Vector};
+use iced::{Color, Element, Length, Padding, Point, Rectangle, Renderer, Size, Vector};
 use std::fmt;
 use std::time::Duration;
 
@@ -13,6 +14,15 @@ const DEFAULT_COLORS: [Color; 4] = [
     Color::from_rgb8(0x2E, 0x31, 0x91),
     Color::from_rgb8(0x41, 0xBB, 0xC7),
 ];
+const BUTTON_COLORS: [Color; 3] = [
+    Color::from_rgb8(0xFF, 0x00, 0x00),
+    Color::from_rgb8(0x00, 0xFF, 0x00),
+    Color::from_rgb8(0x00, 0x00, 0xFF),
+];
+const BUTTON_PARTICLE_COUNT: usize = 50;
+const BUTTON_BACKGROUND: Color = Color::from_rgb8(0x25, 0x63, 0xEB);
+const BUTTON_BACKGROUND_HOVER: Color = Color::from_rgb8(0x1D, 0x4E, 0xD8);
+const BUTTON_BORDER_RADIUS: f32 = 8.0;
 const DEFAULT_DURATION_MS: u64 = 3_500;
 const CRAZY_PARTICLES_FREQUENCY: f32 = 0.1;
 const CRAZY_PARTICLE_CRAZINESS: f32 = 0.3;
@@ -224,6 +234,201 @@ impl Confetti {
         now: Instant,
     ) -> Element<'a, Message> {
         self.into_element(state, now)
+    }
+}
+
+fn button_default_confetti() -> Confetti {
+    Confetti::new()
+        .particle_count(BUTTON_PARTICLE_COUNT)
+        .force(0.5)
+        .stage_height(800.0)
+        .stage_width(1600.0)
+        .colors(&BUTTON_COLORS)
+}
+
+/// Button that carries animations [`Confetti`] defaults and emits a press message.
+///
+/// Confetti is not fired automatically — on press the host should call
+/// [`ConfettiState::clear`] then [`ConfettiState::fire`] with [`Self::confetti`].
+#[must_use = "builders do nothing unless turned into an iced Element"]
+pub struct ConfettiButton<'a, Message> {
+    content: Element<'a, Message>,
+    confetti: Confetti,
+    on_press: Option<Message>,
+    padding: Padding,
+    width: Length,
+    height: Length,
+}
+
+impl<'a, Message> fmt::Debug for ConfettiButton<'a, Message> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ConfettiButton")
+            .field("confetti", &self.confetti)
+            .field("on_press", &self.on_press.is_some())
+            .field("padding", &self.padding)
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, Message> ConfettiButton<'a, Message> {
+    /// Creates a button with animations confetti-button defaults.
+    pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
+        Self {
+            content: content.into(),
+            confetti: button_default_confetti(),
+            on_press: None,
+            padding: Padding::from([12.0, 24.0]),
+            width: Length::Shrink,
+            height: Length::Shrink,
+        }
+    }
+
+    /// Returns the confetti configuration used when firing from this button.
+    pub fn confetti(&self) -> Confetti {
+        self.confetti
+    }
+
+    /// Sets the press handler. The host should clear and fire confetti on this message.
+    #[must_use = "builder setters return updated configuration"]
+    pub fn on_press(mut self, message: Message) -> Self {
+        self.on_press = Some(message);
+        self
+    }
+
+    /// Alias for [`Self::on_press`] — same message, confetti firing stays in the host.
+    #[must_use = "builder setters return updated configuration"]
+    pub fn on_fire<F>(mut self, fire: F) -> Self
+    where
+        F: FnOnce() -> Message,
+    {
+        self.on_press = Some(fire());
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn particle_count(mut self, particle_count: usize) -> Self {
+        self.confetti = self.confetti.particle_count(particle_count);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn particle_shape(mut self, particle_shape: ConfettiParticleShape) -> Self {
+        self.confetti = self.confetti.particle_shape(particle_shape);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn particle_size(mut self, particle_size: f32) -> Self {
+        self.confetti = self.confetti.particle_size(particle_size);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn duration_ms(mut self, duration_ms: u64) -> Self {
+        self.confetti = self.confetti.duration_ms(duration_ms);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn force(mut self, force: f32) -> Self {
+        self.confetti = self.confetti.force(force);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn stage_height(mut self, stage_height: f32) -> Self {
+        self.confetti = self.confetti.stage_height(stage_height);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn stage_width(mut self, stage_width: f32) -> Self {
+        self.confetti = self.confetti.stage_width(stage_width);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn destroy_after_done(mut self, destroy_after_done: bool) -> Self {
+        self.confetti = self.confetti.destroy_after_done(destroy_after_done);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn colors(mut self, colors: &[Color]) -> Self {
+        self.confetti = self.confetti.colors(colors);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn width(mut self, width: Length) -> Self {
+        self.width = width;
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn height(mut self, height: Length) -> Self {
+        self.height = height;
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
+        self.padding = padding.into();
+        self
+    }
+
+    /// Builds the styled button element.
+    pub fn into_element(self) -> Element<'a, Message>
+    where
+        Message: Clone + 'a,
+    {
+        let padding = self.padding;
+        let width = self.width;
+        let height = self.height;
+
+        let mut control = button(self.content)
+            .padding(padding)
+            .style(|_, status| confetti_button_style(status));
+
+        if let Some(message) = self.on_press {
+            control = control.on_press(message);
+        }
+
+        iced::widget::container(control)
+            .width(width)
+            .height(height)
+            .into()
+    }
+
+    /// Alias for [`Self::into_element`].
+    pub fn view(self) -> Element<'a, Message>
+    where
+        Message: Clone + 'a,
+    {
+        self.into_element()
+    }
+}
+
+fn confetti_button_style(status: button::Status) -> button::Style {
+    let background = match status {
+        button::Status::Hovered | button::Status::Pressed => BUTTON_BACKGROUND_HOVER,
+        button::Status::Disabled => BUTTON_BACKGROUND.scale_alpha(0.5),
+        button::Status::Active => BUTTON_BACKGROUND,
+    };
+
+    button::Style {
+        background: Some(iced::Background::Color(background)),
+        text_color: Color::WHITE,
+        border: iced::Border {
+            radius: BUTTON_BORDER_RADIUS.into(),
+            width: 0.0,
+            color: Color::TRANSPARENT,
+        },
+        shadow: iced::Shadow::default(),
+        snap: false,
     }
 }
 
@@ -593,6 +798,20 @@ mod tests {
 
         assert!(at_start.position.y.abs() < 40.0);
         assert!(later.position.y > at_start.position.y);
+    }
+
+    #[test]
+    fn confetti_button_defaults_match_animations_button() {
+        let button = ConfettiButton::<'static, ()>::new(iced::widget::text(""));
+
+        assert_eq!(button.confetti().particle_count, BUTTON_PARTICLE_COUNT);
+        assert!((button.confetti().force - 0.5).abs() < f32::EPSILON);
+        assert_eq!(button.confetti().stage_height, 800.0);
+        assert_eq!(button.confetti().stage_width, 1600.0);
+        assert_eq!(button.confetti().palette().len(), 3);
+        assert_eq!(button.confetti().palette()[0], BUTTON_COLORS[0]);
+        assert_eq!(button.confetti().palette()[1], BUTTON_COLORS[1]);
+        assert_eq!(button.confetti().palette()[2], BUTTON_COLORS[2]);
     }
 
     #[test]

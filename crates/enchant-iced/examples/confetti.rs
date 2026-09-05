@@ -1,9 +1,9 @@
 mod _shared;
 
-use enchant_iced::{ConfettiAction, ConfettiProps, ConfettiState, confetti, confetti_button};
+use enchant_iced::{Confetti, ConfettiButton, ConfettiState};
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container, stack, text};
-use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
+use iced::{Alignment, Border, Color, Element, Length, Size, Subscription, Task};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -23,7 +23,7 @@ pub fn main() -> iced::Result {
 struct ConfettiExample {
     theme_shell: _shared::ThemeShell,
     state: ConfettiState,
-    props: ConfettiProps,
+    confetti: Confetti,
     now: Instant,
 }
 
@@ -31,21 +31,22 @@ struct ConfettiExample {
 enum Message {
     ToggleTheme,
     AnchorsMeasured(enchant_iced::AnchorMeasurements),
-    Fire(ConfettiAction),
+    Fire,
     Tick(Instant),
 }
 
 impl ConfettiExample {
     fn new() -> (Self, Task<Message>) {
-        let props = ConfettiProps::new();
         let now = Instant::now();
+        let confetti = ConfettiButton::<Message>::new(text("")).confetti();
         let mut state = ConfettiState::new();
-        state.apply_action(&ConfettiAction::Fire(None), now, &props);
+        state.fire(now, &confetti);
+
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
                 state,
-                props,
+                confetti,
                 now,
             },
             Task::none(),
@@ -60,14 +61,14 @@ impl ConfettiExample {
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
-
-            Message::Fire(action) => {
-                self.state.apply_action(&action, self.now, &self.props);
+            Message::Fire => {
+                self.state.clear();
+                self.state.fire(self.now, &self.confetti);
             }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
                 self.now = now;
-                self.state.tick(now, &self.props);
+                self.state.tick(now, &self.confetti);
             }
         }
         Task::none()
@@ -78,32 +79,34 @@ impl ConfettiExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let stage = container(stack(vec![
-            container(confetti(&self.state, self.now, &self.props))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into(),
-            container(
-                column![
-                    text("Confetti").size(72),
-                    confetti_button(
-                        text("Hover to celebrate").size(14),
-                        &self.state,
-                        self.now,
-                        &self.props,
-                        Message::Fire,
-                    ),
-                ]
-                .spacing(16)
-                .align_x(Alignment::Center),
-            )
+        let fire_button = ConfettiButton::new(
+            text("Fire Confetti")
+                .size(14)
+                .color(Color::WHITE),
+        )
+        .on_press(Message::Fire);
+
+        let overlay = self
+            .confetti
             .width(Length::Fill)
             .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into(),
-        ]))
-        .width(Length::Fixed(720.0))
+            .view(&self.state, self.now);
+
+        let stage = container(
+            stack![
+                container(overlay)
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+                container(fire_button.into_element())
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill),
+            ]
+            .width(Length::Fill)
+            .height(Length::Fill),
+        )
+        .width(Length::Fill)
         .height(Length::Fixed(500.0))
         .style(|_| container::Style {
             border: Border {
