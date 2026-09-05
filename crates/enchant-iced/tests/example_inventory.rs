@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-const INTERNAL_HELPER_EXAMPLES: &[&str] = &["animated_subscribe_button", "border_track"];
+const INTERNAL_HELPER_EXAMPLES: &[&str] =
+    &["animated_subscribe_button", "border_track", "motion_grid"];
 
 const HELPER_EXPORTS: &[&str] = &[
     "animated_subscribe_button",
@@ -108,8 +109,8 @@ fn example_inventory_matches_official_registry() {
 }
 
 fn official_inventory() -> BTreeMap<String, Vec<OfficialScenario>> {
-    let registry_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/registry-examples.ts");
+    let registry_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/registry-examples.ts");
     let registry = fs::read_to_string(&registry_path)
         .unwrap_or_else(|err| panic!("read {}: {}", registry_path.display(), err));
 

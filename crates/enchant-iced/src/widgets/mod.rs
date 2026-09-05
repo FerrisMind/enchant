@@ -57,6 +57,7 @@ pub mod marquee;
 pub mod meteors;
 pub mod mockups;
 pub mod morphing_text;
+pub mod motion_grid;
 pub mod neon_gradient_card;
 pub mod noise_texture;
 pub mod number_ticker;
@@ -163,6 +164,7 @@ pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee, marque
 pub use meteors::{MeteorsProps, meteors};
 pub use mockups::{AndroidProps, IphoneProps, SafariMode, SafariProps, android, iphone, safari};
 pub use morphing_text::{MorphingTextProps, morphing_text};
+pub use motion_grid::{FrameDot, MotionGrid, MotionGridEase};
 pub use neon_gradient_card::{NeonColors, NeonGradientCardProps, neon_gradient_card};
 pub use noise_texture::{NoiseTextureProps, noise_texture, noise_texture_layer};
 pub use number_ticker::{
