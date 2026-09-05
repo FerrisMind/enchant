@@ -114,9 +114,7 @@ pub use blur_fade::{BlurFadeDirection, BlurFadeProps, BlurFadeState, blur_fade};
 pub use border_beam::{BorderBeam, BorderBeamEase};
 pub use code_comparison::{CodeComparisonProps, code_comparison};
 pub use comic_text::{ComicTextProps, ComicTextState, comic_text};
-pub use confetti::{
-    ConfettiAction, ConfettiBurst, ConfettiProps, ConfettiState, confetti, confetti_button,
-};
+pub use confetti::{Confetti, ConfettiParticleShape, ConfettiState};
 pub use cool_mode::{CoolMode, CoolParticleKind};
 pub use dia_text_reveal::{
     DEFAULT_DIA_COLORS, DiaTextRevealProps, DiaTextRevealState, dia_text_reveal,
