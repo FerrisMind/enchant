@@ -1,195 +1,304 @@
-use crate::primitives::{AnimatedValue, MotionSpec};
-use iced::Element;
-use iced::time::Instant;
-use iced::widget::text;
-use iced_shadcn::Theme;
-use twill::prelude::{Easing, TransitionDuration};
+//! Builder-first animated number ticker (Magic UI `NumberTicker`).
+//!
+//! Spring physics are integrated deterministically from host-supplied [`Duration`]
+//! via [`NumberTicker::value_at`] / [`NumberTicker::into_element`].
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+use iced::font::Weight;
+use iced::widget::{row, text};
+use iced::{Color, Element, Font, Length};
+use std::fmt;
+use std::time::Duration;
+
+const SPRING_STIFFNESS: f64 = 100.0;
+const SPRING_DAMPING: f64 = 60.0;
+const SPRING_DT: f64 = 1.0 / 60.0;
+const MAX_ANIM_SECS: f64 = 4.0;
+const SETTLE_VELOCITY: f64 = 0.01;
+const SETTLE_POSITION: f64 = 0.01;
+
+/// Count direction for the ticker animation.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum NumberTickerDirection {
+    /// Animate from [`NumberTicker::start_value`] toward the constructed value.
     #[default]
     Up,
+    /// Animate from the constructed value toward [`NumberTicker::start_value`].
     Down,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct NumberTickerProps {
-    pub value: f64,
-    pub start_value: f64,
-    pub direction: NumberTickerDirection,
-    pub decimal_places: u8,
-    pub delay_secs: f32,
-    pub motion: MotionSpec,
-    pub prefix: String,
-    pub suffix: String,
-    pub font_size: u16,
+/// Builder for a spring-animated number display.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use enchant_iced::NumberTicker;
+/// use std::time::Duration;
+///
+/// fn ticker<'a, Message: 'a>(elapsed: Duration) -> iced::Element<'a, Message> {
+///     NumberTicker::new(100.0)
+///         .font_size(96.0)
+///         .into_element(elapsed)
+/// }
+/// ```
+#[must_use = "builders do nothing unless turned into an iced Element"]
+#[derive(Clone)]
+pub struct NumberTicker {
+    value: f64,
+    start_value: f64,
+    direction: NumberTickerDirection,
+    delay_secs: f64,
+    decimal_places: u8,
+    prefix: String,
+    suffix: String,
+    once: bool,
+    font_size: f32,
+    font: Font,
+    color: Color,
+    letter_spacing: f32,
+    width: Length,
+    height: Length,
 }
 
-impl Default for NumberTickerProps {
-    fn default() -> Self {
-        Self {
-            value: 100.0,
-            start_value: 0.0,
-            direction: NumberTickerDirection::Up,
-            decimal_places: 0,
-            delay_secs: 0.0,
-            motion: default_motion(),
-            prefix: String::new(),
-            suffix: String::new(),
-            font_size: 36,
-        }
+impl fmt::Debug for NumberTicker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NumberTicker")
+            .field("value", &self.value)
+            .field("start_value", &self.start_value)
+            .field("direction", &self.direction)
+            .field("delay_secs", &self.delay_secs)
+            .field("decimal_places", &self.decimal_places)
+            .field("prefix", &self.prefix)
+            .field("suffix", &self.suffix)
+            .field("once", &self.once)
+            .field("font_size", &self.font_size)
+            .field("font", &self.font)
+            .field("color", &self.color)
+            .field("letter_spacing", &self.letter_spacing)
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .finish()
     }
 }
 
-impl NumberTickerProps {
+impl NumberTicker {
+    /// Creates a ticker that animates toward `value` (Magic UI required prop).
     pub fn new(value: f64) -> Self {
+        let font_size = 96.0;
         Self {
             value,
-            ..Self::default()
+            start_value: 0.0,
+            direction: NumberTickerDirection::Up,
+            delay_secs: 0.0,
+            decimal_places: 0,
+            prefix: String::new(),
+            suffix: String::new(),
+            once: true,
+            font_size,
+            font: Font {
+                weight: Weight::Medium,
+                ..Font::DEFAULT
+            },
+            color: Color::BLACK,
+            letter_spacing: 0.05 * font_size,
+            width: Length::Shrink,
+            height: Length::Shrink,
         }
     }
 
+    /// Starting numeric value when [`NumberTickerDirection::Up`] (default `0`).
     pub fn start_value(mut self, start_value: f64) -> Self {
         self.start_value = start_value;
         self
     }
 
+    /// Animation direction (default [`NumberTickerDirection::Up`]).
     pub fn direction(mut self, direction: NumberTickerDirection) -> Self {
         self.direction = direction;
         self
     }
 
+    /// Delay before the spring starts, in seconds (default `0`).
+    pub fn delay_secs(mut self, delay_secs: f64) -> Self {
+        self.delay_secs = delay_secs.max(0.0);
+        self
+    }
+
+    /// Fixed fraction digits for en-US formatting (clamped to `0..=12`).
     pub fn decimal_places(mut self, decimal_places: u8) -> Self {
-        self.decimal_places = decimal_places;
+        self.decimal_places = decimal_places.min(12);
         self
     }
 
-    pub fn delay(mut self, delay: f32) -> Self {
-        self.delay_secs = delay.max(0.0);
-        self
-    }
-
-    pub fn delay_secs(self, delay_secs: f32) -> Self {
-        self.delay(delay_secs)
-    }
-
-    pub fn motion(mut self, motion: MotionSpec) -> Self {
-        self.motion = motion;
-        self
-    }
-
+    /// Literal prefix concatenated before the formatted number.
     pub fn prefix(mut self, prefix: impl Into<String>) -> Self {
         self.prefix = prefix.into();
         self
     }
 
+    /// Literal suffix concatenated after the formatted number.
     pub fn suffix(mut self, suffix: impl Into<String>) -> Self {
         self.suffix = suffix.into();
         self
     }
 
-    pub fn font_size(mut self, font_size: u16) -> Self {
-        self.font_size = font_size.max(1);
+    /// When `true` (default), host should treat one contiguous play as the animation.
+    pub fn once(mut self, once: bool) -> Self {
+        self.once = once;
         self
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct NumberTickerState {
-    animation: AnimatedValue,
-    started: bool,
-    started_at: Option<Instant>,
-    fingerprint: NumberTickerFingerprint,
-}
+    /// Text size in logical pixels (default `96`, minimum `1`).
+    pub fn font_size(mut self, font_size: f32) -> Self {
+        self.font_size = font_size.max(1.0);
+        self.letter_spacing = 0.05 * self.font_size;
+        self
+    }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct NumberTickerFingerprint {
-    value: f64,
-    start_value: f64,
-    direction: NumberTickerDirection,
-    delay_secs: f32,
-}
+    /// Font face and weight (default medium weight).
+    pub fn font(mut self, font: Font) -> Self {
+        self.font = font;
+        self
+    }
 
-impl NumberTickerState {
-    pub fn new(props: &NumberTickerProps) -> Self {
-        Self {
-            animation: AnimatedValue::with_spec(initial_value(props) as f32, props.motion),
-            started: false,
-            started_at: None,
-            fingerprint: NumberTickerFingerprint {
-                value: props.value,
-                start_value: props.start_value,
-                direction: props.direction,
-                delay_secs: props.delay_secs,
-            },
+    /// Text color (default [`Color::BLACK`]).
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
+
+    /// Extra letter spacing in logical pixels (`tracking-wider` ≈ `0.05em`).
+    pub fn letter_spacing(mut self, letter_spacing: f32) -> Self {
+        self.letter_spacing = letter_spacing;
+        self
+    }
+
+    /// Widget width (default [`Length::Shrink`]).
+    pub fn width(mut self, width: Length) -> Self {
+        self.width = width;
+        self
+    }
+
+    /// Widget height (default [`Length::Shrink`]).
+    pub fn height(mut self, height: Length) -> Self {
+        self.height = height;
+        self
+    }
+
+    /// Spring start value for the current direction.
+    pub fn initial_value(&self) -> f64 {
+        match self.direction {
+            NumberTickerDirection::Up => self.start_value,
+            NumberTickerDirection::Down => self.value,
         }
     }
 
-    pub fn tick(&mut self, now: Instant, props: &NumberTickerProps) {
-        let fingerprint = NumberTickerFingerprint {
-            value: props.value,
-            start_value: props.start_value,
-            direction: props.direction,
-            delay_secs: props.delay_secs,
-        };
-
-        if !self.started || fingerprint != self.fingerprint {
-            self.animation = AnimatedValue::with_spec(initial_value(props) as f32, props.motion);
-            self.started = true;
-            self.started_at = None;
-            self.fingerprint = fingerprint;
-        }
-
-        self.animation.set_spec(props.motion);
-
-        let started_at = self.started_at.get_or_insert(now);
-        if !self.animation.is_animating(now)
-            && now.saturating_duration_since(*started_at).as_secs_f32() < props.delay_secs
-        {
-            return;
-        }
-
-        if !self.animation.is_animating(now) && props.delay_secs >= 0.0 {
-            self.animation.transition(target_value(props) as f32, now);
+    /// Spring target value for the current direction.
+    pub fn target_value(&self) -> f64 {
+        match self.direction {
+            NumberTickerDirection::Up => self.value,
+            NumberTickerDirection::Down => self.start_value,
         }
     }
 
-    pub fn value_at(&self, now: Instant) -> f64 {
-        self.animation.value_at(now) as f64
+    /// Numeric value at `elapsed` after delay and spring integration.
+    pub fn value_at(&self, elapsed: Duration) -> f64 {
+        let elapsed_secs = elapsed.as_secs_f64();
+        let anim_secs = (elapsed_secs - self.delay_secs).max(0.0);
+        spring_position(self.initial_value(), self.target_value(), anim_secs)
     }
 
-    pub fn display_text(&self, now: Instant, props: &NumberTickerProps) -> String {
-        let value = format_number(self.value_at(now), props.decimal_places);
-        format!("{}{}{}", props.prefix, value, props.suffix)
+    /// Formatted display string: `prefix` + en-US number + `suffix` (no extra spaces).
+    pub fn display_text(&self, elapsed: Duration) -> String {
+        let value = self.value_at(elapsed);
+        let number = format_number(value, self.decimal_places);
+        format!("{}{}{}", self.prefix, number, self.suffix)
+    }
+
+    /// Builds the text element for the given animation clock.
+    pub fn into_element<'a, Message: 'a>(self, elapsed: Duration) -> Element<'a, Message> {
+        let display = self.display_text(elapsed);
+
+        if display.is_empty() {
+            return row::<Message, _, _>(std::iter::empty())
+                .width(self.width)
+                .height(self.height)
+                .into();
+        }
+
+        if self.letter_spacing <= 0.0 {
+            return text(display)
+                .size(self.font_size)
+                .font(self.font)
+                .color(self.color)
+                .width(self.width)
+                .height(self.height)
+                .into();
+        }
+
+        let glyphs: Vec<Element<'a, Message>> = display
+            .chars()
+            .map(|ch| {
+                text(ch.to_string())
+                    .size(self.font_size)
+                    .font(self.font)
+                    .color(self.color)
+                    .into()
+            })
+            .collect();
+
+        row(glyphs)
+            .spacing(self.letter_spacing)
+            .width(self.width)
+            .height(self.height)
+            .into()
+    }
+
+    /// Alias for [`Self::into_element`].
+    pub fn view<'a, Message: 'a>(self, elapsed: Duration) -> Element<'a, Message> {
+        self.into_element(elapsed)
     }
 }
 
-pub fn number_ticker<'a, Message: 'a>(
-    state: &NumberTickerState,
-    now: Instant,
-    props: &NumberTickerProps,
-    theme: &Theme,
-) -> Element<'a, Message> {
-    text(state.display_text(now, props))
-        .size(u32::from(props.font_size))
-        .style({
-            let color = theme.palette.foreground;
-            move |_| iced::widget::text::Style { color: Some(color) }
-        })
-        .into()
-}
-
-fn initial_value(props: &NumberTickerProps) -> f64 {
-    match props.direction {
-        NumberTickerDirection::Up => props.start_value,
-        NumberTickerDirection::Down => props.value,
+fn spring_position(from: f64, to: f64, elapsed_anim_secs: f64) -> f64 {
+    if elapsed_anim_secs <= 0.0 {
+        return from;
     }
-}
 
-fn target_value(props: &NumberTickerProps) -> f64 {
-    match props.direction {
-        NumberTickerDirection::Up => props.value,
-        NumberTickerDirection::Down => props.start_value,
+    if (from - to).abs() < SETTLE_POSITION {
+        return to;
+    }
+
+    if elapsed_anim_secs >= MAX_ANIM_SECS {
+        return to;
+    }
+
+    let mut position = from;
+    let mut velocity = 0.0;
+    let mut elapsed = 0.0;
+
+    while elapsed < elapsed_anim_secs {
+        let spring_force = -SPRING_STIFFNESS * (position - to);
+        let damping_force = -SPRING_DAMPING * velocity;
+        let acceleration = spring_force + damping_force;
+
+        velocity += acceleration * SPRING_DT;
+        position += velocity * SPRING_DT;
+        elapsed += SPRING_DT;
+
+        if velocity.abs() < SETTLE_VELOCITY && (position - to).abs() < SETTLE_POSITION {
+            return to;
+        }
+
+        if elapsed >= MAX_ANIM_SECS {
+            return to;
+        }
+    }
+
+    if velocity.abs() < SETTLE_VELOCITY && (position - to).abs() < SETTLE_POSITION {
+        to
+    } else {
+        position
     }
 }
 
@@ -227,83 +336,104 @@ fn group_digits(value: u64) -> String {
     output.chars().rev().collect()
 }
 
-fn default_motion() -> MotionSpec {
-    MotionSpec::new()
-        .duration(TransitionDuration::CustomMs(250))
-        .easing(Easing::Out)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iced::time::Duration;
-    use twill::prelude::{Easing, TransitionDuration};
+    use std::time::Duration;
 
     #[test]
-    fn format_number_adds_grouping_and_decimals() {
+    fn number_ticker_defaults_match_magic_ui() {
+        let t = NumberTicker::new(100.0);
+        assert_eq!(t.start_value, 0.0);
+        assert_eq!(t.direction, NumberTickerDirection::Up);
+        assert_eq!(t.delay_secs, 0.0);
+        assert_eq!(t.decimal_places, 0);
+        assert!(t.once);
+        assert!((t.font_size - 96.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn direction_sets_initial_and_target() {
+        let up = NumberTicker::new(4200.0).start_value(0.0);
+        let down = NumberTicker::new(4200.0)
+            .start_value(0.0)
+            .direction(NumberTickerDirection::Down);
+        assert_eq!(up.initial_value(), 0.0);
+        assert_eq!(up.target_value(), 4200.0);
+        assert_eq!(down.initial_value(), 4200.0);
+        assert_eq!(down.target_value(), 0.0);
+    }
+
+    #[test]
+    fn delay_holds_at_initial_then_moves() {
+        let t = NumberTicker::new(100.0).delay_secs(0.5);
+        let at_250 = t.value_at(Duration::from_millis(250));
+        assert!((at_250 - 0.0).abs() < 0.01);
+        let at_800 = t.value_at(Duration::from_millis(800));
+        assert!(at_800 > 1.0, "expected spring progress after delay, got {at_800}");
+    }
+
+    #[test]
+    fn spring_settles_near_target() {
+        let t = NumberTicker::new(100.0);
+        let settled = t.value_at(Duration::from_secs(5));
+        assert!((settled - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn format_number_en_us() {
         assert_eq!(format_number(12345.0, 0), "12,345");
         assert_eq!(format_number(12345.678, 2), "12,345.68");
         assert_eq!(format_number(-1000.0, 0), "-1,000");
     }
 
     #[test]
-    fn ticker_starts_from_expected_direction() {
-        let up = NumberTickerProps::new(4200.0).start_value(0.0);
-        let down = NumberTickerProps::new(4200.0)
-            .start_value(0.0)
-            .direction(NumberTickerDirection::Down);
-
-        assert_eq!(initial_value(&up), 0.0);
-        assert_eq!(target_value(&up), 4200.0);
-        assert_eq!(initial_value(&down), 4200.0);
-        assert_eq!(target_value(&down), 0.0);
+    fn display_text_prefix_suffix_tight() {
+        let t = NumberTicker::new(100.5)
+            .decimal_places(2)
+            .prefix("$")
+            .suffix("USD");
+        let s = t.display_text(Duration::from_secs(5));
+        assert_eq!(s, "$100.50USD");
     }
 
     #[test]
-    fn ticker_delay_defers_animation_start() {
-        let now = Instant::now();
-        let props = NumberTickerProps::new(100.0).delay(0.5).motion(
-            MotionSpec::new()
-                .duration(twill::prelude::TransitionDuration::Ms100)
-                .easing(twill::prelude::Easing::Linear),
-        );
-        let mut state = NumberTickerState::new(&props);
-
-        state.tick(now, &props);
-        assert_eq!(state.value_at(now + Duration::from_millis(250)), 0.0);
-
-        state.tick(now + Duration::from_millis(600), &props);
-        assert!(state.value_at(now + Duration::from_millis(650)) > 0.0);
+    fn setters_validate_ranges() {
+        let t = NumberTicker::new(1.0)
+            .delay_secs(-1.0)
+            .decimal_places(20)
+            .font_size(0.0);
+        assert_eq!(t.delay_secs, 0.0);
+        assert!(t.font_size >= 1.0);
+        assert_eq!(t.decimal_places, 12);
     }
 
     #[test]
-    fn ticker_defaults_use_upstream_motion_curve() {
-        let props = NumberTickerProps::default();
+    fn letter_spacing_defaults_and_resets_with_font_size() {
+        let t = NumberTicker::new(100.0);
+        assert!((t.letter_spacing - 0.05 * t.font_size).abs() < f32::EPSILON);
 
-        assert_eq!(
-            props.motion,
-            MotionSpec::new()
-                .duration(TransitionDuration::CustomMs(250))
-                .easing(Easing::Out)
-        );
+        let t = NumberTicker::new(100.0).letter_spacing(10.0);
+        assert!((t.letter_spacing - 10.0).abs() < f32::EPSILON);
+
+        let t = NumberTicker::new(100.0)
+            .letter_spacing(10.0)
+            .font_size(48.0);
+        assert!((t.letter_spacing - 0.05 * 48.0).abs() < f32::EPSILON);
     }
 
     #[test]
-    fn ticker_transitions_after_tick() {
-        let now = Instant::now();
-        let props = NumberTickerProps::new(100.0).motion(
-            MotionSpec::new()
-                .duration(twill::prelude::TransitionDuration::Ms100)
-                .easing(twill::prelude::Easing::Linear),
-        );
-        let mut state = NumberTickerState::new(&props);
+    fn font_defaults_to_medium_weight() {
+        let t = NumberTicker::new(100.0);
+        assert_eq!(t.font.weight, Weight::Medium);
+    }
 
-        state.tick(now, &props);
+    #[test]
+    fn non_positive_letter_spacing_uses_single_text_path() {
+        let t = NumberTicker::new(100.0).letter_spacing(0.0);
+        assert!(t.letter_spacing <= 0.0);
 
-        let halfway = state.value_at(now + Duration::from_millis(50));
-        assert!(
-            halfway > 45.0 && halfway < 55.0,
-            "expected halfway value, got {halfway}"
-        );
+        let t = NumberTicker::new(100.0).letter_spacing(-4.8);
+        assert!(t.letter_spacing <= 0.0);
     }
 }

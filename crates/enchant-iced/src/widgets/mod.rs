@@ -167,9 +167,7 @@ pub use morphing_text::{MorphingTextProps, morphing_text};
 pub use motion_grid::{FrameDot, MotionGrid, MotionGridEase};
 pub use neon_gradient_card::{NeonColors, NeonGradientCardProps, neon_gradient_card};
 pub use noise_texture::{NoiseTextureProps, noise_texture, noise_texture_layer};
-pub use number_ticker::{
-    NumberTickerDirection, NumberTickerProps, NumberTickerState, number_ticker,
-};
+pub use number_ticker::{NumberTicker, NumberTickerDirection};
 pub use orbiting_circles::{OrbitingCirclesProps, orbiting_circles};
 pub use particles::{ParticlesAction, ParticlesProps, ParticlesState, particles};
 pub use pixel_image::{PixelGrid, PixelGridPreset, PixelImageProps, PixelImageState, pixel_image};
