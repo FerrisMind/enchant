@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{FileTreeAction, FileTreeElement, FileTreeProps, FileTreeState, file_tree};
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Task};
-use enchant_iced::{FileTreeAction, FileTreeElement, FileTreeProps, FileTreeState, file_tree};
 
 fn reference_tree() -> Vec<FileTreeElement> {
     vec![FileTreeElement::folder(
@@ -93,8 +93,8 @@ impl FileTreeExample {
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
             }
-            other => {
-                let _ = other;
+            Message::Tree(action) => {
+                self.state.apply_action(&action);
             }
         }
         Task::none()

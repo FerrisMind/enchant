@@ -1,10 +1,10 @@
 mod _shared;
 
+use enchant_iced::{MeteorsProps, meteors};
 use iced::time::Instant;
 use iced::widget::{column, container, stack, text};
 use iced::{Alignment, Element, Length, Size, Subscription, Task};
-use iced_shadcn::{CardProps, CardSize, Theme, card};
-use enchant_iced::{MeteorsProps, meteors};
+use iced_shadcn::{CardProps, CardSize, card};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

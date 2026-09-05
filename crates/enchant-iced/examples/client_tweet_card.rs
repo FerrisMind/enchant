@@ -1,12 +1,12 @@
 mod _shared;
 
-use iced::time::Instant;
-use iced::widget::{column, text};
-use iced::{Element, Size, Subscription, Task};
 use enchant_iced::{
     ClientTweetCardProps, ClientTweetCardState, ClientTweetCardStatus, TweetAsset, TweetAuthor,
     TweetCardData, TweetMedia, client_tweet_card,
 };
+use iced::time::Instant;
+use iced::widget::{column, text};
+use iced::{Element, Size, Task};
 
 pub fn main() -> iced::Result {
     iced::application(

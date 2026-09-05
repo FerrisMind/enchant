@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{PointerAction, PointerProps, PointerState, pointer};
 use iced::time::Instant;
 use iced::widget::{column, container, row, text};
 use iced::{Background, Border, Color, Element, Length, Size, Task};
-use enchant_iced::{PointerAction, PointerProps, PointerState, pointer};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -56,9 +56,12 @@ impl PointerExample {
             }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
+                self.now = now;
             }
-            other => {
-                let _ = other;
+            Message::Pointer(index, action) => {
+                if let Some(state) = self.states.get_mut(index) {
+                    state.apply_action(&action, self.now);
+                }
             }
         }
         Task::none()

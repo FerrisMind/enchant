@@ -1,11 +1,11 @@
 mod _shared;
 
+use enchant_iced::{HeroVideoDialogProps, HeroVideoDialogState, hero_video_dialog};
 use iced::time::{Duration, Instant};
 use iced::widget::text;
 use iced::widget::{column, container, image};
 use iced::{Element, Length, Size, Subscription, Task};
-use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, Theme, button_content};
-use enchant_iced::{HeroVideoDialogProps, HeroVideoDialogState, hero_video_dialog};
+use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, button_content};
 
 fn hero_light_handle() -> image::Handle {
     image::Handle::from_bytes(include_bytes!("assets/hero-light.png").as_slice())

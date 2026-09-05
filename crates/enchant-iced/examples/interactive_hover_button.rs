@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{InteractiveHoverButtonProps, interactive_hover_button};
 use iced::time::Instant;
 use iced::widget::{column, text};
-use iced::{Element, Size, Subscription, Task};
-use enchant_iced::{InteractiveHoverButtonProps, interactive_hover_button};
+use iced::{Element, Size, Task};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -43,7 +43,18 @@ impl InteractiveHoverButtonExample {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        let _ = message;
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+            }
+            Message::Clicked => {}
+        }
         Task::none()
     }
 

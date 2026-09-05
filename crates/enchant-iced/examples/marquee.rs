@@ -2,6 +2,7 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee_indexed};
 use iced::advanced::Clipboard;
 use iced::advanced::Renderer as _;
 use iced::advanced::Shell;
@@ -14,13 +15,9 @@ use iced::{
     Alignment, Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Subscription, Task,
 };
 use iced_shadcn::{CardProps, CardSize, DecorativeSurfaceProps, Theme, card, decorative_surface};
-use enchant_iced::{MagicTheme, MarqueeItem, MarqueeOrientation, MarqueeProps, marquee_indexed};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::time::Duration;
-use twill::backends::iced::styled_container_with_semantic_theme;
-use twill::prelude::{BackgroundColor, SemanticColor, SemanticThemeVars, Style as TwillStyle};
-
 static REVIEWS: LazyLock<Vec<MarqueeItem>> = LazyLock::new(reviews);
 const PREVIEW_WIDTH: f32 = 780.0;
 const PREVIEW_PADDING: f32 = 24.0;
@@ -320,10 +317,6 @@ fn marquee_props(reverse: bool) -> MarqueeProps {
         padding: REVIEW_ROW_PADDING,
         edge_fade: false,
     }
-}
-
-fn page_shell_style() -> TwillStyle {
-    TwillStyle::new().background_token(BackgroundColor::semantic(SemanticColor::Background))
 }
 
 fn review_card_props(
@@ -676,13 +669,5 @@ mod tests {
 
         demo.set_card_hover(1, None);
         assert_eq!(demo.hovered_card[1], None);
-    }
-
-    #[test]
-    fn page_shell_uses_twill_semantic_background() {
-        assert_eq!(
-            page_shell_style().background_color_value(),
-            Some(BackgroundColor::semantic(SemanticColor::Background))
-        );
     }
 }

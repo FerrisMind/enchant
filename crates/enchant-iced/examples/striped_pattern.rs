@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{StripedPatternProps, striped_pattern};
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Task};
-use enchant_iced::{StripedPatternProps, striped_pattern};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -42,7 +42,18 @@ impl StripedPatternExample {
         )
     }
 
-    fn update(&mut self, _message: Message) -> Task<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::ToggleTheme => {
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
+            }
+            Message::AnchorsMeasured(measurements) => {
+                self.theme_shell.apply_anchor_and_toggle(&measurements);
+            }
+            Message::Tick(now) => {
+                self.theme_shell.tick(now);
+            }
+        }
         Task::none()
     }
 

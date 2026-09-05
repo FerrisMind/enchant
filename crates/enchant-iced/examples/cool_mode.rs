@@ -1,10 +1,10 @@
 mod _shared;
 
+use enchant_iced::{CoolModeAction, CoolModeProps, CoolModeState, cool_mode};
 use iced::time::{Duration, Instant};
 use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
-use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, Theme, button_content};
-use enchant_iced::{CoolModeAction, CoolModeProps, CoolModeState, cool_mode};
+use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, button_content};
 
 pub fn main() -> iced::Result {
     iced::application(

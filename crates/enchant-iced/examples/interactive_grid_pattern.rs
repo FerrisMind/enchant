@@ -2,12 +2,12 @@ mod _shared;
 
 use iced::time::Instant;
 
-use iced::widget::{column, container};
-use iced::{Alignment, Border, Element, Length, Size, Task};
 use enchant_iced::{
     InteractiveGridPatternAction, InteractiveGridPatternProps, InteractiveGridPatternState,
     interactive_grid_pattern,
 };
+use iced::widget::{column, container};
+use iced::{Alignment, Border, Element, Length, Size, Task};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -59,8 +59,8 @@ impl InteractiveGridPatternExample {
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
             }
-            other => {
-                let _ = other;
+            Message::Grid(action) => {
+                self.state.apply_action(&action);
             }
         }
         Task::none()
