@@ -1,9 +1,9 @@
 mod _shared;
 
-use enchant_iced::{Confetti, ConfettiButton, ConfettiState};
+use enchant_iced::{Confetti, ConfettiState};
 use iced::time::{Duration, Instant};
-use iced::widget::{column, container, stack, text};
-use iced::{Alignment, Border, Color, Element, Length, Size, Subscription, Task};
+use iced::widget::{button, column, container, stack, text};
+use iced::{Alignment, Background, Border, Color, Element, Length, Size, Subscription, Task};
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -38,7 +38,7 @@ enum Message {
 impl ConfettiExample {
     fn new() -> (Self, Task<Message>) {
         let now = Instant::now();
-        let confetti = ConfettiButton::<Message>::new(text("")).confetti();
+        let confetti = Confetti::new();
         let mut state = ConfettiState::new();
         state.fire(now, &confetti);
 
@@ -79,12 +79,10 @@ impl ConfettiExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let fire_button = ConfettiButton::new(
-            text("Fire Confetti")
-                .size(14)
-                .color(Color::WHITE),
-        )
-        .on_press(Message::Fire);
+        let fire_button = button(text("Fire Confetti").size(14).color(Color::WHITE))
+            .padding([10.0, 16.0])
+            .style(fire_button_style)
+            .on_press(Message::Fire);
 
         let overlay = self
             .confetti
@@ -94,10 +92,8 @@ impl ConfettiExample {
 
         let stage = container(
             stack![
-                container(overlay)
-                    .width(Length::Fill)
-                    .height(Length::Fill),
-                container(fire_button.into_element())
+                container(overlay).width(Length::Fill).height(Length::Fill),
+                container(fire_button)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .center_x(Length::Fill)
@@ -112,7 +108,7 @@ impl ConfettiExample {
             border: Border {
                 width: 1.0,
                 radius: 12.0.into(),
-                ..Border::default()
+                color: Color::from_rgb8(228, 228, 231),
             },
             ..container::Style::default()
         });
@@ -123,5 +119,28 @@ impl ConfettiExample {
             &self.theme_shell,
             Message::ToggleTheme,
         )
+    }
+}
+
+fn fire_button_style(
+    _theme: &iced::Theme,
+    status: iced::widget::button::Status,
+) -> iced::widget::button::Style {
+    let background = match status {
+        iced::widget::button::Status::Hovered | iced::widget::button::Status::Pressed => {
+            Color::from_rgb8(38, 38, 38)
+        }
+        iced::widget::button::Status::Disabled => Color::from_rgb8(23, 23, 23).scale_alpha(0.5),
+        iced::widget::button::Status::Active => Color::from_rgb8(23, 23, 23),
+    };
+
+    iced::widget::button::Style {
+        background: Some(Background::Color(background)),
+        text_color: Color::WHITE,
+        border: Border {
+            radius: 8.0.into(),
+            ..Border::default()
+        },
+        ..iced::widget::button::Style::default()
     }
 }
