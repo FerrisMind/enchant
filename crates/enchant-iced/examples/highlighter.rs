@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{HighlighterAction, HighlighterProps, HighlighterState, highlighter};
 use iced::time::{Duration, Instant};
 use iced::widget::{button, column, row, svg, text, tooltip};
 use iced::{Alignment, Color, Element, Length, Size, Subscription, Task};
-use enchant_iced::{HighlighterAction, HighlighterProps, HighlighterState, highlighter};
 
 pub fn main() -> iced::Result {
     iced::application(

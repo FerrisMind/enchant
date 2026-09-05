@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{LensAction, LensProps, LensState, lens};
 use iced::widget::{column, container, image, text};
 use iced::{Element, Length, Size, Task};
-use enchant_iced::{LensAction, LensProps, LensState, lens};
 
 pub fn main() -> iced::Result {
     iced::application(LensExample::new, LensExample::update, LensExample::view)

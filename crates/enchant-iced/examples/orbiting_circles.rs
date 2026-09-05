@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{OrbitingCirclesProps, orbiting_circles};
 use iced::time::Instant;
 use iced::widget::{column, container, stack};
 use iced::{Alignment, Element, Length, Size, Subscription, Task};
-use enchant_iced::{OrbitingCirclesProps, orbiting_circles};
 use std::time::Duration;
 
 const OUTER_ICON_SIZE: f32 = 30.0;

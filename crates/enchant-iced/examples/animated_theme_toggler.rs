@@ -1,11 +1,11 @@
-use iced::time::{Duration, Instant};
-use iced::widget::Id;
-use iced::widget::{container, stack};
-use iced::{Background, Element, Length, Size, Subscription, Task};
 use enchant_iced::{
     AnimatedThemeTogglerController, AnimatedThemeTogglerProps, anchor,
     animated_theme_toggler_with_controller, measure_anchors, theme_transition_overlay,
 };
+use iced::time::{Duration, Instant};
+use iced::widget::Id;
+use iced::widget::{container, stack};
+use iced::{Background, Element, Length, Size, Subscription, Task};
 
 const TOGGLER_ANCHOR: &str = "theme-toggler";
 

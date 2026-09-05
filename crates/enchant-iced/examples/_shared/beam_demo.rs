@@ -2,11 +2,11 @@
 
 use super::beam_icons;
 use super::beam_scene::{self, BeamSceneKind, CONTAINER};
+use enchant_iced::{AnchorBounds, AnchorMeasurements, AnimatedBeamProps, anchor, animated_beam};
 use iced::widget::{column, container, row, space, stack, svg};
 use iced::{
     Alignment, Background, Border, Color, Element, Length, Point, Rectangle, Shadow, Size, Vector,
 };
-use enchant_iced::{AnchorBounds, AnchorMeasurements, AnimatedBeamProps, anchor, animated_beam};
 use std::time::Duration;
 
 pub const SCENE_WIDTH: f32 = 512.0;

@@ -1,12 +1,12 @@
 mod _shared;
 
-use iced::time::{Duration, Instant};
-use iced::widget::column;
-use iced::{Color, Element, Size, Subscription, Task};
 use enchant_iced::{
     Text3DFlipAction, Text3DFlipDirection, Text3DFlipProps, Text3DFlipStaggerFrom, Text3DFlipState,
     text_3d_flip,
 };
+use iced::time::{Duration, Instant};
+use iced::widget::column;
+use iced::{Color, Element, Size, Subscription, Task};
 
 pub fn main() -> iced::Result {
     iced::application(

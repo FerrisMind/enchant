@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{DotPatternProps, dot_pattern};
 use iced::time::Instant;
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
-use enchant_iced::{DotPatternProps, dot_pattern};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

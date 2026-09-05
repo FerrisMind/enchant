@@ -1,13 +1,13 @@
 mod _shared;
 
-use iced::time::Instant;
-use iced::widget::{column, text};
-use iced::{Alignment, Color, Element, Font, Size, Task};
-use lucide_icons::{Icon as LucideIcon, LUCIDE_FONT_BYTES};
 use enchant_iced::{
     AnimatedGradientTextProps, DockAction, DockDirection, DockEntry, DockProps, DockState,
     animated_gradient_text, dock_entries, dock_icon, dock_separator,
 };
+use iced::time::Instant;
+use iced::widget::{column, text};
+use iced::{Alignment, Color, Element, Font, Size, Task};
+use lucide_icons::{Icon as LucideIcon, LUCIDE_FONT_BYTES};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

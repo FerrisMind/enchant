@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{GlyphMatrixProps, glyph_matrix};
 use iced::time::Instant;
 use iced::widget::{column, container};
 use iced::{Alignment, Background, Border, Color, Element, Length, Size, Subscription, Task};
-use enchant_iced::{GlyphMatrixProps, glyph_matrix};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

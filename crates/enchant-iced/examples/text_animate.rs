@@ -1,11 +1,11 @@
 mod _shared;
 
-use iced::time::{Duration, Instant};
-use iced::widget::column;
-use iced::{Element, Size, Subscription, Task};
 use enchant_iced::{
     TextAnimateBy, TextAnimatePreset, TextAnimateProps, TextAnimateState, text_animate,
 };
+use iced::time::{Duration, Instant};
+use iced::widget::column;
+use iced::{Element, Size, Subscription, Task};
 
 pub fn main() -> iced::Result {
     iced::application(

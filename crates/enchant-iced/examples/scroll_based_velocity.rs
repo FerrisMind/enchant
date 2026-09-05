@@ -1,12 +1,12 @@
 mod _shared;
 
-use iced::time::Instant;
-use iced::widget::column;
-use iced::{Element, Size, Subscription, Task};
 use enchant_iced::{
     ScrollVelocityContainerProps, ScrollVelocityDirection, ScrollVelocityItem,
     ScrollVelocityRowProps, ScrollVelocityRowState, scroll_velocity_container, scroll_velocity_row,
 };
+use iced::time::Instant;
+use iced::widget::column;
+use iced::{Element, Size, Subscription, Task};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

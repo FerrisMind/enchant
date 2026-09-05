@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{GridCellIndex, GridPatternProps, grid_pattern};
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Task};
-use enchant_iced::{GridCellIndex, GridPatternProps, grid_pattern};
 
 const REFERENCE_SQUARES: &[(i32, i32)] = &[
     (4, 4),

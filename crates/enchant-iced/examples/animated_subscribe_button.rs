@@ -1,11 +1,11 @@
 mod _shared;
 
-use iced::time::Instant;
-use iced::widget::{button, column, text};
-use iced::{Element, Size, Subscription, Task};
 use enchant_iced::{
     AnimatedSubscribeButtonProps, AnimatedSubscribeButtonState, animated_subscribe_button,
 };
+use iced::time::Instant;
+use iced::widget::{button, column, text};
+use iced::{Element, Size, Subscription, Task};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

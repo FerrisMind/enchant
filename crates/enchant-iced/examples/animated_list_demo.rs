@@ -1,10 +1,10 @@
 mod _shared;
 
+use enchant_iced::{AnimatedListProps, AnimatedListState, animated_list};
 use iced::time::Instant;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{column, container, scrollable, stack};
 use iced::{Alignment, Element, Length, Size, Subscription, Task};
-use enchant_iced::{AnimatedListProps, AnimatedListState, animated_list};
 use std::time::Duration;
 
 use _shared::animated_list_notifications::{

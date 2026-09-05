@@ -2,10 +2,10 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{NoiseTextureProps, noise_texture, noise_texture_layer};
 use iced::widget::{column, container, stack, text, text_input};
 use iced::{Element, Length, Size, Task};
 use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, button_content};
-use enchant_iced::{NoiseTextureProps, noise_texture, noise_texture_layer};
 
 pub fn main() -> iced::Result {
     iced::application(

@@ -1,12 +1,12 @@
 mod _shared;
 
-use iced::time::Instant;
-use iced::widget::column;
-use iced::{Color, Element, Length, Size, Subscription, Task};
 use enchant_iced::{
     AnimatedGradientTextProps, NeonColors, NeonGradientCardProps, animated_gradient_text,
     neon_gradient_card,
 };
+use iced::time::Instant;
+use iced::widget::column;
+use iced::{Color, Element, Length, Size, Subscription, Task};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

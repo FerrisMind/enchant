@@ -1,10 +1,10 @@
 mod _shared;
 
+use enchant_iced::primitives::MotionSpec;
+use enchant_iced::{BlurFadeProps, BlurFadeState, blur_fade};
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container, row, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Size, Subscription, Task};
-use enchant_iced::primitives::MotionSpec;
-use enchant_iced::{BlurFadeProps, BlurFadeState, blur_fade};
 use twill::prelude::TransitionDuration;
 
 const TILE_COUNT: usize = 9;

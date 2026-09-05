@@ -1,10 +1,10 @@
 mod _shared;
 
+use enchant_iced::{WarpBackgroundProps, warp_background};
 use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Alignment, Element, Length, Size, Subscription, Task};
 use iced_shadcn::{CardProps, CardSize, card};
-use enchant_iced::{WarpBackgroundProps, warp_background};
 use std::time::Duration;
 
 /// Tailwind `w-80` = 20rem = 320px at the default 16px root size.

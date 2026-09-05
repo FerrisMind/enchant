@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{MorphingTextProps, morphing_text};
 use iced::time::Instant;
 use iced::widget::column;
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{MorphingTextProps, morphing_text};
 use std::time::Duration;
 
 const MORPHING_TEXTS: &[&str] = &[

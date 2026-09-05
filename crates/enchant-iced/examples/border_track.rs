@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::BorderBeam;
 use iced::time::Instant;
 use iced::widget::{column, container, stack, text};
 use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
-use enchant_iced::BorderBeam;
 use std::time::Duration;
 
 pub fn main() -> iced::Result {
@@ -79,11 +79,11 @@ impl BorderTrackExample {
                 let color = label_color;
                 move |_| iced::widget::text::Style { color: Some(color) }
             }))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .center_x(Length::Fill)
-                .center_y(Length::Fill)
-                .into(),
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .into(),
             container(
                 BorderBeam::new()
                     .radius(radius)

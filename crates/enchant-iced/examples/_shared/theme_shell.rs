@@ -1,14 +1,14 @@
-use iced::time::Instant;
-use iced::widget::Id;
-use iced::widget::{Space, column, container, row, stack, text};
-use iced::{Alignment, Background, Color, Element, Length, Task};
-use iced_shadcn::{Palette, Theme};
 use enchant_iced::theme::MagicTheme;
 use enchant_iced::{
     AnchorMeasurements, AnimatedThemeTogglerController, AnimatedThemeTogglerProps, GlobeDemoColors,
     anchor, animated_theme_toggler_with_controller, globe_demo_colors_blended, measure_anchors,
     theme_transition_overlay,
 };
+use iced::time::Instant;
+use iced::widget::Id;
+use iced::widget::{Space, column, container, row, stack, text};
+use iced::{Alignment, Background, Color, Element, Length, Task};
+use iced_shadcn::{Palette, Theme};
 
 pub const TOGGLER_ANCHOR: &str = "theme-toggler";
 

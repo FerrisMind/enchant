@@ -1,11 +1,11 @@
 mod _shared;
 
-use iced::time::Instant;
-use iced::widget::{column, container, image, row, svg, text};
-use iced::{Alignment, ContentFit, Element, Length, Size, Task};
 use enchant_iced::primitives::glow_from_svg_bytes;
 use enchant_iced::theme::MagicTheme;
 use enchant_iced::{BacklightProps, backlight};
+use iced::time::Instant;
+use iced::widget::{column, container, image, row, svg, text};
+use iced::{Alignment, ContentFit, Element, Length, Size, Task};
 
 const IMAGE_WIDTH: f32 = 480.0;
 const IMAGE_HEIGHT: f32 = 320.0;

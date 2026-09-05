@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{AndroidProps, android};
 use iced::widget::{column, container};
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{AndroidProps, android};
 
 pub fn main() -> iced::Result {
     iced::application(

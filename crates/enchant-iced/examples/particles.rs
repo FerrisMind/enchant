@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{ParticlesAction, ParticlesProps, ParticlesState, particles};
 use iced::time::Instant;
 use iced::widget::{column, container, stack, text};
 use iced::{Alignment, Border, Color, Element, Length, Size, Subscription, Task};
-use enchant_iced::{ParticlesAction, ParticlesProps, ParticlesState, particles};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

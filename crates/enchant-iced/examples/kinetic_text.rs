@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{KineticTextProps, KineticTextState, kinetic_text};
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
-use enchant_iced::{KineticTextProps, KineticTextState, kinetic_text};
 
 pub fn main() -> iced::Result {
     iced::application(

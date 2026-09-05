@@ -529,10 +529,7 @@ fn paint_inset_bottom_glow(
         let w = (size.width - side_pad * 2.0).max(1.0);
 
         frame.fill(
-            &canvas::Path::rectangle(
-                Point::new(side_pad, y - step * 0.5),
-                Size::new(w, step),
-            ),
+            &canvas::Path::rectangle(Point::new(side_pad, y - step * 0.5), Size::new(w, step)),
             Fill::from(Color::from_rgba(1.0, 1.0, 1.0, a)),
         );
     }

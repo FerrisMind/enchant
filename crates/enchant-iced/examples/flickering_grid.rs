@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{FlickeringGridProps, flickering_grid};
 use iced::time::Instant;
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Color, Element, Length, Size, Subscription, Task};
-use enchant_iced::{FlickeringGridProps, flickering_grid};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::ShimmerButton;
 use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Element, Size, Subscription, Task};
-use enchant_iced::ShimmerButton;
 use std::time::Duration;
 
 pub fn main() -> iced::Result {
@@ -84,7 +84,9 @@ impl ShimmerButtonExample {
 
         _shared::themed_shell(
             "Shimmer Button",
-            column![body, feedback].spacing(16).align_x(iced::Alignment::Center),
+            column![body, feedback]
+                .spacing(16)
+                .align_x(iced::Alignment::Center),
             &self.theme_shell,
             Message::ToggleTheme,
         )

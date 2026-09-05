@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{DiaTextRevealProps, DiaTextRevealState, dia_text_reveal};
 use iced::time::Instant;
 use iced::widget::column;
 use iced::{Color, Element, Size, Subscription, Task};
-use enchant_iced::{DiaTextRevealProps, DiaTextRevealState, dia_text_reveal};
 use std::time::Duration;
 
 const DEMO_COLORS_1: &[Color] = &[

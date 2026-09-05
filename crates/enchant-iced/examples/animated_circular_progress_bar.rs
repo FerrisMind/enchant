@@ -1,12 +1,12 @@
 mod _shared;
 
-use iced::time::{Duration, Instant};
-use iced::widget::column;
-use iced::{Color, Element, Size, Subscription, Task};
 use enchant_iced::{
     AnimatedCircularProgressBarProps, AnimatedCircularProgressBarState,
     animated_circular_progress_bar,
 };
+use iced::time::{Duration, Instant};
+use iced::widget::column;
+use iced::{Color, Element, Size, Subscription, Task};
 
 pub fn main() -> iced::Result {
     iced::application(

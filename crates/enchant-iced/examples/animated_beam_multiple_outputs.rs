@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{AnchorMeasurements, AnchorRemeasure, measure_anchors};
 use iced::time::Instant;
 use iced::widget::{column, container};
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{AnchorMeasurements, AnchorRemeasure, measure_anchors};
 use std::time::Duration;
 
 use _shared::beam_demo;

@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{PixelGrid, PixelImageProps, PixelImageState, pixel_image};
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
-use enchant_iced::{PixelGrid, PixelImageProps, PixelImageState, pixel_image};
 
 fn demo_image() -> iced::widget::image::Handle {
     let width = 24;

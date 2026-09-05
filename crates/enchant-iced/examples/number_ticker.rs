@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{NumberTickerProps, NumberTickerState, number_ticker};
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Element, Size, Subscription, Task};
-use enchant_iced::{NumberTickerProps, NumberTickerState, number_ticker};
 
 pub fn main() -> iced::Result {
     iced::application(

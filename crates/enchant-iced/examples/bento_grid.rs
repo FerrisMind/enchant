@@ -6,6 +6,11 @@
 mod _shared;
 
 use chrono::NaiveDate;
+use enchant_iced::{
+    AnchorMeasurements, AnchorRemeasure, AnimatedListProps, AnimatedListState, AnimatedValue,
+    BentoCardProps, BentoGridProps, MarqueeOrientation, MarqueeProps, MotionSpec, animated_list,
+    bento_grid, marquee_indexed, measure_anchors,
+};
 use iced::time::{Duration, Instant};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{column, container, scrollable, stack, text};
@@ -14,11 +19,6 @@ use iced::{
 };
 use iced_shadcn::{CalendarAction, CalendarMode, CalendarProps, CalendarState, calendar};
 use lucide_icons::{Icon as LucideIcon, LUCIDE_FONT_BYTES};
-use enchant_iced::{
-    AnchorMeasurements, AnchorRemeasure, AnimatedListProps, AnimatedListState, AnimatedValue,
-    BentoCardProps, BentoGridProps, MarqueeOrientation, MarqueeProps, MotionSpec, animated_list,
-    bento_grid, marquee_indexed, measure_anchors,
-};
 use twill::prelude::{Easing, TransitionDuration};
 
 use _shared::animated_list_notifications::{

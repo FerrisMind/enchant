@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{ConfettiAction, ConfettiProps, ConfettiState, confetti, confetti_button};
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container, stack, text};
 use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
-use enchant_iced::{ConfettiAction, ConfettiProps, ConfettiState, confetti, confetti_button};
 
 pub fn main() -> iced::Result {
     iced::application(

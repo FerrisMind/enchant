@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{IphoneProps, iphone};
 use iced::widget::{column, container};
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{IphoneProps, iphone};
 
 pub fn main() -> iced::Result {
     iced::application(

@@ -287,8 +287,7 @@ fn draw_gradient_beam(
         }
 
         let along_beam = 1.0 - dist / beam_span;
-        let color =
-            sample_border_beam_gradient(along_beam, config.color_from, config.color_to);
+        let color = sample_border_beam_gradient(along_beam, config.color_from, config.color_to);
 
         if color.a <= 0.01 {
             continue;

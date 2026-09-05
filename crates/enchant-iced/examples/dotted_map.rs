@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{DottedMapMarker, DottedMapOverlay, DottedMapProps, DottedMapState, dotted_map};
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
-use enchant_iced::{DottedMapMarker, DottedMapOverlay, DottedMapProps, DottedMapState, dotted_map};
 
 pub fn main() -> iced::Result {
     iced::application(

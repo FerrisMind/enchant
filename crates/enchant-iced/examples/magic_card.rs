@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{MagicCardProps, magic_card};
 use iced::widget::column;
 use iced::{Element, Length, Size, Task};
-use enchant_iced::{MagicCardProps, magic_card};
 
 pub fn main() -> iced::Result {
     iced::application(

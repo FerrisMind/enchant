@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{IconCloudAction, IconCloudItem, IconCloudProps, IconCloudState, icon_cloud};
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{IconCloudAction, IconCloudItem, IconCloudProps, IconCloudState, icon_cloud};
 
 pub fn main() -> iced::Result {
     iced::application(

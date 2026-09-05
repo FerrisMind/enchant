@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{ProgressiveBlurPosition, ProgressiveBlurProps, progressive_blur};
 use iced::widget::{column, container, scrollable, stack, text};
 use iced::{Alignment, Border, Element, Length, Size, Task};
-use enchant_iced::{ProgressiveBlurPosition, ProgressiveBlurProps, progressive_blur};
 
 pub fn main() -> iced::Result {
     iced::application(

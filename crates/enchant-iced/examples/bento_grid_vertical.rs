@@ -10,11 +10,11 @@
 
 mod _shared;
 
+use enchant_iced::{BENTO_GAP, BentoCardProps, BentoGridProps, bento_card};
 use iced::time::{Duration, Instant};
 use iced::widget::{Space, column, container, row, text};
 use iced::{Alignment, Color, Element, Font, Length, Size, Subscription, Task};
 use lucide_icons::{Icon as LucideIcon, LUCIDE_FONT_BYTES};
-use enchant_iced::{BENTO_GAP, BentoCardProps, BentoGridProps, bento_card};
 
 pub fn main() -> iced::Result {
     iced::application(

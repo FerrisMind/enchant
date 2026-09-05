@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{TerminalLine, TerminalProps, TerminalSegment, TerminalState, terminal};
 use iced::time::{Duration, Instant};
 use iced::widget::column;
 use iced::{Color, Element, Size, Subscription, Task};
-use enchant_iced::{TerminalLine, TerminalProps, TerminalSegment, TerminalState, terminal};
 
 pub fn main() -> iced::Result {
     iced::application(

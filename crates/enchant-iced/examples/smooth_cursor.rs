@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{SmoothCursorAction, SmoothCursorProps, SmoothCursorState, smooth_cursor};
 use iced::time::{Duration, Instant};
 use iced::widget::{column, container, stack, text};
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{SmoothCursorAction, SmoothCursorProps, SmoothCursorState, smooth_cursor};
 
 pub fn main() -> iced::Result {
     iced::application(

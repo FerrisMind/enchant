@@ -1,9 +1,11 @@
 mod _shared;
 
+use enchant_iced::{
+    TweetAsset, TweetAuthor, TweetCardData, TweetCardProps, TweetMedia, tweet_card,
+};
 use iced::time::Instant;
 use iced::widget::{column, text};
 use iced::{Element, Size, Task};
-use enchant_iced::{TweetAsset, TweetAuthor, TweetCardData, TweetCardProps, TweetMedia, tweet_card};
 
 pub fn main() -> iced::Result {
     iced::application(

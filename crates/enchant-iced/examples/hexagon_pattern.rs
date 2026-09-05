@@ -2,9 +2,9 @@ mod _shared;
 
 use iced::time::Instant;
 
+use enchant_iced::{HexagonPatternProps, hexagon_pattern};
 use iced::widget::{column, container};
 use iced::{Alignment, Border, Element, Length, Size, Task};
-use enchant_iced::{HexagonPatternProps, hexagon_pattern};
 
 const HIGHLIGHTS: &[(i32, i32)] = &[
     (1, 1),

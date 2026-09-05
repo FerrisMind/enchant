@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{FrameSequence, VideoTextProps, VideoTextSource, VideoTextState, video_text};
 use iced::time::Instant;
 use iced::widget::{column, image, text};
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{FrameSequence, VideoTextProps, VideoTextSource, VideoTextState, video_text};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {

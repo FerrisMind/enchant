@@ -1,9 +1,9 @@
 mod _shared;
 
+use enchant_iced::{ShineBorderProps, shine_border};
 use iced::time::Instant;
 use iced::widget::{column, container, stack};
 use iced::{Element, Length, Size, Subscription, Task};
-use enchant_iced::{ShineBorderProps, shine_border};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {
