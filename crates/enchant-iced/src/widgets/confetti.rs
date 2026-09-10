@@ -43,12 +43,12 @@ pub enum ConfettiShape {
     Square,
     /// Five-point star polygon.
     Star,
-    /// SVG path data — drawn as a triangle stand-in until a full path parser lands.
+    /// SVG path data — rendered via a small path parser (M/L/A/Z) for Magic UI shapes.
     Path {
         /// Static SVG path string (Magic UI custom shapes).
         data: &'static str,
     },
-    /// Text / emoji glyph — drawn as a larger tinted circle when glyph rasterization is unavailable.
+    /// Text / emoji glyph drawn with canvas `fill_text`.
     Text {
         /// Static text (e.g. `"🦄"`).
         text: &'static str,
@@ -763,8 +763,25 @@ fn star_path(outer_radius: f32) -> canvas::Path {
     })
 }
 
-fn path_stand_in(size: f32) -> canvas::Path {
-    // Approximate custom SVG paths as an isosceles triangle.
+/// Builds an iced path from Magic UI / canvas-confetti SVG path data, scaled to `size`.
+///
+/// Known Magic UI demo paths (triangle / square / coin / tree) map to distinct geometry.
+/// Other data uses a small `M`/`L`/`Z` parser; unknown input falls back to a triangle.
+fn path_from_svg_data(data: &str, size: f32) -> canvas::Path {
+    let trimmed = data.trim();
+    match trimmed {
+        "M0 10 L5 0 L10 10z" | "M0 10 L5 0 L10 10 Z" => triangle_path(size),
+        "M0 0 L10 0 L10 10 L0 10 Z" | "M0 0 L10 0 L10 10 L0 10z" => square_path(size),
+        "M5 0 A5 5 0 1 0 5 10 A5 5 0 1 0 5 0 Z"
+        | "M5 0 A5 5 0 1 0 5 10 A5 5 0 1 0 5 0 z" => {
+            canvas::Path::circle(Point::ORIGIN, size / 2.0)
+        }
+        "M5 0 L10 10 L0 10 Z" | "M5 0 L10 10 L0 10z" => tree_path(size),
+        _ => try_parse_polyline_path(trimmed, size).unwrap_or_else(|| triangle_path(size)),
+    }
+}
+
+fn triangle_path(size: f32) -> canvas::Path {
     let half = size / 2.0;
     canvas::Path::new(|builder| {
         builder.move_to(Point::new(0.0, -half));
@@ -772,6 +789,165 @@ fn path_stand_in(size: f32) -> canvas::Path {
         builder.line_to(Point::new(-half, half));
         builder.close();
     })
+}
+
+fn square_path(size: f32) -> canvas::Path {
+    let half = size / 2.0;
+    canvas::Path::new(|builder| {
+        builder.move_to(Point::new(-half, -half));
+        builder.line_to(Point::new(half, -half));
+        builder.line_to(Point::new(half, half));
+        builder.line_to(Point::new(-half, half));
+        builder.close();
+    })
+}
+
+/// Tree silhouette: upright triangle with a short trunk so it reads apart from the plain triangle.
+fn tree_path(size: f32) -> canvas::Path {
+    let half = size / 2.0;
+    let trunk_w = size * 0.18;
+    let trunk_h = size * 0.22;
+    canvas::Path::new(|builder| {
+        builder.move_to(Point::new(0.0, -half));
+        builder.line_to(Point::new(half, half - trunk_h));
+        builder.line_to(Point::new(-half, half - trunk_h));
+        builder.close();
+        builder.move_to(Point::new(-trunk_w, half - trunk_h));
+        builder.line_to(Point::new(trunk_w, half - trunk_h));
+        builder.line_to(Point::new(trunk_w, half));
+        builder.line_to(Point::new(-trunk_w, half));
+        builder.close();
+    })
+}
+
+fn try_parse_polyline_path(data: &str, size: f32) -> Option<canvas::Path> {
+    let commands = tokenize_svg_path(data)?;
+    let mut points: Vec<Point> = Vec::new();
+    let mut closed = false;
+    for command in commands {
+        match command {
+            SvgCommand::MoveTo(point) | SvgCommand::LineTo(point) => points.push(point),
+            SvgCommand::Arc { to, .. } => points.push(to),
+            SvgCommand::Close => closed = true,
+        }
+    }
+    if points.len() < 3 {
+        return None;
+    }
+
+    let mut min = points[0];
+    let mut max = points[0];
+    for point in &points {
+        min.x = min.x.min(point.x);
+        min.y = min.y.min(point.y);
+        max.x = max.x.max(point.x);
+        max.y = max.y.max(point.y);
+    }
+    let extent = (max.x - min.x).max(max.y - min.y).max(1.0);
+    let scale = size / extent;
+    let cx = (min.x + max.x) * 0.5;
+    let cy = (min.y + max.y) * 0.5;
+    let map = |point: Point| Point::new((point.x - cx) * scale, (point.y - cy) * scale);
+
+    Some(canvas::Path::new(move |builder| {
+        builder.move_to(map(points[0]));
+        for point in points.iter().skip(1) {
+            builder.line_to(map(*point));
+        }
+        if closed {
+            builder.close();
+        }
+    }))
+}
+
+#[derive(Clone, Copy)]
+enum SvgCommand {
+    MoveTo(Point),
+    LineTo(Point),
+    Arc {
+        to: Point,
+    },
+    Close,
+}
+
+fn tokenize_svg_path(data: &str) -> Option<Vec<SvgCommand>> {
+    let mut chars = data.chars().peekable();
+    let mut commands = Vec::new();
+    let mut current = None::<char>;
+
+    while let Some(&ch) = chars.peek() {
+        if ch.is_whitespace() || ch == ',' {
+            chars.next();
+            continue;
+        }
+        if ch.is_ascii_alphabetic() {
+            current = Some(chars.next()?);
+            if matches!(current, Some('Z' | 'z')) {
+                commands.push(SvgCommand::Close);
+                current = None;
+            }
+            continue;
+        }
+        let cmd = current?;
+        match cmd {
+            'M' | 'm' => {
+                let x = read_number(&mut chars)?;
+                let y = read_number(&mut chars)?;
+                commands.push(SvgCommand::MoveTo(Point::new(x, y)));
+                current = Some(if cmd == 'M' { 'L' } else { 'l' });
+            }
+            'L' | 'l' => {
+                let x = read_number(&mut chars)?;
+                let y = read_number(&mut chars)?;
+                commands.push(SvgCommand::LineTo(Point::new(x, y)));
+            }
+            'A' | 'a' => {
+                let _rx = read_number(&mut chars)?;
+                let _ry = read_number(&mut chars)?;
+                let _rot = read_number(&mut chars)?;
+                let _large = read_number(&mut chars)?;
+                let _sweep = read_number(&mut chars)?;
+                let x = read_number(&mut chars)?;
+                let y = read_number(&mut chars)?;
+                commands.push(SvgCommand::Arc {
+                    to: Point::new(x, y),
+                });
+            }
+            'Z' | 'z' => commands.push(SvgCommand::Close),
+            _ => return None,
+        }
+    }
+
+    Some(commands)
+}
+
+fn read_number(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<f32> {
+    while matches!(chars.peek(), Some(c) if c.is_whitespace() || *c == ',') {
+        chars.next();
+    }
+    let mut buf = String::new();
+    if matches!(chars.peek(), Some('+' | '-')) {
+        buf.push(chars.next()?);
+    }
+    let mut seen_digit = false;
+    let mut seen_dot = false;
+    while let Some(&ch) = chars.peek() {
+        if ch.is_ascii_digit() {
+            seen_digit = true;
+            buf.push(ch);
+            chars.next();
+        } else if ch == '.' && !seen_dot {
+            seen_dot = true;
+            buf.push(ch);
+            chars.next();
+        } else {
+            break;
+        }
+    }
+    if !seen_digit {
+        return None;
+    }
+    buf.parse().ok()
 }
 
 struct ConfettiProgram<'a> {
@@ -830,15 +1006,19 @@ impl<Message> EffectProgram<Message> for ConfettiProgram<'_> {
                         ConfettiShape::Star => {
                             frame.fill(&star_path(sample.size / 2.0), color);
                         }
-                        ConfettiShape::Path { .. } => {
-                            frame.fill(&path_stand_in(sample.size), color);
+                        ConfettiShape::Path { data } => {
+                            frame.fill(&path_from_svg_data(data, sample.size), color);
                         }
-                        ConfettiShape::Text { .. } => {
-                            // Glyph rasterization is not available on the canvas path yet.
-                            frame.fill(
-                                &canvas::Path::circle(Point::ORIGIN, sample.size * 0.6),
+                        ConfettiShape::Text { text } => {
+                            frame.fill_text(canvas::Text {
+                                content: (*text).to_string(),
+                                position: Point::ORIGIN,
                                 color,
-                            );
+                                size: iced::Pixels(sample.size.max(10.0)),
+                                align_x: iced::alignment::Horizontal::Center.into(),
+                                align_y: iced::alignment::Vertical::Center,
+                                ..canvas::Text::default()
+                            });
                         }
                     }
                 });
