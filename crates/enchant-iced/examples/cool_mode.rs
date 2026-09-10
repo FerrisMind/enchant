@@ -7,10 +7,6 @@ use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, button_content};
 use std::time::Duration;
 
-fn svelte_logo_handle() -> image::Handle {
-    image::Handle::from_bytes(include_bytes!("assets/cool-mode/svelte-logo.png").as_slice())
-}
-
 pub fn main() -> iced::Result {
     iced::application(
         CoolModeExample::new,
@@ -30,6 +26,7 @@ struct CoolModeExample {
     theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
+    svelte_logo: image::Handle,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +44,9 @@ impl CoolModeExample {
                 theme_shell: _shared::ThemeShell::new(),
                 start,
                 elapsed: Duration::ZERO,
+                svelte_logo: image::Handle::from_bytes(
+                    include_bytes!("assets/cool-mode/svelte-logo.png").as_slice(),
+                ),
             },
             Task::none(),
         )
@@ -102,7 +102,7 @@ impl CoolModeExample {
 
         let custom_image_stage = container(
             CoolMode::new(svelte_image)
-                .particle(CoolParticleKind::Image(svelte_logo_handle()))
+                .particle(CoolParticleKind::Image(self.svelte_logo.clone()))
                 .into_element(self.elapsed),
         )
         .width(Length::Fill)
