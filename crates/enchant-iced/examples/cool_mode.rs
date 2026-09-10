@@ -26,7 +26,7 @@ struct CoolModeExample {
     theme_shell: _shared::ThemeShell,
     start: Instant,
     elapsed: Duration,
-    svelte_logo: image::Handle,
+    rust_logo: image::Handle,
 }
 
 #[derive(Debug, Clone)]
@@ -44,8 +44,8 @@ impl CoolModeExample {
                 theme_shell: _shared::ThemeShell::new(),
                 start,
                 elapsed: Duration::ZERO,
-                svelte_logo: image::Handle::from_bytes(
-                    include_bytes!("assets/cool-mode/svelte-logo.png").as_slice(),
+                rust_logo: image::Handle::from_bytes(
+                    include_bytes!("assets/cool-mode/rust-logo.png").as_slice(),
                 ),
             },
             Task::none(),
@@ -85,8 +85,8 @@ impl CoolModeExample {
             self.theme_shell.theme(),
         );
 
-        let svelte_image = button_content(
-            text("Svelte Image"),
+        let rust_image = button_content(
+            text("Rust Image"),
             None::<Message>,
             ButtonProps::new()
                 .variant(ButtonVariant::Default)
@@ -101,8 +101,8 @@ impl CoolModeExample {
             .center_y(Length::Fill);
 
         let custom_image_stage = container(
-            CoolMode::new(svelte_image)
-                .particle(CoolParticleKind::Image(self.svelte_logo.clone()))
+            CoolMode::new(rust_image)
+                .particle(CoolParticleKind::Image(self.rust_logo.clone()))
                 .into_element(self.elapsed),
         )
         .width(Length::Fill)

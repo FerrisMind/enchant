@@ -620,18 +620,15 @@ fn paint_particle(frame: &mut canvas::Frame, particle: &CoolParticle, kind: &Coo
         }
         CoolParticleKind::Image(handle) => {
             let extent = particle.size.max(0.0);
-            let size = Size::new(extent, extent);
-            let rect = Rectangle::new(Point::new(-extent * 0.5, -extent * 0.5), size);
-            // Magic CSS `border-radius: 50%`: clip_bounds = particle box, Radius = size/2 → circle.
+            // Magic CSS `border-radius: 50%` on the img box; use Image.rotation (center pivot).
+            let rect = Rectangle::new(
+                Point::new(particle.left, particle.top),
+                Size::new(extent, extent),
+            );
             let mut image = canvas::Image::new(handle.clone());
             image.border_radius = Radius::from(extent * 0.5);
-            frame.with_save(|frame| {
-                frame.translate(iced::Vector::new(center.x, center.y));
-                frame.rotate(angle);
-                frame.with_clip(rect, |frame| {
-                    frame.draw_image(rect, image);
-                });
-            });
+            image.rotation = iced::Radians(angle);
+            frame.draw_image(rect, image);
         }
     }
 }
