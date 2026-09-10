@@ -6,7 +6,7 @@
 use crate::primitives::{pointer_distance, pointer_strength};
 use iced::time::Instant;
 use iced::widget::{Space, container, mouse_area, row, stack, text};
-use iced::{Alignment, Background, Border, Color, Element, Length};
+use iced::{Alignment, Background, Border, Color, Element, Length, Padding};
 use iced_shadcn::Theme as ShadTheme;
 
 /// Magic UI bar height (`h-14`).
@@ -24,6 +24,16 @@ pub enum DockAction {
 }
 
 /// Vertical alignment of icons inside the fixed-height bar.
+///
+/// Matches the Magic UI Direction demo visuals: idle placement is identical for all
+/// variants (icons fill the `h-14` content band). On magnification:
+/// - [`Self::Top`] — pin bottom edge, grow **up**
+/// - [`Self::Middle`] — grow both ways
+/// - [`Self::Bottom`] — pin top edge, grow **down**
+///
+/// Note: Magic UI's Svelte source maps `direction="top"` → CSS `items-start` (grow down).
+/// This port swaps Top/Bottom to match the documented Direction demo expectation
+/// (Top → icons rise, Bottom → icons drop).
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub enum DockDirection {
@@ -270,7 +280,8 @@ impl Dock {
         self
     }
 
-    /// Vertical icon alignment inside the bar (default [`DockDirection::Middle`]).
+    /// Idle is identical for all directions; on magnification Top grows up and
+    /// Bottom grows down (Direction demo; opposite of raw CSS `items-start`/`items-end`).
     pub fn direction(mut self, direction: DockDirection) -> Self {
         self.direction = direction;
         self
@@ -337,26 +348,21 @@ impl Dock {
             .unwrap_or_else(|| dock_surface_color(theme));
         let border_color = dock_border_color(theme);
         let radius = theme.radius.lg;
-        let align_y = match self.direction {
-            DockDirection::Top => Alignment::Start,
-            DockDirection::Middle => Alignment::Center,
-            DockDirection::Bottom => Alignment::End,
-        };
-
-        // Svelte dock.svelte: `flex h-14 w-max … gap-2 … p-2` frosted pill.
-        // - Height is **constant** `max(h-14, iconMagnification)` so live springs never
-        //   shift the page title / reserved box (iced cannot do CSS overflow:visible on h-14).
-        // - Width is explicit `Fixed` from live spring widths (`w-max`). Never `Fill` /
-        //   Fill+Shrink stacks — those collapse to width 0 in iced.
+        // Idle icons fill the padded content band (`h-14 − 2·p-2`), so Top/Middle/Bottom
+        // look identical. On hover: Top grows up, Bottom grows down (Direction demo).
+        // Never align against the full reserved box — that inverted idle vs hover.
         let reserved_height = dock_reserved_height(&self);
         let content_width = dock_content_width(&items, state, &self);
         let pointer_mapper = dock_pointer_mapper(&items, state, &self);
+        // Chrome is centered in `reserved_height` ⇒ content-band top inset equals
+        // `(reserved − h-14)/2 + p-2` (and matches the bottom inset).
+        let content_inset = (reserved_height - DOCK_BAR_HEIGHT) / 2.0 + self.padding;
 
         // Horizontal `p-2` as side Spaces only — never `row.padding` vertically (would
         // squash Fixed(spring) slots). Gaps are inserted between entries only; do **not**
         // use `row.spacing` around the padding Spaces (that inflated width past `w-max`
         // and horizontally crushed square slots into ovals).
-        let mut icons = row![].align_y(align_y);
+        let mut icons = row![].align_y(Alignment::Start);
         let mut icon_index = 0;
 
         for (entry_index, item) in items.into_iter().enumerate() {
@@ -368,10 +374,24 @@ impl Dock {
                 DockEntry::Icon(item) => {
                     let size = state.icon_size_at(icon_index, &self);
                     icon_index += 1;
-                    icons = icons.push(dock_icon_slot(item, size, &self, theme));
+                    let slot = dock_icon_slot(item, size, &self, theme);
+                    icons = icons.push(dock_direction_place(
+                        slot,
+                        size,
+                        reserved_height,
+                        content_inset,
+                        self.direction,
+                    ));
                 }
                 DockEntry::Separator => {
-                    icons = icons.push(dock_separator_view(theme));
+                    // Separator stays in the h-14 content band (middle), not direction-shifted.
+                    icons = icons.push(dock_direction_place(
+                        dock_separator_view(theme),
+                        (DOCK_BAR_HEIGHT - 2.0 * self.padding).max(1.0),
+                        reserved_height,
+                        content_inset,
+                        DockDirection::Middle,
+                    ));
                 }
             }
         }
@@ -381,7 +401,7 @@ impl Dock {
             icons,
             Space::new().width(Length::Fixed(self.padding)),
         ]
-        .align_y(align_y);
+        .align_y(Alignment::Start);
 
         let chrome = container(Space::new())
             .width(Length::Fixed(content_width))
@@ -401,24 +421,10 @@ impl Dock {
             .height(Length::Fixed(reserved_height))
             .center_y(Length::Fixed(reserved_height));
 
-        // Vertically place the icons row inside the reserved box like CSS
-        // `items-{start|center|end}` on the bar (`DockDirection`).
-        let icons_layer = match self.direction {
-            DockDirection::Middle => container(content)
-                .width(Length::Fixed(content_width))
-                .center_y(Length::Fixed(reserved_height))
-                .clip(false),
-            DockDirection::Top => container(content)
-                .width(Length::Fixed(content_width))
-                .height(Length::Fixed(reserved_height))
-                .align_y(Alignment::Start)
-                .clip(false),
-            DockDirection::Bottom => container(content)
-                .width(Length::Fixed(content_width))
-                .height(Length::Fixed(reserved_height))
-                .align_y(Alignment::End)
-                .clip(false),
-        };
+        let icons_layer = container(content)
+            .width(Length::Fixed(content_width))
+            .height(Length::Fixed(reserved_height))
+            .clip(false);
 
         let body = container(stack![chrome_layer, icons_layer])
             .width(Length::Fixed(content_width))
@@ -528,6 +534,55 @@ pub fn dock_entry_icon_count<Message>(items: &[DockEntry<'_, Message>]) -> usize
         .count()
 }
 
+/// Place a spring slot (or separator) inside the reserved box against the h-14
+/// content band so idle Top/Middle/Bottom share the same Y.
+///
+/// On magnification: Top grows **up**, Bottom grows **down**, Middle both ways.
+fn dock_direction_place<'a, Message: 'a>(
+    slot: Element<'a, Message>,
+    slot_height: f32,
+    reserved_height: f32,
+    content_inset: f32,
+    direction: DockDirection,
+) -> Element<'a, Message> {
+    let inset = content_inset.max(0.0);
+    // `slot_height` documents the idle/hover relationship for readers/tests; layout
+    // uses direction + inset against the reserved box (springs keep their Fixed size).
+    let _ = slot_height;
+
+    match direction {
+        // Top → rise: pin bottom of content band (CSS items-end).
+        DockDirection::Top => container(slot)
+            .height(Length::Fixed(reserved_height))
+            .align_y(Alignment::End)
+            .padding(Padding {
+                top: 0.0,
+                right: 0.0,
+                bottom: inset,
+                left: 0.0,
+            })
+            .clip(false)
+            .into(),
+        // Bottom → drop: pin top of content band (CSS items-start).
+        DockDirection::Bottom => container(slot)
+            .height(Length::Fixed(reserved_height))
+            .align_y(Alignment::Start)
+            .padding(Padding {
+                top: inset,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            })
+            .clip(false)
+            .into(),
+        DockDirection::Middle => container(slot)
+            .height(Length::Fixed(reserved_height))
+            .center_y(Length::Fixed(reserved_height))
+            .clip(false)
+            .into(),
+    }
+}
+
 /// Magic UI preview `Button` `size-12` (3rem) — stays fixed while `DockIcon` springs.
 ///
 /// Svelte preview: `class={cn("size-12 rounded-full")}` inside `DockIcon`.
@@ -580,28 +635,26 @@ fn dock_icon_slot<'a, Message: Clone + 'static>(
                 .into()
         }
         None => {
-            // Svelte dock-icon.svelte: `padding: max(6, iconSize * 0.2)` from **base**
-            // iconSize (not the live spring).
+            // Svelte dock-icon.svelte: outer `motion.div` gets `width/height: scaleSize`,
+            // `padding: max(6, iconSize * 0.2)`, `rounded-full`, and `class` (incl. `bg-*`).
+            // Glyph fills the padded content box (`size-full`).
             let pad = icon_slot_padding(dock.icon_size);
-            let inner = (slot_w - pad * 2.0).max(1.0);
-            let mut inner_box = container(glyph)
-                .width(Length::Fixed(inner))
-                .height(Length::Fixed(inner))
-                .center_x(Length::Fixed(inner))
-                .center_y(Length::Fixed(inner));
+            let radius = decorative_icon_surface_radius(slot_w);
+            let background = item.background;
 
-            if let Some(background) = item.background {
-                inner_box = inner_box.style(move |_| iced::widget::container::Style {
-                    background: Some(Background::Color(background)),
+            container(glyph)
+                .width(Length::Fixed(slot_w))
+                .height(Length::Fixed(slot_h))
+                .padding(pad)
+                .style(move |_| iced::widget::container::Style {
+                    background: background.map(Background::Color),
                     border: Border {
-                        radius: (inner / 2.0).into(),
+                        radius: radius.into(),
                         ..Default::default()
                     },
                     ..iced::widget::container::Style::default()
-                });
-            }
-
-            inner_box.into()
+                })
+                .into()
         }
     };
 
@@ -707,7 +760,7 @@ fn with_dock_tooltip<'a, Message: 'static>(
     iced::widget::tooltip(
         content,
         text(tooltip).size(12),
-        iced::widget::tooltip::Position::Bottom,
+        iced::widget::tooltip::Position::Top,
     )
     .gap(8)
     .padding(8)
@@ -813,13 +866,22 @@ fn icon_slot_padding(base_size: f32) -> f32 {
     (base_size * 0.2).max(6.0)
 }
 
-/// Stable outer layout height: frosted chrome is `h-14`; room for peak magnification
-/// is reserved up front so live springs never change the dock's allocated size.
+/// `rounded-full` radius for decorative DockIcon chrome (Svelte outer `motion.div`).
 ///
-/// iced adaptation (only allowed overflow stand-in per parity constraints): CSS
-/// `overflow:visible` on `h-14` is unavailable, so height = `max(56, iconMagnification)`.
+/// Background paints this spring diameter — not the inner padded content box.
+fn decorative_icon_surface_radius(spring_size: f32) -> f32 {
+    dock_icon_slot_size(spring_size).0 / 2.0
+}
+
+/// Stable outer layout height for the iced stand-in of CSS `overflow:visible` on `h-14`.
+///
+/// Must fit a peak spring pinned to the content band (Top grows down, Bottom grows up):
+/// with the chrome centered, that needs `reserved >= 2 * (icon_magnification - padding)`
+/// as well as `max(h-14, icon_magnification)`.
 fn dock_reserved_height(dock: &Dock) -> f32 {
-    DOCK_BAR_HEIGHT.max(dock.icon_magnification)
+    let peak = dock.icon_magnification;
+    let for_directional_overflow = (2.0 * (peak - dock.padding)).max(0.0);
+    DOCK_BAR_HEIGHT.max(peak).max(for_directional_overflow)
 }
 
 /// Intrinsic dock width (`w-max`): padding + gaps + live icon/separator sizes.
@@ -1008,7 +1070,12 @@ mod tests {
     #[test]
     fn reserved_height_is_stable_across_pointer_motion() {
         let dock = Dock::new();
-        let expected = DOCK_BAR_HEIGHT.max(dock.icon_magnification);
+        let expected = {
+            let peak = dock.icon_magnification;
+            DOCK_BAR_HEIGHT
+                .max(peak)
+                .max((2.0 * (peak - dock.padding)).max(0.0))
+        };
         assert!((dock_reserved_height(&dock) - expected).abs() < f32::EPSILON);
 
         let mut state = DockState::new();
@@ -1024,6 +1091,53 @@ mod tests {
         assert!(state.max_icon_size(&dock) > dock.icon_size + 10.0);
         // Layout reservation must not track live springs — no page shift / icon jerk.
         assert!((dock_reserved_height(&dock) - expected).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn direction_idle_offsets_match_across_top_middle_bottom() {
+        // Idle spring == content band ⇒ same content-band placement for every direction.
+        let dock = Dock::new();
+        let reserved = dock_reserved_height(&dock);
+        let inset = (reserved - DOCK_BAR_HEIGHT) / 2.0 + dock.padding;
+        let band = (DOCK_BAR_HEIGHT - 2.0 * dock.padding).max(1.0);
+        let spring = dock.icon_size;
+        assert!(
+            (spring - band).abs() < f32::EPSILON,
+            "defaults: icon_size fills h-14 content band"
+        );
+
+        let top_y = reserved - inset - spring; // Top pins spring bottom to content bottom
+        let middle_y = (reserved - spring) / 2.0;
+        let bottom_y = inset; // Bottom pins spring top to content top
+        assert!(
+            (top_y - middle_y).abs() < 0.01,
+            "idle Top Y ({top_y}) must match Middle ({middle_y})"
+        );
+        assert!(
+            (bottom_y - middle_y).abs() < 0.01,
+            "idle Bottom Y ({bottom_y}) must match Middle ({middle_y})"
+        );
+    }
+
+    #[test]
+    fn direction_hover_peak_moves_up_for_top_and_down_for_bottom() {
+        let dock = Dock::new();
+        let reserved = dock_reserved_height(&dock);
+        let inset = (reserved - DOCK_BAR_HEIGHT) / 2.0 + dock.padding;
+        let peak = dock.icon_magnification;
+        let idle = dock.icon_size;
+        let idle_mid = inset + idle / 2.0;
+        // Top pins bottom → center moves up; Bottom pins top → center moves down.
+        let top_mid = reserved - inset - peak / 2.0;
+        let bottom_mid = inset + peak / 2.0;
+        assert!(
+            top_mid < idle_mid - 1.0,
+            "Top peak center must move up"
+        );
+        assert!(
+            bottom_mid > idle_mid + 1.0,
+            "Bottom peak center must move down"
+        );
     }
 
     #[test]
@@ -1062,6 +1176,27 @@ mod tests {
         assert!((DOCK_ICON_BUTTON_SIZE - 48.0).abs() < f32::EPSILON);
         let radius = DOCK_ICON_BUTTON_SIZE / 2.0;
         assert!((radius - 24.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn decorative_background_uses_outer_spring_radius_not_inner() {
+        // Svelte dock-icon.svelte: `class` / `bg-*` + `rounded-full` on the outer
+        // spring square (`width/height: scaleSize`), not the padded content box.
+        let spring = 60.0;
+        let icon_size = 40.0;
+        let pad = icon_slot_padding(icon_size);
+        let radius = decorative_icon_surface_radius(spring);
+        assert!(
+            (radius - spring / 2.0).abs() < f32::EPSILON,
+            "expected outer spring radius {}, got {radius}",
+            spring / 2.0
+        );
+        let inner_radius = (spring - pad * 2.0).max(1.0) / 2.0;
+        assert!(
+            (radius - inner_radius).abs() > 1.0,
+            "radius must not collapse to inner padded box ({inner_radius})"
+        );
+        assert!((pad - 8.0).abs() < f32::EPSILON);
     }
 
     #[test]
