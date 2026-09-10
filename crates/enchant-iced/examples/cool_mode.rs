@@ -69,6 +69,9 @@ impl CoolModeExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        // Pass the button only — not a Fill-centering wrapper (that made the whole
+        // stage the CoolMode content hit target). CoolMode fills the stage for
+        // particle travel and centers Shrink content internally.
         let trigger = button_content(
             text("Click Me!"),
             None::<Message>,
@@ -78,18 +81,11 @@ impl CoolModeExample {
             self.theme_shell.theme(),
         );
 
-        let content = container(trigger)
+        let stage = container(CoolMode::new(trigger).into_element(self.elapsed))
             .width(Length::Fill)
-            .height(Length::Fill)
+            .height(Length::Fixed(420.0))
             .center_x(Length::Fill)
             .center_y(Length::Fill);
-
-        // CoolMode fills so particles travel across the stage (not clipped to the button).
-        let stage = container(
-            CoolMode::new(content).into_element(self.elapsed),
-        )
-        .width(Length::Fill)
-        .height(Length::Fixed(420.0));
 
         _shared::themed_shell(
             "Cool Mode",

@@ -1,16 +1,21 @@
 //! Builder-first cool-mode particle burst (Magic UI / svelte-animations `CoolMode`).
 //!
-//! Press-hold on the wrapped content emits particles; the overlay fills the parent
-//! and does not steal clicks (`mouse::Interaction::None`). Physics matches the
-//! Magic rAF step (`speedUp -= 1` capped by `size`, 30 ms emit delay, hard limit).
+//! Press-hold on the **wrapped content** emits particles; the particle layer fills the
+//! CoolMode outer bounds and does not steal clicks. Physics matches the Magic rAF step
+//! (`speedUp -= 1` capped by `size`, 30 ms emit delay, hard limit).
 
-use crate::primitives::{EffectCanvasProps, EffectProgram, StableRng, effect_canvas};
+use crate::primitives::StableRng;
+use iced::advanced::Renderer as _;
+use iced::advanced::graphics::geometry::Renderer as _;
+use iced::advanced::layout::{self, Layout};
+use iced::advanced::renderer;
+use iced::advanced::widget::{self, Operation, Tree};
+use iced::advanced::{Clipboard, Shell, Widget};
+use iced::border::Radius;
 use iced::mouse;
 use iced::widget::canvas::{self, Fill, Text};
-use iced::widget::{container, stack};
-use iced::border::Radius;
 use iced::{
-    Color, Element, Event, Length, Point, Pixels, Rectangle, Renderer, Size,
+    Color, Element, Event, Length, Point, Pixels, Rectangle, Renderer, Size, Vector,
 };
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -149,42 +154,270 @@ impl<'a, Message> CoolMode<'a, Message> {
     /// Builds the layered element for the host animation clock.
     pub fn into_element(self, elapsed: Duration) -> Element<'a, Message>
     where
-        Message: Clone + 'a,
+        Message: 'a + 'static,
     {
-        let width = self.width;
-        let height = self.height;
-        let overlay = effect_canvas::<_, Message>(
-            CoolModeProgram {
-                elapsed,
-                kind: self.kind,
-                size: self.size,
-                particle_count: self.particle_count,
-                speed_horz: self.speed_horz,
-                speed_up: self.speed_up,
-            },
-            EffectCanvasProps::new()
-                .width(Length::Fill)
-                .height(Length::Fill),
-        );
-
-        let overlay_layer: Element<'a, Message> = container(overlay)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into();
-
-        // Content keeps hit-testing; overlay is Interaction::None (pointer-events: none).
-        // Do not clip — particles travel across the CoolMode parent bounds.
-        let layered = stack(vec![self.content, overlay_layer]);
-
-        container(layered).width(width).height(height).into()
+        Element::new(CoolModeWidget {
+            content: self.content,
+            elapsed,
+            kind: self.kind,
+            size: self.size,
+            particle_count: self.particle_count,
+            speed_horz: self.speed_horz,
+            speed_up: self.speed_up,
+            width: self.width,
+            height: self.height,
+        })
     }
 
     /// Alias for [`Self::into_element`].
     pub fn view(self, elapsed: Duration) -> Element<'a, Message>
     where
-        Message: Clone + 'a,
+        Message: 'a + 'static,
     {
         self.into_element(elapsed)
+    }
+}
+
+/// Magic binds pointer events to the children wrapper only — not the particle overlay.
+fn press_targets_content(cursor: mouse::Cursor, content_bounds: Rectangle) -> bool {
+    cursor.is_over(content_bounds)
+}
+
+struct CoolModeWidget<'a, Message> {
+    content: Element<'a, Message>,
+    elapsed: Duration,
+    kind: CoolParticleKind,
+    size: Option<f32>,
+    particle_count: usize,
+    speed_horz: Option<f32>,
+    speed_up: Option<f32>,
+    width: Length,
+    height: Length,
+}
+
+impl<Message> CoolModeWidget<'_, Message> {
+    fn emit_config(&self) -> CoolModeEmitConfig {
+        CoolModeEmitConfig {
+            size: self.size,
+            particle_count: self.particle_count,
+            speed_horz: self.speed_horz,
+            speed_up: self.speed_up,
+        }
+    }
+}
+
+impl<Message> Widget<Message, iced::Theme, Renderer> for CoolModeWidget<'_, Message>
+where
+    Message: 'static,
+{
+    fn tag(&self) -> widget::tree::Tag {
+        widget::tree::Tag::of::<CoolModeState>()
+    }
+
+    fn state(&self) -> widget::tree::State {
+        widget::tree::State::new(CoolModeState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        Size::new(self.width, self.height)
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        // Outer CoolMode fills the parent (particle travel area).
+        let outer = limits.resolve(self.width, self.height, Size::ZERO);
+        // Content keeps its intrinsic size — do not force Fill (Magic children wrapper).
+        let content_limits = layout::Limits::new(Size::ZERO, outer);
+        let mut content_node =
+            self.content
+                .as_widget_mut()
+                .layout(&mut tree.children[0], renderer, &content_limits);
+        let content_size = content_node.size();
+        // Center Shrink content inside the Fill stage (example may also center CoolMode).
+        let offset = Point::new(
+            ((outer.width - content_size.width) * 0.5).max(0.0),
+            ((outer.height - content_size.height) * 0.5).max(0.0),
+        );
+        content_node = content_node.move_to(offset);
+        layout::Node::with_children(outer, vec![content_node])
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        operation.container(None, layout.bounds());
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().expect("cool_mode content layout"),
+            renderer,
+            operation,
+        );
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        let outer_bounds = layout.bounds();
+        let content_layout = layout.children().next().expect("cool_mode content layout");
+        let content_bounds = content_layout.bounds();
+        let over_content = press_targets_content(cursor, content_bounds);
+
+        let state = tree.state.downcast_mut::<CoolModeState>();
+        let mut sim = state.sim.borrow_mut();
+        let mut dirty = false;
+
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+            | Event::Touch(iced::touch::Event::FingerPressed { .. })
+                if over_content =>
+            {
+                if let Some(position) = cursor.position_in(outer_bounds) {
+                    sim.set_pointer(Some(position));
+                }
+                if !sim.auto_add {
+                    sim.set_press(true);
+                    dirty = true;
+                }
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            | Event::Touch(iced::touch::Event::FingerLifted { .. }) => {
+                if sim.auto_add {
+                    sim.set_press(false);
+                    dirty = true;
+                }
+            }
+            Event::Mouse(mouse::Event::CursorLeft)
+            | Event::Touch(iced::touch::Event::FingerLost { .. }) => {
+                if sim.auto_add {
+                    sim.set_press(false);
+                    dirty = true;
+                }
+                sim.set_pointer(None);
+            }
+            Event::Mouse(mouse::Event::CursorMoved { .. })
+            | Event::Touch(iced::touch::Event::FingerMoved { .. }) => {
+                if over_content {
+                    if let Some(position) = cursor.position_in(outer_bounds) {
+                        sim.set_pointer(Some(position));
+                        dirty = true;
+                    }
+                } else if sim.auto_add {
+                    // Magic: pointerleave on the children wrapper stops emission.
+                    sim.set_press(false);
+                    dirty = true;
+                }
+            }
+            _ => {}
+        }
+
+        let before = sim.particles.len();
+        let was_auto = sim.auto_add;
+        sim.advance(self.elapsed, outer_bounds.height, &self.emit_config());
+        if sim.particles.len() != before || was_auto || !sim.particles.is_empty() {
+            dirty = true;
+        }
+        drop(sim);
+
+        if dirty {
+            shell.request_redraw();
+        }
+
+        // Content receives events; particle layer is not a hit target (no overlay child).
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            content_layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &iced::Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        let outer_bounds = layout.bounds();
+        let content_layout = layout.children().next().expect("cool_mode content layout");
+
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            content_layout,
+            cursor,
+            viewport,
+        );
+
+        let state = tree.state.downcast_ref::<CoolModeState>();
+        let mut sim = state.sim.borrow_mut();
+        sim.advance(self.elapsed, outer_bounds.height, &self.emit_config());
+
+        if outer_bounds.width < 1.0 || outer_bounds.height < 1.0 {
+            return;
+        }
+
+        let mut frame = canvas::Frame::new(renderer, outer_bounds.size());
+        for particle in sim.particles.iter() {
+            paint_particle(&mut frame, particle, &self.kind);
+        }
+        let geometry = frame.into_geometry();
+        renderer.with_translation(
+            Vector::new(outer_bounds.x, outer_bounds.y),
+            |renderer| {
+                renderer.draw_geometry(geometry);
+            },
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout.children().next().expect("cool_mode content layout"),
+            cursor,
+            viewport,
+            renderer,
+        )
     }
 }
 
@@ -351,123 +584,6 @@ struct CoolModeState {
     sim: RefCell<CoolModeSim>,
 }
 
-struct CoolModeProgram {
-    elapsed: Duration,
-    kind: CoolParticleKind,
-    size: Option<f32>,
-    particle_count: usize,
-    speed_horz: Option<f32>,
-    speed_up: Option<f32>,
-}
-
-impl CoolModeProgram {
-    fn emit_config(&self) -> CoolModeEmitConfig {
-        CoolModeEmitConfig {
-            size: self.size,
-            particle_count: self.particle_count,
-            speed_horz: self.speed_horz,
-            speed_up: self.speed_up,
-        }
-    }
-}
-
-impl<Message> EffectProgram<Message> for CoolModeProgram {
-    type State = CoolModeState;
-
-    fn update(
-        &self,
-        state: &mut Self::State,
-        event: &canvas::Event,
-        bounds: Rectangle,
-        cursor: mouse::Cursor,
-        _viewport: &Rectangle,
-    ) -> Option<canvas::Action<Message>> {
-        let mut sim = state.sim.borrow_mut();
-        let mut dirty = false;
-        let over = cursor.is_over(bounds);
-
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
-            | Event::Touch(iced::touch::Event::FingerPressed { .. })
-                if over =>
-            {
-                if let Some(position) = cursor.position_in(bounds) {
-                    sim.set_pointer(Some(position));
-                }
-                if !sim.auto_add {
-                    sim.set_press(true);
-                    dirty = true;
-                }
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
-            | Event::Touch(iced::touch::Event::FingerLifted { .. }) => {
-                if sim.auto_add {
-                    sim.set_press(false);
-                    dirty = true;
-                }
-            }
-            Event::Mouse(mouse::Event::CursorLeft)
-            | Event::Touch(iced::touch::Event::FingerLost { .. }) => {
-                if sim.auto_add {
-                    sim.set_press(false);
-                    dirty = true;
-                }
-                sim.set_pointer(None);
-            }
-            Event::Mouse(mouse::Event::CursorMoved { .. })
-            | Event::Touch(iced::touch::Event::FingerMoved { .. }) => {
-                if let Some(position) = cursor.position_in(bounds) {
-                    sim.set_pointer(Some(position));
-                    dirty = true;
-                }
-            }
-            _ => {}
-        }
-
-        let before = sim.particles.len();
-        let was_auto = sim.auto_add;
-        sim.advance(self.elapsed, bounds.height, &self.emit_config());
-        if sim.particles.len() != before || was_auto || !sim.particles.is_empty() {
-            dirty = true;
-        }
-
-        dirty.then(canvas::Action::request_redraw)
-    }
-
-    fn mouse_interaction(
-        &self,
-        _state: &Self::State,
-        _bounds: Rectangle,
-        _cursor: mouse::Cursor,
-        _viewport: &Rectangle,
-    ) -> mouse::Interaction {
-        mouse::Interaction::None
-    }
-
-    fn draw(
-        &self,
-        state: &Self::State,
-        renderer: &Renderer,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-        _viewport: &Rectangle,
-    ) -> Vec<canvas::Geometry> {
-        let mut sim = state.sim.borrow_mut();
-        sim.advance(self.elapsed, bounds.height, &self.emit_config());
-
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        if bounds.width < 1.0 || bounds.height < 1.0 {
-            return vec![frame.into_geometry()];
-        }
-
-        for particle in sim.particles.iter() {
-            paint_particle(&mut frame, particle, &self.kind);
-        }
-
-        vec![frame.into_geometry()]
-    }
-}
-
 fn paint_particle(frame: &mut canvas::Frame, particle: &CoolParticle, kind: &CoolParticleKind) {
     let center = Point::new(
         particle.left + particle.size * 0.5,
@@ -579,6 +695,20 @@ mod tests {
         assert!(cleared.size.is_none());
         assert!(cleared.speed_horz.is_none());
         assert!(cleared.speed_up.is_none());
+    }
+
+    #[test]
+    fn press_targets_content_gates_empty_stage() {
+        let content = Rectangle::new(Point::new(160.0, 190.0), Size::new(100.0, 40.0));
+        let over_button = mouse::Cursor::Available(Point::new(200.0, 210.0));
+        let over_empty_stage = mouse::Cursor::Available(Point::new(20.0, 20.0));
+
+        assert!(press_targets_content(over_button, content));
+        assert!(
+            !press_targets_content(over_empty_stage, content),
+            "empty CoolMode stage must not start emission"
+        );
+        assert!(!press_targets_content(mouse::Cursor::Unavailable, content));
     }
 
     #[test]
