@@ -1,11 +1,15 @@
 mod _shared;
 
-use enchant_iced::CoolMode;
+use enchant_iced::{CoolMode, CoolParticleKind};
 use iced::time::Instant;
-use iced::widget::{column, container, text};
+use iced::widget::{column, container, image, text};
 use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, button_content};
 use std::time::Duration;
+
+fn svelte_logo_handle() -> image::Handle {
+    image::Handle::from_bytes(include_bytes!("assets/cool-mode/svelte-logo.png").as_slice())
+}
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -15,7 +19,7 @@ pub fn main() -> iced::Result {
     )
     .title("Cool Mode")
     .window(iced::window::Settings {
-        size: Size::new(900.0, 520.0),
+        size: Size::new(900.0, 720.0),
         ..Default::default()
     })
     .subscription(CoolModeExample::subscription)
@@ -72,7 +76,7 @@ impl CoolModeExample {
         // Pass the button only — not a Fill-centering wrapper (that made the whole
         // stage the CoolMode content hit target). CoolMode fills the stage for
         // particle travel and centers Shrink content internally.
-        let trigger = button_content(
+        let click_me = button_content(
             text("Click Me!"),
             None::<Message>,
             ButtonProps::new()
@@ -81,15 +85,36 @@ impl CoolModeExample {
             self.theme_shell.theme(),
         );
 
-        let stage = container(CoolMode::new(trigger).into_element(self.elapsed))
+        let svelte_image = button_content(
+            text("Svelte Image"),
+            None::<Message>,
+            ButtonProps::new()
+                .variant(ButtonVariant::Default)
+                .size(ButtonSize::Size2),
+            self.theme_shell.theme(),
+        );
+
+        let preview_stage = container(CoolMode::new(click_me).into_element(self.elapsed))
             .width(Length::Fill)
-            .height(Length::Fixed(420.0))
+            .height(Length::Fixed(300.0))
             .center_x(Length::Fill)
             .center_y(Length::Fill);
 
+        let custom_image_stage = container(
+            CoolMode::new(svelte_image)
+                .particle(CoolParticleKind::Image(svelte_logo_handle()))
+                .into_element(self.elapsed),
+        )
+        .width(Length::Fill)
+        .height(Length::Fixed(300.0))
+        .center_x(Length::Fill)
+        .center_y(Length::Fill);
+
         _shared::themed_shell(
             "Cool Mode",
-            column![stage].spacing(24).width(Length::Fill),
+            column![preview_stage, custom_image_stage]
+                .spacing(24)
+                .width(Length::Fill),
             &self.theme_shell,
             Message::ToggleTheme,
         )
