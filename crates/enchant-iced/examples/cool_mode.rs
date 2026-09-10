@@ -1,10 +1,11 @@
 mod _shared;
 
-use enchant_iced::{CoolModeAction, CoolModeProps, CoolModeState, cool_mode};
-use iced::time::{Duration, Instant};
-use iced::widget::{column, text};
-use iced::{Element, Size, Subscription, Task};
+use enchant_iced::CoolMode;
+use iced::time::Instant;
+use iced::widget::{column, container, text};
+use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, button_content};
+use std::time::Duration;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -14,7 +15,7 @@ pub fn main() -> iced::Result {
     )
     .title("Cool Mode")
     .window(iced::window::Settings {
-        size: Size::new(900.0, 360.0),
+        size: Size::new(900.0, 520.0),
         ..Default::default()
     })
     .subscription(CoolModeExample::subscription)
@@ -23,27 +24,25 @@ pub fn main() -> iced::Result {
 
 struct CoolModeExample {
     theme_shell: _shared::ThemeShell,
-    state: CoolModeState,
-    props: CoolModeProps,
-    now: Instant,
+    start: Instant,
+    elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     ToggleTheme,
     AnchorsMeasured(enchant_iced::AnchorMeasurements),
-    CoolMode(CoolModeAction),
     Tick(Instant),
 }
 
 impl CoolModeExample {
     fn new() -> (Self, Task<Message>) {
+        let start = Instant::now();
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-                state: CoolModeState::new(),
-                props: CoolModeProps::new(),
-                now: Instant::now(),
+                start,
+                elapsed: Duration::ZERO,
             },
             Task::none(),
         )
@@ -57,14 +56,9 @@ impl CoolModeExample {
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
-
-            Message::CoolMode(action) => {
-                self.state.apply_action(&action, self.now, &self.props);
-            }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
-                self.now = now;
-                self.state.tick(now, &self.props);
+                self.elapsed = now.duration_since(self.start);
             }
         }
         Task::none()
@@ -84,10 +78,22 @@ impl CoolModeExample {
             self.theme_shell.theme(),
         );
 
-        let body = cool_mode(trigger, &self.state, &self.props, Message::CoolMode);
+        let content = container(trigger)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill);
+
+        // CoolMode fills so particles travel across the stage (not clipped to the button).
+        let stage = container(
+            CoolMode::new(content).into_element(self.elapsed),
+        )
+        .width(Length::Fill)
+        .height(Length::Fixed(420.0));
+
         _shared::themed_shell(
             "Cool Mode",
-            column![body].spacing(24),
+            column![stage].spacing(24).width(Length::Fill),
             &self.theme_shell,
             Message::ToggleTheme,
         )
