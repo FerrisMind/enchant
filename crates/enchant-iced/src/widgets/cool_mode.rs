@@ -8,6 +8,7 @@ use crate::primitives::{EffectCanvasProps, EffectProgram, StableRng, effect_canv
 use iced::mouse;
 use iced::widget::canvas::{self, Fill, Text};
 use iced::widget::{container, stack};
+use iced::border::Radius;
 use iced::{
     Color, Element, Event, Length, Point, Pixels, Rectangle, Renderer, Size,
 };
@@ -303,8 +304,8 @@ impl CoolModeSim {
         let steps = ((delta.as_secs_f32() / FRAME_SECS).floor() as u32).min(MAX_STEPS_PER_TICK);
 
         if steps == 0 {
+            // Leave `last_sim_elapsed` unchanged so sub-frame deltas accumulate.
             self.try_emit(elapsed, config);
-            self.last_sim_elapsed = elapsed;
             return;
         }
 
@@ -315,7 +316,8 @@ impl CoolModeSim {
             step_all(&mut self.particles);
             retain_in_bounds(&mut self.particles, bounds_height);
         }
-        self.last_sim_elapsed = elapsed;
+        // Advance only by consumed whole frames; leftover delta carries forward.
+        self.last_sim_elapsed = sim_t;
     }
 }
 
@@ -501,17 +503,17 @@ fn paint_particle(frame: &mut canvas::Frame, particle: &CoolParticle, kind: &Coo
             });
         }
         CoolParticleKind::Image(handle) => {
-            let size = Size::new(particle.size.max(0.0), particle.size.max(0.0));
-            let rect = Rectangle::new(
-                Point::new(-particle.size * 0.5, -particle.size * 0.5),
-                size,
-            );
+            let extent = particle.size.max(0.0);
+            let size = Size::new(extent, extent);
+            let rect = Rectangle::new(Point::new(-extent * 0.5, -extent * 0.5), size);
+            // Magic CSS `border-radius: 50%`: clip_bounds = particle box, Radius = size/2 → circle.
+            let mut image = canvas::Image::new(handle.clone());
+            image.border_radius = Radius::from(extent * 0.5);
             frame.with_save(|frame| {
                 frame.translate(iced::Vector::new(center.x, center.y));
                 frame.rotate(angle);
-                // Approximate CSS `border-radius: 50%` with a square clip of the particle box.
                 frame.with_clip(rect, |frame| {
-                    frame.draw_image(rect, handle);
+                    frame.draw_image(rect, image);
                 });
             });
         }
@@ -668,5 +670,38 @@ mod tests {
         assert!(sim.auto_add);
         sim.set_press(false);
         assert!(!sim.auto_add);
+    }
+
+    #[test]
+    fn sub_frame_deltas_accumulate_before_step() {
+        let mut sim = CoolModeSim::default();
+        let config = CoolModeEmitConfig {
+            size: Some(20.0),
+            particle_count: 4,
+            speed_horz: Some(0.0),
+            speed_up: Some(0.0),
+        };
+
+        sim.advance(Duration::ZERO, 400.0, &config);
+        assert_eq!(sim.last_sim_elapsed, Duration::ZERO);
+
+        // Two partial frames must not consume the clock.
+        sim.advance(Duration::from_millis(8), 400.0, &config);
+        assert_eq!(sim.last_sim_elapsed, Duration::ZERO);
+        sim.advance(Duration::from_millis(16), 400.0, &config);
+        assert_eq!(sim.last_sim_elapsed, Duration::ZERO);
+
+        // Crossing one FRAME_SECS advances last_sim by exactly one frame, not wall elapsed.
+        sim.advance(Duration::from_millis(17), 400.0, &config);
+        assert_eq!(
+            sim.last_sim_elapsed,
+            Duration::from_secs_f32(FRAME_SECS),
+            "partial leftovers must remain so the next tick can accumulate"
+        );
+        assert_ne!(
+            sim.last_sim_elapsed,
+            Duration::from_millis(17),
+            "must not snap last_sim to wall-clock elapsed"
+        );
     }
 }
