@@ -158,7 +158,7 @@ pub use interactive_hover_button::{
     InteractiveHoverButton, InteractiveHoverEase, InteractiveHoverIcon,
 };
 pub use kinetic_text::{KineticTextProps, KineticTextRole, KineticTextState, kinetic_text};
-pub use lens::{LensAction, LensProps, LensState, lens};
+pub use lens::{Lens, LensAction, LensState, LensValues, LensVisibility};
 pub use light_rays::{LightRaysProps, light_rays};
 pub use line_shadow_text::{LineShadowTextProps, line_shadow_color_for_mode, line_shadow_text};
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
