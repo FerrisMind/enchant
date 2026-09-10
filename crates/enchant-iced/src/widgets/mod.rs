@@ -117,7 +117,7 @@ pub use comic_text::{ComicTextProps, ComicTextState, comic_text};
 pub use confetti::{
     ConfettiAction, ConfettiBurst, ConfettiProps, ConfettiState, confetti, confetti_button,
 };
-pub use cool_mode::{CoolModeAction, CoolModeProps, CoolModeState, CoolParticleVisual, cool_mode};
+pub use cool_mode::{CoolMode, CoolParticleKind};
 pub use dia_text_reveal::{
     DEFAULT_DIA_COLORS, DiaTextRevealProps, DiaTextRevealState, dia_text_reveal,
     dia_text_reveal_companion,

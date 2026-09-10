@@ -1,10 +1,11 @@
 mod _shared;
 
-use enchant_iced::{CoolModeAction, CoolModeProps, CoolModeState, cool_mode};
-use iced::time::{Duration, Instant};
-use iced::widget::{column, text};
-use iced::{Element, Size, Subscription, Task};
+use enchant_iced::{CoolMode, CoolParticleKind};
+use iced::time::Instant;
+use iced::widget::{column, container, image, text};
+use iced::{Element, Length, Size, Subscription, Task};
 use iced_shadcn::{ButtonProps, ButtonSize, ButtonVariant, button_content};
+use std::time::Duration;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -14,7 +15,7 @@ pub fn main() -> iced::Result {
     )
     .title("Cool Mode")
     .window(iced::window::Settings {
-        size: Size::new(900.0, 360.0),
+        size: Size::new(900.0, 720.0),
         ..Default::default()
     })
     .subscription(CoolModeExample::subscription)
@@ -23,27 +24,29 @@ pub fn main() -> iced::Result {
 
 struct CoolModeExample {
     theme_shell: _shared::ThemeShell,
-    state: CoolModeState,
-    props: CoolModeProps,
-    now: Instant,
+    start: Instant,
+    elapsed: Duration,
+    rust_logo: image::Handle,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     ToggleTheme,
     AnchorsMeasured(enchant_iced::AnchorMeasurements),
-    CoolMode(CoolModeAction),
     Tick(Instant),
 }
 
 impl CoolModeExample {
     fn new() -> (Self, Task<Message>) {
+        let start = Instant::now();
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-                state: CoolModeState::new(),
-                props: CoolModeProps::new(),
-                now: Instant::now(),
+                start,
+                elapsed: Duration::ZERO,
+                rust_logo: image::Handle::from_bytes(
+                    include_bytes!("assets/cool-mode/rust-logo.png").as_slice(),
+                ),
             },
             Task::none(),
         )
@@ -57,14 +60,9 @@ impl CoolModeExample {
             Message::AnchorsMeasured(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
-
-            Message::CoolMode(action) => {
-                self.state.apply_action(&action, self.now, &self.props);
-            }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
-                self.now = now;
-                self.state.tick(now, &self.props);
+                self.elapsed = now.duration_since(self.start);
             }
         }
         Task::none()
@@ -75,7 +73,10 @@ impl CoolModeExample {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let trigger = button_content(
+        // Pass the button only — not a Fill-centering wrapper (that made the whole
+        // stage the CoolMode content hit target). CoolMode fills the stage for
+        // particle travel and centers Shrink content internally.
+        let click_me = button_content(
             text("Click Me!"),
             None::<Message>,
             ButtonProps::new()
@@ -84,10 +85,36 @@ impl CoolModeExample {
             self.theme_shell.theme(),
         );
 
-        let body = cool_mode(trigger, &self.state, &self.props, Message::CoolMode);
+        let rust_image = button_content(
+            text("Rust Image"),
+            None::<Message>,
+            ButtonProps::new()
+                .variant(ButtonVariant::Default)
+                .size(ButtonSize::Size2),
+            self.theme_shell.theme(),
+        );
+
+        let preview_stage = container(CoolMode::new(click_me).into_element(self.elapsed))
+            .width(Length::Fill)
+            .height(Length::Fixed(300.0))
+            .center_x(Length::Fill)
+            .center_y(Length::Fill);
+
+        let custom_image_stage = container(
+            CoolMode::new(rust_image)
+                .particle(CoolParticleKind::Image(self.rust_logo.clone()))
+                .into_element(self.elapsed),
+        )
+        .width(Length::Fill)
+        .height(Length::Fixed(300.0))
+        .center_x(Length::Fill)
+        .center_y(Length::Fill);
+
         _shared::themed_shell(
             "Cool Mode",
-            column![body].spacing(24),
+            column![preview_stage, custom_image_stage]
+                .spacing(24)
+                .width(Length::Fill),
             &self.theme_shell,
             Message::ToggleTheme,
         )
