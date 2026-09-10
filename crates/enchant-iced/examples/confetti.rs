@@ -1,9 +1,19 @@
 mod _shared;
 
-use enchant_iced::{Confetti, ConfettiState};
+use enchant_iced::{
+    AnchorMeasurements, AnchorRemeasure, Confetti, ConfettiButton, ConfettiState, anchor,
+    measure_anchors,
+};
 use iced::time::{Duration, Instant};
-use iced::widget::{button, column, container, stack, text};
-use iced::{Alignment, Background, Border, Color, Element, Length, Size, Subscription, Task};
+use iced::widget::{Id, button, column, container, stack, text};
+use iced::{
+    Alignment, Background, Border, Color, Element, Length, Point, Size, Subscription, Task,
+};
+
+const STAGE_ID: &str = "confetti-stage";
+const FIRE_BUTTON_ID: &str = "confetti-fire-button";
+const BUTTON_STAGE_ID: &str = "confetti-button-stage";
+const CONFETTI_BUTTON_ID: &str = "confetti-button";
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -13,7 +23,7 @@ pub fn main() -> iced::Result {
     )
     .title("Confetti")
     .window(iced::window::Settings {
-        size: Size::new(900.0, 620.0),
+        size: Size::new(900.0, 920.0),
         ..Default::default()
     })
     .subscription(ConfettiExample::subscription)
@@ -22,56 +32,110 @@ pub fn main() -> iced::Result {
 
 struct ConfettiExample {
     theme_shell: _shared::ThemeShell,
-    state: ConfettiState,
-    confetti: Confetti,
+    preview_state: ConfettiState,
+    preview_confetti: Confetti,
+    button_state: ConfettiState,
+    button_confetti: Confetti,
     now: Instant,
+    preview_origin: Option<Point>,
+    button_origin: Option<Point>,
+    auto_fired_preview: bool,
+    remeasure: AnchorRemeasure,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     ToggleTheme,
-    AnchorsMeasured(enchant_iced::AnchorMeasurements),
-    Fire,
+    ThemeAnchors(enchant_iced::AnchorMeasurements),
+    LayoutMeasured(AnchorMeasurements),
+    FirePreview,
+    FireButton,
     Tick(Instant),
 }
 
 impl ConfettiExample {
     fn new() -> (Self, Task<Message>) {
         let now = Instant::now();
-        let confetti = Confetti::new();
-        let mut state = ConfettiState::new();
-        state.fire(now, &confetti);
+        let preview_confetti = Confetti::new();
+        let button_confetti = ConfettiButton::<()>::new(text("")).confetti();
 
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
-                state,
-                confetti,
+                preview_state: ConfettiState::new(),
+                preview_confetti,
+                button_state: ConfettiState::new(),
+                button_confetti,
                 now,
+                preview_origin: None,
+                button_origin: None,
+                auto_fired_preview: false,
+                remeasure: AnchorRemeasure::new(),
             },
-            Task::none(),
+            measure_demo_layout(),
         )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleTheme => {
-                return _shared::ThemeShell::measure_toggle_anchor().map(Message::AnchorsMeasured);
+                return _shared::ThemeShell::measure_toggle_anchor().map(Message::ThemeAnchors);
             }
-            Message::AnchorsMeasured(measurements) => {
+            Message::ThemeAnchors(measurements) => {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
-            Message::Fire => {
-                self.state.clear();
-                self.state.fire(self.now, &self.confetti);
+            Message::LayoutMeasured(measurements) => {
+                self.apply_layout(&measurements);
+                if !self.auto_fired_preview {
+                    if let Some(origin) = self.preview_origin {
+                        self.preview_state
+                            .fire_at(self.now, &self.preview_confetti, origin);
+                        self.auto_fired_preview = true;
+                    } else {
+                        self.remeasure.schedule();
+                    }
+                }
+            }
+            Message::FirePreview => {
+                if let Some(origin) = self.preview_origin {
+                    self.preview_state.clear();
+                    self.preview_state
+                        .fire_at(self.now, &self.preview_confetti, origin);
+                } else {
+                    self.remeasure.schedule();
+                    return measure_demo_layout();
+                }
+            }
+            Message::FireButton => {
+                if let Some(origin) = self.button_origin {
+                    self.button_state.clear();
+                    self.button_state
+                        .fire_at(self.now, &self.button_confetti, origin);
+                } else {
+                    self.remeasure.schedule();
+                    return measure_demo_layout();
+                }
             }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
                 self.now = now;
-                self.state.tick(now, &self.confetti);
+                self.preview_state.tick(now, &self.preview_confetti);
+                self.button_state.tick(now, &self.button_confetti);
+                if self.remeasure.take() {
+                    return measure_demo_layout();
+                }
             }
         }
         Task::none()
+    }
+
+    fn apply_layout(&mut self, measurements: &AnchorMeasurements) {
+        if let (Some(stage), Some(button)) = (measurements.get(0), measurements.get(1)) {
+            self.preview_origin = Some(content_top_center(stage.bounds, button.bounds));
+        }
+        if let (Some(stage), Some(button)) = (measurements.get(2), measurements.get(3)) {
+            self.button_origin = Some(content_top_center(stage.bounds, button.bounds));
+        }
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -82,44 +146,110 @@ impl ConfettiExample {
         let fire_button = button(text("Fire Confetti").size(14).color(Color::WHITE))
             .padding([10.0, 16.0])
             .style(fire_button_style)
-            .on_press(Message::Fire);
+            .on_press(Message::FirePreview);
 
-        let overlay = self
-            .confetti
+        let preview_overlay = self
+            .preview_confetti
             .width(Length::Fill)
             .height(Length::Fill)
-            .view(&self.state, self.now);
+            .view(&self.preview_state, self.now);
 
-        let stage = container(
-            stack![
-                container(overlay).width(Length::Fill).height(Length::Fill),
-                container(fire_button)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .center_x(Length::Fill)
-                    .center_y(Length::Fill),
-            ]
+        let preview_stage = bordered_stage(
+            STAGE_ID,
+            FIRE_BUTTON_ID,
+            fire_button.into(),
+            preview_overlay,
+        );
+
+        let confetti_button = ConfettiButton::new(text("Click Me!").size(14).color(Color::WHITE))
+            .on_press(Message::FireButton)
+            .view();
+
+        let button_overlay = self
+            .button_confetti
             .width(Length::Fill)
-            .height(Length::Fill),
-        )
-        .width(Length::Fill)
-        .height(Length::Fixed(500.0))
-        .style(|_| container::Style {
-            border: Border {
-                width: 1.0,
-                radius: 12.0.into(),
-                color: Color::from_rgb8(228, 228, 231),
-            },
-            ..container::Style::default()
-        });
+            .height(Length::Fill)
+            .view(&self.button_state, self.now);
+
+        let confetti_button_stage = bordered_stage(
+            BUTTON_STAGE_ID,
+            CONFETTI_BUTTON_ID,
+            confetti_button,
+            button_overlay,
+        );
 
         _shared::themed_shell(
             "Confetti",
-            column![stage].spacing(24).align_x(Alignment::Center),
+            column![
+                section_label("Confetti"),
+                preview_stage,
+                section_label("ConfettiButton"),
+                confetti_button_stage,
+            ]
+            .spacing(16)
+            .align_x(Alignment::Center),
             &self.theme_shell,
             Message::ToggleTheme,
         )
     }
+}
+
+fn measure_demo_layout() -> Task<Message> {
+    measure_anchors([
+        Id::new(STAGE_ID),
+        Id::new(FIRE_BUTTON_ID),
+        Id::new(BUTTON_STAGE_ID),
+        Id::new(CONFETTI_BUTTON_ID),
+    ])
+    .map(Message::LayoutMeasured)
+}
+
+fn content_top_center(stage: iced::Rectangle, button: iced::Rectangle) -> Point {
+    Point::new(
+        button.x - stage.x + button.width / 2.0,
+        button.y - stage.y,
+    )
+}
+
+fn section_label(label: &str) -> Element<'_, Message> {
+    text(label)
+        .size(18)
+        .color(Color::from_rgb8(24, 24, 27))
+        .into()
+}
+
+fn bordered_stage<'a>(
+    stage_id: &'static str,
+    button_id: &'static str,
+    button: Element<'a, Message>,
+    overlay: Element<'a, Message>,
+) -> Element<'a, Message> {
+    let stage = container(
+        stack![
+            container(overlay)
+                .width(Length::Fill)
+                .height(Length::Fill),
+            container(anchor(button_id, button))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
+        ]
+        .width(Length::Fill)
+        .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fixed(500.0))
+    .style(|_| container::Style {
+        border: Border {
+            width: 1.0,
+            radius: 12.0.into(),
+            color: Color::from_rgb8(228, 228, 231),
+        },
+        ..container::Style::default()
+    });
+
+    anchor(stage_id, stage).into()
 }
 
 fn fire_button_style(

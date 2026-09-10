@@ -297,7 +297,8 @@ fn button_default_confetti() -> Confetti {
 /// Button that carries animations [`Confetti`] defaults and emits a press message.
 ///
 /// Confetti is not fired automatically — on press the host should call
-/// [`ConfettiState::clear`] then [`ConfettiState::fire`] with [`Self::confetti`].
+/// [`ConfettiState::clear`] then [`ConfettiState::fire_at`] with [`Self::confetti`]
+/// and the button top-center in canvas-local coordinates.
 #[must_use = "builders do nothing unless turned into an iced Element"]
 pub struct ConfettiButton<'a, Message> {
     content: Element<'a, Message>,
@@ -493,12 +494,28 @@ impl ConfettiState {
         Self::default()
     }
 
-    /// Clears existing particles and starts one new burst.
-    pub fn fire(&mut self, now: Instant, config: &Confetti) {
+    /// Clears existing particles and starts one new burst at `origin`.
+    ///
+    /// `origin` is in canvas-local logical coordinates. For the animations
+    /// preview pattern (stage overlay), pass the **content top-center**
+    /// (typically the Fire Confetti / ConfettiButton top-center relative to
+    /// the stage canvas). Particle samples are offsets from this point.
+    pub fn fire_at(&mut self, now: Instant, config: &Confetti, origin: Point) {
+        let origin = Point::new(finite_or(origin.x, 0.0), finite_or(origin.y, 0.0));
         self.bursts.clear();
         self.bursts
-            .push(ConfettiBurst::new(now, *config, self.nonce));
+            .push(ConfettiBurst::new(now, *config, self.nonce, origin));
         self.nonce = self.nonce.wrapping_add(1);
+    }
+
+    /// Starts a burst at canvas `(0, 0)`.
+    ///
+    /// Prefer [`Self::fire_at`] with an explicit content top-center when the
+    /// canvas is a full-stage overlay. Use this only when the canvas itself is
+    /// the content-sized box (origin coinciding with the box top-left), or when
+    /// tests need a known origin.
+    pub fn fire(&mut self, now: Instant, config: &Confetti) {
+        self.fire_at(now, config, Point::ORIGIN);
     }
 
     /// Removes all active bursts.
@@ -527,11 +544,12 @@ impl ConfettiState {
 #[derive(Clone, Debug)]
 struct ConfettiBurst {
     started_at: Instant,
+    origin: Point,
     particles: Vec<Particle>,
 }
 
 impl ConfettiBurst {
-    fn new(started_at: Instant, config: Confetti, nonce: u64) -> Self {
+    fn new(started_at: Instant, config: Confetti, nonce: u64, origin: Point) -> Self {
         let mut rng = StableRng::new(config.seed.wrapping_add(nonce));
         let particles = (0..config.particle_count)
             .map(|index| spawn_particle(index, config, &mut rng))
@@ -539,6 +557,7 @@ impl ConfettiBurst {
 
         Self {
             started_at,
+            origin,
             particles,
         }
     }
@@ -737,14 +756,17 @@ impl<Message> EffectProgram<Message> for ConfettiProgram<'_> {
                 .now
                 .saturating_duration_since(burst.started_at)
                 .as_millis() as u64;
-            let origin = Point::new(bounds.width / 2.0, 0.0);
 
             for particle in &burst.particles {
                 let fraction = elapsed_ms as f32 / particle.duration_ms as f32;
                 let sample = sample_neoconfetti(particle, fraction, self.config.stage_height);
                 let color = particle.color;
-                let position =
-                    Point::new(origin.x + sample.position.x, origin.y + sample.position.y);
+                // Spawn at the baked content origin (e.g. button top-center),
+                // never hardcode the stage canvas top edge.
+                let position = Point::new(
+                    burst.origin.x + sample.position.x,
+                    burst.origin.y + sample.position.y,
+                );
 
                 frame.with_save(|frame| {
                     frame.translate(Vector::new(position.x, position.y));
@@ -847,6 +869,49 @@ mod tests {
 
         assert!(at_start.position.y.abs() < 40.0);
         assert!(later.position.y > at_start.position.y);
+    }
+
+    #[test]
+    fn fire_at_bakes_origin_and_t0_samples_near_it() {
+        let mut state = ConfettiState::new();
+        let confetti = Confetti::new().with_particle_count(12).with_seed(7);
+        let started_at = Instant::now();
+        let origin = Point::new(100.0, 200.0);
+
+        state.fire_at(started_at, &confetti, origin);
+        assert_eq!(state.burst_count(), 1);
+
+        let burst = &state.bursts[0];
+        assert!((burst.origin.x - 100.0).abs() < f32::EPSILON);
+        assert!((burst.origin.y - 200.0).abs() < f32::EPSILON);
+
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+        let mut min_x = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+
+        for particle in &burst.particles {
+            let sample = sample_neoconfetti(particle, 0.0, confetti.stage_height());
+            let position = Point::new(
+                burst.origin.x + sample.position.x,
+                burst.origin.y + sample.position.y,
+            );
+            min_y = min_y.min(position.y);
+            max_y = max_y.max(position.y);
+            min_x = min_x.min(position.x);
+            max_x = max_x.max(position.x);
+        }
+
+        // At t≈0 samples sit near the baked origin — not the stage top (y=0).
+        assert!(
+            min_y > 160.0 && max_y < 240.0,
+            "expected t0 y near 200, got [{min_y}, {max_y}]"
+        );
+        assert!(
+            min_x > 40.0 && max_x < 160.0,
+            "expected t0 x near 100, got [{min_x}, {max_x}]"
+        );
+        assert!(min_y.abs() > 1.0, "must not collapse to stage-top y≈0");
     }
 
     #[test]
