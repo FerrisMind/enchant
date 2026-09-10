@@ -1,178 +1,229 @@
-use crate::primitives::{EffectCanvasProps, EffectProgram, StableRng, effect_canvas};
+//! Magic UI / canvas-confetti style confetti cannon for iced.
+
+use crate::primitives::{
+    ConfettiParticle, EffectCanvasProps, EffectProgram, ParticleShape, confetti_particles,
+    effect_canvas, sample_confetti_particle,
+};
 use iced::mouse;
 use iced::time::Instant;
 use iced::widget::button;
 use iced::widget::canvas;
 use iced::{Color, Element, Length, Padding, Point, Rectangle, Renderer, Size, Vector};
+use std::f32::consts::{PI, TAU};
 use std::fmt;
 use std::time::Duration;
 
 const MAX_COLORS: usize = 8;
-const DEFAULT_COLORS: [Color; 4] = [
-    Color::from_rgb8(0xFF, 0xC7, 0x00),
-    Color::from_rgb8(0xFF, 0x00, 0x00),
-    Color::from_rgb8(0x2E, 0x31, 0x91),
-    Color::from_rgb8(0x41, 0xBB, 0xC7),
+const MAX_SHAPES: usize = 8;
+/// Approximate canvas-confetti tick duration at ~60 fps.
+const MS_PER_TICK: u64 = 16;
+
+/// Default palette from canvas-confetti.
+const DEFAULT_COLORS: [Color; 7] = [
+    Color::from_rgb8(0x26, 0xCC, 0xFF),
+    Color::from_rgb8(0xA2, 0x5A, 0xFD),
+    Color::from_rgb8(0xFF, 0x5E, 0x7E),
+    Color::from_rgb8(0x88, 0xFF, 0x5A),
+    Color::from_rgb8(0xFC, 0xFF, 0x42),
+    Color::from_rgb8(0xFF, 0xA6, 0x2D),
+    Color::from_rgb8(0xFF, 0x36, 0xFF),
 ];
-const BUTTON_COLORS: [Color; 3] = [
-    Color::from_rgb8(0xFF, 0x00, 0x00),
-    Color::from_rgb8(0x00, 0xFF, 0x00),
-    Color::from_rgb8(0x00, 0x00, 0xFF),
-];
-const BUTTON_PARTICLE_COUNT: usize = 50;
+
 const BUTTON_BACKGROUND: Color = Color::from_rgb8(0x25, 0x63, 0xEB);
 const BUTTON_BACKGROUND_HOVER: Color = Color::from_rgb8(0x1D, 0x4E, 0xD8);
 const BUTTON_BORDER_RADIUS: f32 = 8.0;
-const DEFAULT_DURATION_MS: u64 = 3_500;
-const CRAZY_PARTICLES_FREQUENCY: f32 = 0.1;
-const CRAZY_PARTICLE_CRAZINESS: f32 = 0.3;
-const BEZIER_MEDIAN: f32 = 0.5;
-const POSSIBLE_ROTATION_TRANSFORMS: u32 = 6;
-const ROTATION_SPEED_MIN_MS: f32 = 200.0;
-const ROTATION_SPEED_MAX_MS: f32 = 800.0;
 
-/// The particle geometry used by [`Confetti`].
+/// Particle geometry matching Magic UI / canvas-confetti shapes.
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum ConfettiParticleShape {
-    /// Use both circles and rectangles.
-    #[default]
-    Mix,
-    /// Use circles only.
-    Circles,
-    /// Use rectangles only.
-    Rectangles,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ConfettiShape {
+    /// Filled circle.
+    Circle,
+    /// Axis-aligned square (rotated in flight).
+    Square,
+    /// Five-point star polygon.
+    Star,
+    /// SVG path data — drawn as a triangle stand-in until a full path parser lands.
+    Path {
+        /// Static SVG path string (Magic UI custom shapes).
+        data: &'static str,
+    },
+    /// Text / emoji glyph — drawn as a larger tinted circle when glyph rasterization is unavailable.
+    Text {
+        /// Static text (e.g. `"🦄"`).
+        text: &'static str,
+    },
 }
 
-/// Builder configuration for a neoconfetti-style burst.
-#[must_use = "builders do nothing unless turned into an iced Element"]
+impl ConfettiShape {
+    fn to_particle_shape(self) -> ParticleShape {
+        match self {
+            Self::Circle | Self::Text { .. } => ParticleShape::Circle,
+            Self::Square | Self::Path { .. } => ParticleShape::Square,
+            Self::Star => ParticleShape::Star,
+        }
+    }
+}
+
+/// Magic UI / canvas-confetti fire options.
+#[must_use = "builders do nothing unless passed to ConfettiState::fire"]
 #[derive(Clone, Copy, PartialEq)]
-pub struct Confetti {
+pub struct ConfettiOptions {
     particle_count: usize,
-    particle_shape: ConfettiParticleShape,
-    particle_size: f32,
-    duration_ms: u64,
-    force: f32,
-    stage_height: f32,
-    stage_width: f32,
-    destroy_after_done: bool,
+    angle: f32,
+    spread: f32,
+    start_velocity: f32,
+    decay: f32,
+    gravity: f32,
+    drift: f32,
+    ticks: u64,
+    origin_x: Option<f32>,
+    origin_y: Option<f32>,
     colors: [Color; MAX_COLORS],
     color_len: u8,
-    width: Length,
-    height: Length,
+    scalar: f32,
+    shapes: [ConfettiShape; MAX_SHAPES],
+    shape_len: u8,
     seed: u64,
 }
 
-impl fmt::Debug for Confetti {
+impl fmt::Debug for ConfettiOptions {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("Confetti")
+            .debug_struct("ConfettiOptions")
             .field("particle_count", &self.particle_count)
-            .field("particle_shape", &self.particle_shape)
-            .field("particle_size", &self.particle_size)
-            .field("duration_ms", &self.duration_ms)
-            .field("force", &self.force)
-            .field("stage_height", &self.stage_height)
-            .field("stage_width", &self.stage_width)
-            .field("destroy_after_done", &self.destroy_after_done)
+            .field("angle", &self.angle)
+            .field("spread", &self.spread)
+            .field("start_velocity", &self.start_velocity)
+            .field("decay", &self.decay)
+            .field("gravity", &self.gravity)
+            .field("drift", &self.drift)
+            .field("ticks", &self.ticks)
+            .field("origin_x", &self.origin_x)
+            .field("origin_y", &self.origin_y)
             .field("colors", &self.colors())
-            .field("width", &self.width)
-            .field("height", &self.height)
+            .field("scalar", &self.scalar)
+            .field("shapes", &self.shapes())
             .field("seed", &self.seed)
             .finish()
     }
 }
 
-impl Default for Confetti {
+impl Default for ConfettiOptions {
     fn default() -> Self {
         let mut colors = [Color::TRANSPARENT; MAX_COLORS];
         colors[..DEFAULT_COLORS.len()].copy_from_slice(&DEFAULT_COLORS);
 
+        let mut shapes = [ConfettiShape::Circle; MAX_SHAPES];
+        shapes[0] = ConfettiShape::Square;
+        shapes[1] = ConfettiShape::Circle;
+
         Self {
-            particle_count: 40,
-            particle_shape: ConfettiParticleShape::Mix,
-            particle_size: 12.0,
-            duration_ms: DEFAULT_DURATION_MS,
-            force: 0.5,
-            stage_height: 800.0,
-            stage_width: 1600.0,
-            destroy_after_done: true,
+            particle_count: 50,
+            angle: 90.0,
+            spread: 45.0,
+            start_velocity: 45.0,
+            decay: 0.9,
+            gravity: 1.0,
+            drift: 0.0,
+            ticks: 200,
+            origin_x: None,
+            origin_y: None,
             colors,
             color_len: DEFAULT_COLORS.len() as u8,
-            width: Length::Fill,
-            height: Length::Fill,
+            scalar: 1.0,
+            shapes,
+            shape_len: 2,
             seed: 0,
         }
     }
 }
 
-impl Confetti {
-    /// Creates a builder with the animations wrapper defaults.
+impl ConfettiOptions {
+    /// Creates options with canvas-confetti defaults.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Sets the number of particles, clamped to at least one.
-    ///
-    /// Named `with_*` so it does not collide with the C-GETTER [`Self::particle_count`].
+    /// Sets particle count (at least 1).
     #[must_use = "builder setters return updated configuration"]
     pub fn with_particle_count(mut self, particle_count: usize) -> Self {
         self.particle_count = particle_count.max(1);
         self
     }
 
-    /// Sets the particle shape.
+    /// Launch angle in degrees (90 = straight up).
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_particle_shape(mut self, particle_shape: ConfettiParticleShape) -> Self {
-        self.particle_shape = particle_shape;
+    pub fn with_angle(mut self, angle: f32) -> Self {
+        self.angle = finite_or(angle, 90.0);
         self
     }
 
-    /// Sets the particle size in logical pixels.
+    /// Spread cone in degrees.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_particle_size(mut self, particle_size: f32) -> Self {
-        self.particle_size = finite_or(particle_size, 1.0).max(1.0);
+    pub fn with_spread(mut self, spread: f32) -> Self {
+        self.spread = finite_or(spread, 0.0).max(0.0);
         self
     }
 
-    /// Sets the burst duration in milliseconds.
+    /// Initial speed.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_duration_ms(mut self, duration_ms: u64) -> Self {
-        self.duration_ms = duration_ms.max(1);
+    pub fn with_start_velocity(mut self, start_velocity: f32) -> Self {
+        self.start_velocity = finite_or(start_velocity, 0.0).max(0.0);
         self
     }
 
-    /// Sets the force in the inclusive range `0..=1`.
+    /// Velocity decay in `0..=1`.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_force(mut self, force: f32) -> Self {
-        self.force = finite_or(force, 0.0).clamp(0.0, 1.0);
+    pub fn with_decay(mut self, decay: f32) -> Self {
+        self.decay = finite_or(decay, 0.9).clamp(0.0, 1.0);
         self
     }
 
-    /// Sets the stage height in logical pixels.
+    /// Gravity multiplier (1 = full).
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_stage_height(mut self, stage_height: f32) -> Self {
-        self.stage_height = finite_or(stage_height, 1.0).max(1.0);
+    pub fn with_gravity(mut self, gravity: f32) -> Self {
+        self.gravity = finite_or(gravity, 1.0);
         self
     }
 
-    /// Sets the stage width in logical pixels.
+    /// Horizontal drift.
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_stage_width(mut self, stage_width: f32) -> Self {
-        self.stage_width = finite_or(stage_width, 1.0).max(1.0);
+    pub fn with_drift(mut self, drift: f32) -> Self {
+        self.drift = finite_or(drift, 0.0);
         self
     }
 
-    /// Controls whether a finished burst is removed during [`ConfettiState::tick`].
+    /// Lifetime in canvas-confetti ticks (mapped to ms at ~60 fps).
     #[must_use = "builder setters return updated configuration"]
-    pub fn with_destroy_after_done(mut self, destroy_after_done: bool) -> Self {
-        self.destroy_after_done = destroy_after_done;
+    pub fn with_ticks(mut self, ticks: u64) -> Self {
+        self.ticks = ticks.max(1);
         self
     }
 
-    /// Sets particle colors, keeping at most eight colors.
-    ///
-    /// An empty slice leaves the current palette unchanged.
+    /// Normalized origin `x` in `[0, 1]` for [`ConfettiState::fire`].
+    #[must_use = "builder setters return updated configuration"]
+    pub fn with_origin_x(mut self, origin_x: f32) -> Self {
+        self.origin_x = Some(finite_or(origin_x, 0.5).clamp(0.0, 1.0));
+        self
+    }
+
+    /// Normalized origin `y` in `[0, 1]` for [`ConfettiState::fire`].
+    #[must_use = "builder setters return updated configuration"]
+    pub fn with_origin_y(mut self, origin_y: f32) -> Self {
+        self.origin_y = Some(finite_or(origin_y, 0.5).clamp(0.0, 1.0));
+        self
+    }
+
+    /// Clears normalized origin so [`ConfettiState::fire`] uses canvas center.
+    #[must_use = "builder setters return updated configuration"]
+    pub fn clear_origin(mut self) -> Self {
+        self.origin_x = None;
+        self.origin_y = None;
+        self
+    }
+
+    /// Particle colors (keeps at most eight). Empty slice leaves palette unchanged.
     #[must_use = "builder setters return updated configuration"]
     pub fn with_colors(mut self, colors: &[Color]) -> Self {
         if colors.is_empty() {
@@ -185,75 +236,158 @@ impl Confetti {
         self
     }
 
-    /// Sets the canvas width.
+    /// Size scalar (≥ 0).
     #[must_use = "builder setters return updated configuration"]
-    pub fn width(mut self, width: impl Into<Length>) -> Self {
-        self.width = width.into();
+    pub fn with_scalar(mut self, scalar: f32) -> Self {
+        self.scalar = finite_or(scalar, 0.0).max(0.0);
         self
     }
 
-    /// Sets the canvas height.
+    /// Shape mix (keeps at most eight). Empty slice leaves shapes unchanged.
     #[must_use = "builder setters return updated configuration"]
-    pub fn height(mut self, height: impl Into<Length>) -> Self {
-        self.height = height.into();
+    pub fn with_shapes(mut self, shapes: &[ConfettiShape]) -> Self {
+        if shapes.is_empty() {
+            return self;
+        }
+
+        let shape_len = shapes.len().min(MAX_SHAPES);
+        self.shapes[..shape_len].copy_from_slice(&shapes[..shape_len]);
+        self.shape_len = shape_len as u8;
         self
     }
 
-    /// Sets the deterministic particle seed.
+    /// Deterministic spawn seed.
     #[must_use = "builder setters return updated configuration"]
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = seed;
         self
     }
 
-    /// Number of particles in a burst.
+    /// Number of particles.
     pub fn particle_count(&self) -> usize {
         self.particle_count
     }
 
-    /// Particle geometry mode.
-    pub fn particle_shape(&self) -> ConfettiParticleShape {
-        self.particle_shape
+    /// Launch angle in degrees.
+    pub fn angle(&self) -> f32 {
+        self.angle
     }
 
-    /// Particle size in logical pixels.
-    pub fn particle_size(&self) -> f32 {
-        self.particle_size
+    /// Spread in degrees.
+    pub fn spread(&self) -> f32 {
+        self.spread
     }
 
-    /// Burst duration in milliseconds.
-    pub fn duration_ms(&self) -> u64 {
-        self.duration_ms
+    /// Initial velocity.
+    pub fn start_velocity(&self) -> f32 {
+        self.start_velocity
     }
 
-    /// Launch force in `0..=1`.
-    pub fn force(&self) -> f32 {
-        self.force
+    /// Decay factor.
+    pub fn decay(&self) -> f32 {
+        self.decay
     }
 
-    /// Stage height in logical pixels.
-    pub fn stage_height(&self) -> f32 {
-        self.stage_height
+    /// Gravity multiplier.
+    pub fn gravity(&self) -> f32 {
+        self.gravity
     }
 
-    /// Stage width in logical pixels.
-    pub fn stage_width(&self) -> f32 {
-        self.stage_width
+    /// Drift.
+    pub fn drift(&self) -> f32 {
+        self.drift
     }
 
-    /// Whether finished bursts are removed by [`ConfettiState::tick`].
-    pub fn destroy_after_done(&self) -> bool {
-        self.destroy_after_done
+    /// Lifetime ticks.
+    pub fn ticks(&self) -> u64 {
+        self.ticks
     }
 
-    /// Active particle color palette.
+    /// Optional normalized origin x.
+    pub fn origin_x(&self) -> Option<f32> {
+        self.origin_x
+    }
+
+    /// Optional normalized origin y.
+    pub fn origin_y(&self) -> Option<f32> {
+        self.origin_y
+    }
+
+    /// Active color palette.
     pub fn colors(&self) -> &[Color] {
         &self.colors[..usize::from(self.color_len)]
     }
 
-    /// Deterministic particle seed.
+    /// Size scalar.
+    pub fn scalar(&self) -> f32 {
+        self.scalar
+    }
+
+    /// Active shapes.
+    pub fn shapes(&self) -> &[ConfettiShape] {
+        &self.shapes[..usize::from(self.shape_len)]
+    }
+
+    /// Spawn seed.
     pub fn seed(&self) -> u64 {
         self.seed
+    }
+
+    fn life_ms(&self) -> u64 {
+        self.ticks.saturating_mul(MS_PER_TICK).max(1)
+    }
+
+    fn particle_shapes_buf(&self) -> ([ParticleShape; MAX_SHAPES], usize) {
+        let mut buf = [ParticleShape::Circle; MAX_SHAPES];
+        let len = self.shapes().len().max(1);
+        for (index, shape) in self.shapes().iter().enumerate() {
+            buf[index] = shape.to_particle_shape();
+        }
+        if self.shapes().is_empty() {
+            buf[0] = ParticleShape::Square;
+            buf[1] = ParticleShape::Circle;
+            (buf, 2)
+        } else {
+            (buf, len)
+        }
+    }
+}
+
+/// Full-stage confetti canvas overlay (Magic UI `Confetti` component).
+#[must_use = "builders do nothing unless turned into an iced Element"]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Confetti {
+    width: Length,
+    height: Length,
+}
+
+impl Default for Confetti {
+    fn default() -> Self {
+        Self {
+            width: Length::Fill,
+            height: Length::Fill,
+        }
+    }
+}
+
+impl Confetti {
+    /// Creates a fill-sized confetti canvas.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets canvas width.
+    #[must_use = "builder setters return updated configuration"]
+    pub fn width(mut self, width: impl Into<Length>) -> Self {
+        self.width = width.into();
+        self
+    }
+
+    /// Sets canvas height.
+    #[must_use = "builder setters return updated configuration"]
+    pub fn height(mut self, height: impl Into<Length>) -> Self {
+        self.height = height.into();
+        self
     }
 
     /// Builds the confetti canvas for the supplied state and clock.
@@ -263,11 +397,7 @@ impl Confetti {
         now: Instant,
     ) -> Element<'a, Message> {
         effect_canvas::<_, Message>(
-            ConfettiProgram {
-                state,
-                now,
-                config: self,
-            },
+            ConfettiProgram { state, now },
             EffectCanvasProps::new()
                 .width(self.width)
                 .height(self.height),
@@ -285,24 +415,15 @@ impl Confetti {
     }
 }
 
-fn button_default_confetti() -> Confetti {
-    Confetti::new()
-        .with_particle_count(BUTTON_PARTICLE_COUNT)
-        .with_force(0.5)
-        .with_stage_height(800.0)
-        .with_stage_width(1600.0)
-        .with_colors(&BUTTON_COLORS)
-}
-
-/// Button that carries animations [`Confetti`] defaults and emits a press message.
+/// Button that carries [`ConfettiOptions`] and emits a press message.
 ///
 /// Confetti is not fired automatically — on press the host should call
-/// [`ConfettiState::clear`] then [`ConfettiState::fire_at`] with [`Self::confetti`]
-/// and the button top-center in canvas-local coordinates.
+/// [`ConfettiState::fire_at`] with [`Self::options`] and the button center
+/// (or top-center) in canvas-local coordinates.
 #[must_use = "builders do nothing unless turned into an iced Element"]
 pub struct ConfettiButton<'a, Message> {
     content: Element<'a, Message>,
-    confetti: Confetti,
+    options: ConfettiOptions,
     on_press: Option<Message>,
     padding: Padding,
     width: Length,
@@ -313,7 +434,7 @@ impl<'a, Message> fmt::Debug for ConfettiButton<'a, Message> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ConfettiButton")
-            .field("confetti", &self.confetti)
+            .field("options", &self.options)
             .field("on_press", &self.on_press.is_some())
             .field("padding", &self.padding)
             .field("width", &self.width)
@@ -323,11 +444,11 @@ impl<'a, Message> fmt::Debug for ConfettiButton<'a, Message> {
 }
 
 impl<'a, Message> ConfettiButton<'a, Message> {
-    /// Creates a button with animations confetti-button defaults.
+    /// Creates a button with canvas-confetti defaults.
     pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
         Self {
             content: content.into(),
-            confetti: button_default_confetti(),
+            options: ConfettiOptions::new(),
             on_press: None,
             padding: Padding::from([12.0, 24.0]),
             width: Length::Shrink,
@@ -335,19 +456,26 @@ impl<'a, Message> ConfettiButton<'a, Message> {
         }
     }
 
-    /// Returns the confetti configuration used when firing from this button.
-    pub fn confetti(&self) -> Confetti {
-        self.confetti
+    /// Returns the options used when firing from this button.
+    pub fn options(&self) -> ConfettiOptions {
+        self.options
     }
 
-    /// Sets the press handler. The host should clear and fire confetti on this message.
+    /// Replaces fire options.
+    #[must_use = "builder setters return updated configuration"]
+    pub fn with_options(mut self, options: ConfettiOptions) -> Self {
+        self.options = options;
+        self
+    }
+
+    /// Sets the press handler. The host should fire confetti on this message.
     #[must_use = "builder setters return updated configuration"]
     pub fn on_press(mut self, message: Message) -> Self {
         self.on_press = Some(message);
         self
     }
 
-    /// Alias for [`Self::on_press`] — same message, confetti firing stays in the host.
+    /// Alias for [`Self::on_press`].
     #[must_use = "builder setters return updated configuration"]
     pub fn on_fire<F>(mut self, fire: F) -> Self
     where
@@ -359,55 +487,37 @@ impl<'a, Message> ConfettiButton<'a, Message> {
 
     #[must_use = "builder setters return updated configuration"]
     pub fn particle_count(mut self, particle_count: usize) -> Self {
-        self.confetti = self.confetti.with_particle_count(particle_count);
+        self.options = self.options.with_particle_count(particle_count);
         self
     }
 
     #[must_use = "builder setters return updated configuration"]
-    pub fn particle_shape(mut self, particle_shape: ConfettiParticleShape) -> Self {
-        self.confetti = self.confetti.with_particle_shape(particle_shape);
+    pub fn angle(mut self, angle: f32) -> Self {
+        self.options = self.options.with_angle(angle);
         self
     }
 
     #[must_use = "builder setters return updated configuration"]
-    pub fn particle_size(mut self, particle_size: f32) -> Self {
-        self.confetti = self.confetti.with_particle_size(particle_size);
+    pub fn spread(mut self, spread: f32) -> Self {
+        self.options = self.options.with_spread(spread);
         self
     }
 
     #[must_use = "builder setters return updated configuration"]
-    pub fn duration_ms(mut self, duration_ms: u64) -> Self {
-        self.confetti = self.confetti.with_duration_ms(duration_ms);
-        self
-    }
-
-    #[must_use = "builder setters return updated configuration"]
-    pub fn force(mut self, force: f32) -> Self {
-        self.confetti = self.confetti.with_force(force);
-        self
-    }
-
-    #[must_use = "builder setters return updated configuration"]
-    pub fn stage_height(mut self, stage_height: f32) -> Self {
-        self.confetti = self.confetti.with_stage_height(stage_height);
-        self
-    }
-
-    #[must_use = "builder setters return updated configuration"]
-    pub fn stage_width(mut self, stage_width: f32) -> Self {
-        self.confetti = self.confetti.with_stage_width(stage_width);
-        self
-    }
-
-    #[must_use = "builder setters return updated configuration"]
-    pub fn destroy_after_done(mut self, destroy_after_done: bool) -> Self {
-        self.confetti = self.confetti.with_destroy_after_done(destroy_after_done);
+    pub fn start_velocity(mut self, start_velocity: f32) -> Self {
+        self.options = self.options.with_start_velocity(start_velocity);
         self
     }
 
     #[must_use = "builder setters return updated configuration"]
     pub fn colors(mut self, colors: &[Color]) -> Self {
-        self.confetti = self.confetti.with_colors(colors);
+        self.options = self.options.with_colors(colors);
+        self
+    }
+
+    #[must_use = "builder setters return updated configuration"]
+    pub fn shapes(mut self, shapes: &[ConfettiShape]) -> Self {
+        self.options = self.options.with_shapes(shapes);
         self
     }
 
@@ -481,7 +591,7 @@ fn confetti_button_style(status: button::Status) -> button::Style {
     }
 }
 
-/// Runtime state for one active confetti burst.
+/// Runtime state for active confetti bursts.
 #[derive(Clone, Debug, Default)]
 pub struct ConfettiState {
     bursts: Vec<ConfettiBurst>,
@@ -494,28 +604,25 @@ impl ConfettiState {
         Self::default()
     }
 
-    /// Clears existing particles and starts one new burst at `origin`.
-    ///
-    /// `origin` is in canvas-local logical coordinates. For the animations
-    /// preview pattern (stage overlay), pass the **content top-center**
-    /// (typically the Fire Confetti / ConfettiButton top-center relative to
-    /// the stage canvas). Particle samples are offsets from this point.
-    pub fn fire_at(&mut self, now: Instant, config: &Confetti, origin: Point) {
-        let origin = Point::new(finite_or(origin.x, 0.0), finite_or(origin.y, 0.0));
-        self.bursts.clear();
-        self.bursts
-            .push(ConfettiBurst::new(now, *config, self.nonce, origin));
-        self.nonce = self.nonce.wrapping_add(1);
+    /// Fires a burst using normalized `origin` from options (default center) mapped to `canvas_size`.
+    pub fn fire(&mut self, now: Instant, opts: &ConfettiOptions, canvas_size: Size) {
+        let width = finite_or(canvas_size.width, 0.0).max(0.0);
+        let height = finite_or(canvas_size.height, 0.0).max(0.0);
+        let origin = Point::new(
+            opts.origin_x().unwrap_or(0.5) * width,
+            opts.origin_y().unwrap_or(0.5) * height,
+        );
+        self.fire_at(now, opts, origin);
     }
 
-    /// Starts a burst at canvas `(0, 0)`.
+    /// Fires a burst at an absolute canvas-local origin (e.g. measured button center).
     ///
-    /// Prefer [`Self::fire_at`] with an explicit content top-center when the
-    /// canvas is a full-stage overlay. Use this only when the canvas itself is
-    /// the content-sized box (origin coinciding with the box top-left), or when
-    /// tests need a known origin.
-    pub fn fire(&mut self, now: Instant, config: &Confetti) {
-        self.fire_at(now, config, Point::ORIGIN);
+    /// Bursts accumulate — call [`Self::clear`] first when replacing a previous shot.
+    pub fn fire_at(&mut self, now: Instant, opts: &ConfettiOptions, origin: Point) {
+        let origin = Point::new(finite_or(origin.x, 0.0), finite_or(origin.y, 0.0));
+        self.bursts
+            .push(ConfettiBurst::new(now, opts, self.nonce, origin));
+        self.nonce = self.nonce.wrapping_add(1);
     }
 
     /// Removes all active bursts.
@@ -523,219 +630,153 @@ impl ConfettiState {
         self.bursts.clear();
     }
 
-    /// Removes finished bursts when destruction is enabled.
-    pub fn tick(&mut self, now: Instant, config: &Confetti) {
-        if !config.destroy_after_done {
-            return;
-        }
-
+    /// Drops bursts whose particles have all expired.
+    pub fn tick(&mut self, now: Instant) {
         self.bursts.retain(|burst| {
-            now.saturating_duration_since(burst.started_at)
-                < Duration::from_millis(config.duration_ms)
+            let elapsed_ms = now.saturating_duration_since(burst.started_at).as_millis() as u64;
+            burst
+                .particles
+                .iter()
+                .any(|particle| elapsed_ms < particle.physics.life_ms)
         });
     }
 
-    /// Returns the number of active bursts.
+    /// Number of active bursts.
     pub fn burst_count(&self) -> usize {
         self.bursts.len()
+    }
+
+    /// Total live particles across bursts (for tests).
+    pub fn particle_count(&self) -> usize {
+        self.bursts.iter().map(|burst| burst.particles.len()).sum()
+    }
+
+    /// Samples the first particle of the first burst at `elapsed` (for tests).
+    pub fn sample_first(
+        &self,
+        elapsed: Duration,
+    ) -> Option<(Point, f32, ParticleShape)> {
+        let burst = self.bursts.first()?;
+        let particle = burst.particles.first()?;
+        let elapsed_ms = elapsed.as_millis() as u64;
+        sample_confetti_particle(
+            particle.physics,
+            elapsed_ms,
+            burst.gravity,
+            burst.decay,
+            burst.drift,
+        )
+        .map(|sample| (sample.position, sample.opacity, sample.shape))
     }
 }
 
 #[derive(Clone, Debug)]
 struct ConfettiBurst {
     started_at: Instant,
-    origin: Point,
-    particles: Vec<Particle>,
+    gravity: f32,
+    decay: f32,
+    drift: f32,
+    particles: Vec<LiveParticle>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LiveParticle {
+    physics: ConfettiParticle,
+    color: Color,
+    shape: ConfettiShape,
 }
 
 impl ConfettiBurst {
-    fn new(started_at: Instant, config: Confetti, nonce: u64, origin: Point) -> Self {
-        let mut rng = StableRng::new(config.seed.wrapping_add(nonce));
-        let particles = (0..config.particle_count)
-            .map(|index| spawn_particle(index, config, &mut rng))
+    fn new(started_at: Instant, opts: &ConfettiOptions, nonce: u64, origin: Point) -> Self {
+        let (shape_buf, shape_len) = opts.particle_shapes_buf();
+        let mut physics = confetti_particles(
+            opts.particle_count(),
+            origin,
+            opts.seed().wrapping_add(nonce),
+            opts.angle(),
+            opts.spread(),
+            opts.start_velocity(),
+            opts.scalar(),
+            &shape_buf[..shape_len],
+        );
+
+        let life_ms = opts.life_ms();
+        let colors = opts.colors();
+        let color_len = colors.len().max(1);
+        let shapes = opts.shapes();
+        let shape_fallback = [ConfettiShape::Square, ConfettiShape::Circle];
+        let shape_src = if shapes.is_empty() {
+            &shape_fallback[..]
+        } else {
+            shapes
+        };
+
+        let particles = physics
+            .drain(..)
+            .enumerate()
+            .map(|(index, mut particle)| {
+                particle.life_ms = life_ms;
+                LiveParticle {
+                    physics: particle,
+                    color: colors[index % color_len],
+                    shape: shape_src[index % shape_src.len()],
+                }
+            })
             .collect();
 
         Self {
             started_at,
-            origin,
+            gravity: opts.gravity(),
+            decay: opts.decay(),
+            drift: opts.drift(),
             particles,
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct Particle {
-    x_landing_point: f32,
-    duration_ms: u64,
-    x1: f32,
-    x2: f32,
-    x3: f32,
-    x4: f32,
-    y1: f32,
-    y2: f32,
-    y3: f32,
-    y4: f32,
-    width: f32,
-    height: f32,
-    rotation_transform: u8,
-    rotation_duration_ms: f32,
-    color: Color,
-    is_circle: bool,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct SampledParticle {
-    position: Point,
-    width: f32,
-    height: f32,
-    rotation: f32,
-    is_circle: bool,
-}
-
-fn spawn_particle(index: usize, config: Confetti, rng: &mut StableRng) -> Particle {
-    let degree = index as f32 * 360.0 / config.particle_count as f32;
-    let rotated_degree = if degree + 90.0 > 360.0 {
-        degree + 90.0 - 360.0
-    } else {
-        degree + 90.0
-    };
-    let distance = (rotated_degree - 180.0).abs();
-    let x_landing_point = map_range(
-        distance,
-        0.0,
-        180.0,
-        -config.stage_width / 2.0,
-        config.stage_width / 2.0,
-    );
-    let duration_ms = config
-        .duration_ms
-        .saturating_sub((rng.next_f32() * 1_000.0).round() as u64)
-        .max(1);
-    let x1 = if rng.next_f32() < CRAZY_PARTICLES_FREQUENCY {
-        round(rng.next_f32() * CRAZY_PARTICLE_CRAZINESS, 2)
-    } else {
-        0.0
-    };
-    let x4 = round((2.0 * distance / 180.0 - 1.0).abs(), 4);
-    let y1 = round(rng.next_f32() * BEZIER_MEDIAN, 4);
-    let y2 = round(
-        rng.next_f32() * config.force * if rng.next_f32() > 0.5 { 1.0 } else { -1.0 },
-        4,
-    );
-    let y4 = round(
-        (config.force - 2.0 * (degree - 180.0).abs() / 180.0 * config.force).max(0.0),
-        4,
-    );
-    let rotation_transform =
-        (rng.next_f32() * (POSSIBLE_ROTATION_TRANSFORMS - 1) as f32).round() as u8;
-    let is_circle = match config.particle_shape {
-        ConfettiParticleShape::Circles => true,
-        ConfettiParticleShape::Rectangles => false,
-        ConfettiParticleShape::Mix => rotation_transform != 1 && rng.next_f32() > 0.5,
-    };
-
-    Particle {
-        x_landing_point,
-        duration_ms,
-        x1,
-        x2: -x1,
-        x3: x1,
-        x4,
-        y1,
-        y2,
-        y3: BEZIER_MEDIAN,
-        y4,
-        width: if is_circle {
-            config.particle_size
-        } else {
-            (rng.next_f32() * 4.0).round() + config.particle_size / 2.0
-        },
-        height: if is_circle {
-            config.particle_size
-        } else {
-            (rng.next_f32() * 2.0).round() + config.particle_size
-        },
-        rotation_transform,
-        rotation_duration_ms: rng.range_f32(ROTATION_SPEED_MIN_MS, ROTATION_SPEED_MAX_MS),
-        color: config.colors()[index % config.colors().len().max(1)],
-        is_circle,
-    }
-}
-
-fn sample_neoconfetti(
-    particle: &Particle,
-    animation_fraction: f32,
-    stage_height: f32,
-) -> SampledParticle {
-    let fraction = animation_fraction.clamp(0.0, 1.0);
-    let x = sample_cubic_bezier(fraction, particle.x1, particle.x2, particle.x3, particle.x4)
-        * particle.x_landing_point;
-    let y = sample_cubic_bezier(fraction, particle.y1, particle.y2, particle.y3, particle.y4)
-        * stage_height;
-    let rotation = fraction * std::f32::consts::TAU * 800.0
-        / particle.rotation_duration_ms.max(1.0)
-        * if particle.rotation_transform & 1 == 1 {
-            -1.0
-        } else {
-            1.0
-        };
-
-    SampledParticle {
-        position: Point::new(x, y),
-        width: particle.width,
-        height: particle.height,
-        rotation,
-        is_circle: particle.is_circle,
-    }
-}
-
-fn sample_cubic_bezier(time: f32, x1: f32, y1: f32, x2: f32, y2: f32) -> f32 {
-    let time = time.clamp(0.0, 1.0);
-    let mut parameter = time;
-
-    for _ in 0..8 {
-        let current = cubic_component(parameter, x1, x2) - time;
-        let derivative = cubic_derivative(parameter, x1, x2);
-        if derivative.abs() < 1e-6 {
-            break;
-        }
-        parameter = (parameter - current / derivative).clamp(0.0, 1.0);
-    }
-
-    cubic_component(parameter, y1, y2)
-}
-
-fn cubic_component(parameter: f32, first_control: f32, second_control: f32) -> f32 {
-    let inverse = 1.0 - parameter;
-    3.0 * inverse * inverse * parameter * first_control
-        + 3.0 * inverse * parameter * parameter * second_control
-        + parameter * parameter * parameter
-}
-
-fn cubic_derivative(parameter: f32, first_control: f32, second_control: f32) -> f32 {
-    let inverse = 1.0 - parameter;
-    3.0 * inverse * inverse * first_control
-        + 6.0 * inverse * parameter * (second_control - first_control)
-        + 3.0 * parameter * parameter * (1.0 - second_control)
-}
-
-fn map_range(value: f32, from_start: f32, from_end: f32, to_start: f32, to_end: f32) -> f32 {
-    (value - from_start) * (to_end - to_start) / (from_end - from_start) + to_start
-}
-
-fn round(value: f32, precision: u32) -> f32 {
-    let factor = 10_f32.powi(precision as i32);
-    (value * factor).round() / factor
-}
-
 fn finite_or(value: f32, fallback: f32) -> f32 {
-    if value.is_finite() { value } else { fallback }
+    if value.is_finite() {
+        value
+    } else {
+        fallback
+    }
+}
+
+fn star_path(outer_radius: f32) -> canvas::Path {
+    let inner_radius = outer_radius * 0.4;
+    canvas::Path::new(|builder| {
+        for i in 0..10 {
+            let radius = if i % 2 == 0 {
+                outer_radius
+            } else {
+                inner_radius
+            };
+            let angle = -PI / 2.0 + f32::from(i as u16) * TAU / 10.0;
+            let point = Point::new(radius * angle.cos(), radius * angle.sin());
+            if i == 0 {
+                builder.move_to(point);
+            } else {
+                builder.line_to(point);
+            }
+        }
+        builder.close();
+    })
+}
+
+fn path_stand_in(size: f32) -> canvas::Path {
+    // Approximate custom SVG paths as an isosceles triangle.
+    let half = size / 2.0;
+    canvas::Path::new(|builder| {
+        builder.move_to(Point::new(0.0, -half));
+        builder.line_to(Point::new(half, half));
+        builder.line_to(Point::new(-half, half));
+        builder.close();
+    })
 }
 
 struct ConfettiProgram<'a> {
     state: &'a ConfettiState,
     now: Instant,
-    config: Confetti,
 }
 
 impl<Message> EffectProgram<Message> for ConfettiProgram<'_> {
@@ -758,30 +799,47 @@ impl<Message> EffectProgram<Message> for ConfettiProgram<'_> {
                 .as_millis() as u64;
 
             for particle in &burst.particles {
-                let fraction = elapsed_ms as f32 / particle.duration_ms as f32;
-                let sample = sample_neoconfetti(particle, fraction, self.config.stage_height);
-                let color = particle.color;
-                // Spawn at the baked content origin (e.g. button top-center),
-                // never hardcode the stage canvas top edge.
-                let position = Point::new(
-                    burst.origin.x + sample.position.x,
-                    burst.origin.y + sample.position.y,
-                );
+                let Some(sample) = sample_confetti_particle(
+                    particle.physics,
+                    elapsed_ms,
+                    burst.gravity,
+                    burst.decay,
+                    burst.drift,
+                ) else {
+                    continue;
+                };
 
+                let color = particle.color.scale_alpha(sample.opacity);
                 frame.with_save(|frame| {
-                    frame.translate(Vector::new(position.x, position.y));
+                    frame.translate(Vector::new(sample.position.x, sample.position.y));
                     frame.rotate(sample.rotation);
-                    if sample.is_circle {
-                        frame.fill(
-                            &canvas::Path::circle(Point::ORIGIN, sample.width / 2.0),
-                            color,
-                        );
-                    } else {
-                        frame.fill_rectangle(
-                            Point::new(-sample.width / 2.0, -sample.height / 2.0),
-                            Size::new(sample.width, sample.height),
-                            color,
-                        );
+                    match particle.shape {
+                        ConfettiShape::Circle => {
+                            frame.fill(
+                                &canvas::Path::circle(Point::ORIGIN, sample.size / 2.0),
+                                color,
+                            );
+                        }
+                        ConfettiShape::Square => {
+                            frame.fill_rectangle(
+                                Point::new(-sample.size / 2.0, -sample.size / 2.0),
+                                Size::new(sample.size, sample.size),
+                                color,
+                            );
+                        }
+                        ConfettiShape::Star => {
+                            frame.fill(&star_path(sample.size / 2.0), color);
+                        }
+                        ConfettiShape::Path { .. } => {
+                            frame.fill(&path_stand_in(sample.size), color);
+                        }
+                        ConfettiShape::Text { .. } => {
+                            // Glyph rasterization is not available on the canvas path yet.
+                            frame.fill(
+                                &canvas::Path::circle(Point::ORIGIN, sample.size * 0.6),
+                                color,
+                            );
+                        }
                     }
                 });
             }
@@ -796,150 +854,198 @@ mod tests {
     use super::*;
 
     #[test]
-    fn confetti_defaults_match_animations_wrapper() {
-        let confetti = Confetti::new();
+    fn confetti_options_defaults_match_canvas_confetti() {
+        let opts = ConfettiOptions::new();
 
-        assert_eq!(confetti.particle_count(), 40);
-        assert!((confetti.force() - 0.5).abs() < f32::EPSILON);
-        assert_eq!(confetti.particle_size(), 12.0);
-        assert_eq!(confetti.duration_ms(), 3500);
-        assert_eq!(confetti.stage_height(), 800.0);
-        assert_eq!(confetti.stage_width(), 1600.0);
-        assert!(confetti.destroy_after_done());
-        assert_eq!(confetti.particle_shape(), ConfettiParticleShape::Mix);
-        assert_eq!(confetti.colors().len(), 4);
-        assert_eq!(confetti.colors()[0], Color::from_rgb8(0xFF, 0xC7, 0x00));
-        assert_eq!(confetti.seed(), 0);
+        assert_eq!(opts.particle_count(), 50);
+        assert!((opts.angle() - 90.0).abs() < f32::EPSILON);
+        assert!((opts.spread() - 45.0).abs() < f32::EPSILON);
+        assert!((opts.start_velocity() - 45.0).abs() < f32::EPSILON);
+        assert!((opts.decay() - 0.9).abs() < f32::EPSILON);
+        assert!((opts.gravity() - 1.0).abs() < f32::EPSILON);
+        assert!((opts.drift() - 0.0).abs() < f32::EPSILON);
+        assert_eq!(opts.ticks(), 200);
+        assert!(opts.origin_x().is_none());
+        assert!(opts.origin_y().is_none());
+        assert!((opts.scalar() - 1.0).abs() < f32::EPSILON);
+        assert_eq!(opts.colors().len(), 7);
+        assert_eq!(opts.colors()[0], Color::from_rgb8(0x26, 0xCC, 0xFF));
+        assert_eq!(opts.shapes().len(), 2);
+        assert_eq!(opts.shapes()[0], ConfettiShape::Square);
+        assert_eq!(opts.shapes()[1], ConfettiShape::Circle);
+        assert_eq!(opts.seed(), 0);
     }
 
     #[test]
     fn setters_validate_ranges() {
-        let confetti = Confetti::new()
+        let opts = ConfettiOptions::new()
             .with_particle_count(0)
-            .with_force(2.0)
-            .with_particle_size(-1.0)
-            .with_duration_ms(0)
-            .with_stage_height(0.0);
+            .with_spread(-10.0)
+            .with_start_velocity(-5.0)
+            .with_decay(2.0)
+            .with_ticks(0)
+            .with_scalar(-1.0)
+            .with_origin_x(2.0)
+            .with_origin_y(-1.0);
 
-        assert!(confetti.particle_count() >= 1);
-        assert!((0.0..=1.0).contains(&confetti.force()));
-        assert!(confetti.particle_size() > 0.0);
-        assert!(confetti.duration_ms() >= 1);
-        assert!(confetti.stage_height() >= 1.0);
+        assert!(opts.particle_count() >= 1);
+        assert!(opts.spread() >= 0.0);
+        assert!(opts.start_velocity() >= 0.0);
+        assert!((0.0..=1.0).contains(&opts.decay()));
+        assert!(opts.ticks() >= 1);
+        assert!(opts.scalar() >= 0.0);
+        assert_eq!(opts.origin_x(), Some(1.0));
+        assert_eq!(opts.origin_y(), Some(0.0));
     }
 
     #[test]
-    fn fire_adds_burst_and_destroy_clears_after_duration() {
+    fn fire_spawns_particles_and_accumulates_bursts() {
         let mut state = ConfettiState::new();
-        let confetti = Confetti::new()
-            .with_duration_ms(100)
-            .with_destroy_after_done(true);
-        let started_at = Instant::now();
+        let opts = ConfettiOptions::new()
+            .with_particle_count(12)
+            .with_seed(7);
+        let now = Instant::now();
+        let canvas = Size::new(400.0, 300.0);
 
-        state.fire(started_at, &confetti);
+        state.fire(now, &opts, canvas);
+        assert_eq!(state.burst_count(), 1);
+        assert_eq!(state.particle_count(), 12);
+
+        state.fire(now, &opts.with_particle_count(5), canvas);
+        assert_eq!(state.burst_count(), 2);
+        assert_eq!(state.particle_count(), 17);
+    }
+
+    #[test]
+    fn fire_maps_normalized_origin_to_canvas_pixels() {
+        let mut state = ConfettiState::new();
+        let opts = ConfettiOptions::new()
+            .with_particle_count(4)
+            .with_origin_x(0.0)
+            .with_origin_y(0.5)
+            .with_seed(1);
+        let now = Instant::now();
+
+        state.fire(now, &opts, Size::new(200.0, 100.0));
+        let sample = state
+            .sample_first(Duration::ZERO)
+            .expect("particle at t0");
+        assert!(
+            (sample.0.x).abs() < 1.0,
+            "expected x≈0, got {}",
+            sample.0.x
+        );
+        assert!(
+            (sample.0.y - 50.0).abs() < 1.0,
+            "expected y≈50, got {}",
+            sample.0.y
+        );
+    }
+
+    #[test]
+    fn fire_at_bakes_pixel_origin() {
+        let mut state = ConfettiState::new();
+        let opts = ConfettiOptions::new()
+            .with_particle_count(8)
+            .with_seed(3);
+        let now = Instant::now();
+        let origin = Point::new(120.0, 80.0);
+
+        state.fire_at(now, &opts, origin);
+        let sample = state
+            .sample_first(Duration::ZERO)
+            .expect("particle at t0");
+        assert!((sample.0.x - 120.0).abs() < 1.0);
+        assert!((sample.0.y - 80.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn sample_moves_under_gravity() {
+        let mut state = ConfettiState::new();
+        let opts = ConfettiOptions::new()
+            .with_particle_count(1)
+            .with_angle(90.0)
+            .with_spread(0.0)
+            .with_start_velocity(0.0)
+            .with_gravity(1.0)
+            .with_decay(0.9)
+            .with_drift(0.0)
+            .with_seed(9);
+        let now = Instant::now();
+
+        state.fire_at(now, &opts, Point::new(50.0, 10.0));
+        let start = state
+            .sample_first(Duration::ZERO)
+            .expect("t0")
+            .0;
+        let later = state
+            .sample_first(Duration::from_millis(500))
+            .expect("t=500ms")
+            .0;
+
+        assert!(
+            later.y > start.y,
+            "gravity should pull down: start={} later={}",
+            start.y,
+            later.y
+        );
+    }
+
+    #[test]
+    fn particles_expire_after_ticks() {
+        let mut state = ConfettiState::new();
+        let opts = ConfettiOptions::new()
+            .with_particle_count(6)
+            .with_ticks(10)
+            .with_seed(2);
+        let started = Instant::now();
+
+        state.fire_at(started, &opts, Point::ORIGIN);
         assert_eq!(state.burst_count(), 1);
 
-        state.tick(started_at + Duration::from_millis(150), &confetti);
+        let life = Duration::from_millis(opts.life_ms());
+        assert!(
+            state.sample_first(life).is_none(),
+            "sample past life should be gone"
+        );
+
+        state.tick(started + life + Duration::from_millis(1));
         assert_eq!(state.burst_count(), 0);
-    }
-
-    #[test]
-    fn sample_at_t0_near_origin_and_later_falls() {
-        let particle = Particle {
-            x_landing_point: 0.0,
-            duration_ms: 1000,
-            x1: 0.0,
-            x2: 0.0,
-            x3: 0.0,
-            x4: 0.0,
-            y1: 0.25,
-            y2: 0.25,
-            y3: 0.5,
-            y4: 0.5,
-            width: 12.0,
-            height: 12.0,
-            rotation_transform: 0,
-            rotation_duration_ms: 500.0,
-            color: Color::WHITE,
-            is_circle: true,
-        };
-
-        let at_start = sample_neoconfetti(&particle, 0.0, 800.0);
-        let later = sample_neoconfetti(&particle, 0.9, 800.0);
-
-        assert!(at_start.position.y.abs() < 40.0);
-        assert!(later.position.y > at_start.position.y);
-    }
-
-    #[test]
-    fn fire_at_bakes_origin_and_t0_samples_near_it() {
-        let mut state = ConfettiState::new();
-        let confetti = Confetti::new().with_particle_count(12).with_seed(7);
-        let started_at = Instant::now();
-        let origin = Point::new(100.0, 200.0);
-
-        state.fire_at(started_at, &confetti, origin);
-        assert_eq!(state.burst_count(), 1);
-
-        let burst = &state.bursts[0];
-        assert!((burst.origin.x - 100.0).abs() < f32::EPSILON);
-        assert!((burst.origin.y - 200.0).abs() < f32::EPSILON);
-
-        let mut min_y = f32::INFINITY;
-        let mut max_y = f32::NEG_INFINITY;
-        let mut min_x = f32::INFINITY;
-        let mut max_x = f32::NEG_INFINITY;
-
-        for particle in &burst.particles {
-            let sample = sample_neoconfetti(particle, 0.0, confetti.stage_height());
-            let position = Point::new(
-                burst.origin.x + sample.position.x,
-                burst.origin.y + sample.position.y,
-            );
-            min_y = min_y.min(position.y);
-            max_y = max_y.max(position.y);
-            min_x = min_x.min(position.x);
-            max_x = max_x.max(position.x);
-        }
-
-        // At t≈0 samples sit near the baked origin — not the stage top (y=0).
-        assert!(
-            min_y > 160.0 && max_y < 240.0,
-            "expected t0 y near 200, got [{min_y}, {max_y}]"
-        );
-        assert!(
-            min_x > 40.0 && max_x < 160.0,
-            "expected t0 x near 100, got [{min_x}, {max_x}]"
-        );
-        assert!(min_y.abs() > 1.0, "must not collapse to stage-top y≈0");
-    }
-
-    #[test]
-    fn confetti_button_defaults_match_animations_button() {
-        let button = ConfettiButton::<'static, ()>::new(iced::widget::text(""));
-
-        assert_eq!(button.confetti().particle_count(), BUTTON_PARTICLE_COUNT);
-        assert!((button.confetti().force() - 0.5).abs() < f32::EPSILON);
-        assert_eq!(button.confetti().stage_height(), 800.0);
-        assert_eq!(button.confetti().stage_width(), 1600.0);
-        assert_eq!(button.confetti().colors().len(), 3);
-        assert_eq!(button.confetti().colors()[0], BUTTON_COLORS[0]);
-        assert_eq!(button.confetti().colors()[1], BUTTON_COLORS[1]);
-        assert_eq!(button.confetti().colors()[2], BUTTON_COLORS[2]);
     }
 
     #[test]
     fn particle_color_baked_at_fire_time() {
         let mut state = ConfettiState::new();
-        let fire_config = Confetti::new().with_colors(&[Color::WHITE]);
-        let started_at = Instant::now();
+        let fire_opts = ConfettiOptions::new().with_colors(&[Color::WHITE]);
+        let started = Instant::now();
 
-        state.fire(started_at, &fire_config);
-        let baked_color = state.bursts[0].particles[0].color;
+        state.fire_at(started, &fire_opts, Point::ORIGIN);
+        let baked = state.bursts[0].particles[0].color;
 
-        let shrunk_config = Confetti::new().with_colors(&[]);
-        assert_eq!(baked_color, Color::WHITE);
-        assert_eq!(shrunk_config.colors().len(), 4);
-        assert_eq!(state.bursts[0].particles[0].color, baked_color);
+        let unchanged = ConfettiOptions::new().with_colors(&[]);
+        assert_eq!(baked, Color::WHITE);
+        assert_eq!(unchanged.colors().len(), 7);
+        assert_eq!(state.bursts[0].particles[0].color, baked);
+    }
+
+    #[test]
+    fn confetti_button_defaults_use_canvas_confetti_options() {
+        let button = ConfettiButton::<'static, ()>::new(iced::widget::text(""));
+        let opts = button.options();
+
+        assert_eq!(opts.particle_count(), 50);
+        assert!((opts.angle() - 90.0).abs() < f32::EPSILON);
+        assert_eq!(opts.colors().len(), 7);
+    }
+
+    #[test]
+    fn clear_removes_bursts() {
+        let mut state = ConfettiState::new();
+        let opts = ConfettiOptions::new().with_particle_count(3);
+        state.fire_at(Instant::now(), &opts, Point::ORIGIN);
+        assert_eq!(state.burst_count(), 1);
+        state.clear();
+        assert_eq!(state.burst_count(), 0);
+        assert_eq!(state.particle_count(), 0);
     }
 }

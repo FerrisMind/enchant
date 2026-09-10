@@ -1,8 +1,8 @@
 mod _shared;
 
 use enchant_iced::{
-    AnchorMeasurements, AnchorRemeasure, Confetti, ConfettiButton, ConfettiState, anchor,
-    measure_anchors,
+    AnchorMeasurements, AnchorRemeasure, Confetti, ConfettiButton, ConfettiOptions, ConfettiState,
+    anchor, measure_anchors,
 };
 use iced::time::{Duration, Instant};
 use iced::widget::{Id, button, column, container, stack, text};
@@ -33,9 +33,9 @@ pub fn main() -> iced::Result {
 struct ConfettiExample {
     theme_shell: _shared::ThemeShell,
     preview_state: ConfettiState,
-    preview_confetti: Confetti,
+    preview_options: ConfettiOptions,
     button_state: ConfettiState,
-    button_confetti: Confetti,
+    button_options: ConfettiOptions,
     now: Instant,
     preview_origin: Option<Point>,
     button_origin: Option<Point>,
@@ -59,16 +59,16 @@ enum Message {
 impl ConfettiExample {
     fn new() -> (Self, Task<Message>) {
         let now = Instant::now();
-        let preview_confetti = Confetti::new();
-        let button_confetti = ConfettiButton::<()>::new(text("")).confetti();
+        let preview_options = ConfettiOptions::new();
+        let button_options = ConfettiButton::<()>::new(text("")).options();
 
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
                 preview_state: ConfettiState::new(),
-                preview_confetti,
+                preview_options,
                 button_state: ConfettiState::new(),
-                button_confetti,
+                button_options,
                 now,
                 preview_origin: None,
                 button_origin: None,
@@ -96,7 +96,7 @@ impl ConfettiExample {
                 if !self.auto_fired_preview {
                     if let Some(origin) = self.preview_origin {
                         self.preview_state
-                            .fire_at(self.now, &self.preview_confetti, origin);
+                            .fire_at(self.now, &self.preview_options, origin);
                         self.auto_fired_preview = true;
                     } else {
                         self.remeasure.schedule();
@@ -128,14 +128,13 @@ impl ConfettiExample {
                 }
             }
             Message::WindowResized => {
-                // Layout may still be settling; remeasure on the next tick.
                 self.remeasure.schedule();
             }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
                 self.now = now;
-                self.preview_state.tick(now, &self.preview_confetti);
-                self.button_state.tick(now, &self.button_confetti);
+                self.preview_state.tick(now);
+                self.button_state.tick(now);
                 if self.remeasure.take() {
                     return measure_demo_layout();
                 }
@@ -147,14 +146,14 @@ impl ConfettiExample {
     fn fire_preview(&mut self, origin: Point) {
         self.preview_state.clear();
         self.preview_state
-            .fire_at(self.now, &self.preview_confetti, origin);
+            .fire_at(self.now, &self.preview_options, origin);
         self.pending_fire_preview = false;
     }
 
     fn fire_button(&mut self, origin: Point) {
         self.button_state.clear();
         self.button_state
-            .fire_at(self.now, &self.button_confetti, origin);
+            .fire_at(self.now, &self.button_options, origin);
         self.pending_fire_button = false;
     }
 
@@ -163,7 +162,6 @@ impl ConfettiExample {
             && let Some(origin) = self.preview_origin
         {
             self.fire_preview(origin);
-            // User click already covered the cold-start auto-fire.
             self.auto_fired_preview = true;
         }
         if self.pending_fire_button
@@ -174,12 +172,11 @@ impl ConfettiExample {
     }
 
     fn apply_layout(&mut self, measurements: &AnchorMeasurements) {
-        // Indices match measure_demo_layout() order (API is index-only; no named lookup).
         if let (Some(stage), Some(button)) = (measurements.get(0), measurements.get(1)) {
-            self.preview_origin = Some(content_top_center(stage.bounds, button.bounds));
+            self.preview_origin = Some(content_center(stage.bounds, button.bounds));
         }
         if let (Some(stage), Some(button)) = (measurements.get(2), measurements.get(3)) {
-            self.button_origin = Some(content_top_center(stage.bounds, button.bounds));
+            self.button_origin = Some(content_center(stage.bounds, button.bounds));
         }
     }
 
@@ -196,8 +193,7 @@ impl ConfettiExample {
             .style(fire_button_style)
             .on_press(Message::FirePreview);
 
-        let preview_overlay = self
-            .preview_confetti
+        let preview_overlay = Confetti::new()
             .width(Length::Fill)
             .height(Length::Fill)
             .view(&self.preview_state, self.now);
@@ -213,8 +209,7 @@ impl ConfettiExample {
             .on_press(Message::FireButton)
             .view();
 
-        let button_overlay = self
-            .button_confetti
+        let button_overlay = Confetti::new()
             .width(Length::Fill)
             .height(Length::Fill)
             .view(&self.button_state, self.now);
@@ -252,10 +247,10 @@ fn measure_demo_layout() -> Task<Message> {
     .map(Message::LayoutMeasured)
 }
 
-fn content_top_center(stage: iced::Rectangle, button: iced::Rectangle) -> Point {
+fn content_center(stage: iced::Rectangle, button: iced::Rectangle) -> Point {
     Point::new(
         button.x - stage.x + button.width / 2.0,
-        button.y - stage.y,
+        button.y - stage.y + button.height / 2.0,
     )
 }
 

@@ -33,7 +33,7 @@ pub use widgets::{
     BlurFadeDirection, BlurFadeProps, BlurFadeState, BorderBeam, BorderBeamEase,
     ClientTweetCardAction, ClientTweetCardProps, ClientTweetCardState, ClientTweetCardStatus,
     CodeComparisonProps, ComicTextProps, ComicTextState, Confetti, ConfettiButton,
-    ConfettiParticleShape, ConfettiState, CoolMode, CoolParticleKind, DEFAULT_DIA_COLORS,
+    ConfettiOptions, ConfettiShape, ConfettiState, CoolMode, CoolParticleKind, DEFAULT_DIA_COLORS,
     DiaTextRevealProps, DiaTextRevealState, Dock, DockAction, DockDirection, DockEntry, DockIcon,
     DockState, DockValues, DotPatternProps, DottedMapMarker, DottedMapOverlay, DottedMapProps,
     DottedMapState, FileTreeAction, FileTreeElement, FileTreeKind, FileTreeProps, FileTreeSort,
