@@ -123,8 +123,8 @@ pub use dia_text_reveal::{
     dia_text_reveal_companion,
 };
 pub use dock::{
-    DockAction, DockDirection, DockEntry, DockIcon, DockProps, DockState, dock, dock_entries,
-    dock_entry_icon, dock_entry_icon_count, dock_icon, dock_separator,
+    Dock, DockAction, DockDirection, DockEntry, DockIcon, DockState, DockValues, dock_entry_icon_count,
+    dock_icon, dock_separator,
 };
 pub use dot_pattern::{DotPatternProps, dot_pattern};
 pub use dotted_map::{
