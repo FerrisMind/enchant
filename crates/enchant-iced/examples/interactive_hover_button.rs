@@ -1,9 +1,14 @@
 mod _shared;
 
-use enchant_iced::{InteractiveHoverButtonProps, interactive_hover_button};
+use enchant_iced::{InteractiveHoverButton, InteractiveHoverIcon};
 use iced::time::Instant;
 use iced::widget::{column, text};
-use iced::{Element, Size, Task};
+use iced::{Element, Font, Size, Subscription, Task};
+use lucide_icons::{Icon as LucideIcon, LUCIDE_FONT_BYTES};
+use std::time::Duration;
+
+/// Lucide default SVG size measured on the svelte docs preview.
+const DOCS_ARROW_SIZE: f32 = 24.0;
 
 pub fn main() -> iced::Result {
     iced::application(
@@ -12,6 +17,7 @@ pub fn main() -> iced::Result {
         InteractiveHoverButtonExample::view,
     )
     .title("Interactive Hover Button")
+    .font(LUCIDE_FONT_BYTES)
     .window(iced::window::Settings {
         size: Size::new(1000.0, 700.0),
         ..Default::default()
@@ -22,21 +28,28 @@ pub fn main() -> iced::Result {
 
 struct InteractiveHoverButtonExample {
     theme_shell: _shared::ThemeShell,
+    start: Instant,
+    elapsed: Duration,
+    presses: u32,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     ToggleTheme,
-    Tick(Instant),
     AnchorsMeasured(enchant_iced::AnchorMeasurements),
-    Clicked,
+    Tick(Instant),
+    Pressed,
 }
 
 impl InteractiveHoverButtonExample {
     fn new() -> (Self, Task<Message>) {
+        let start = Instant::now();
         (
             Self {
                 theme_shell: _shared::ThemeShell::new(),
+                start,
+                elapsed: Duration::ZERO,
+                presses: 0,
             },
             Task::none(),
         )
@@ -52,26 +65,49 @@ impl InteractiveHoverButtonExample {
             }
             Message::Tick(now) => {
                 self.theme_shell.tick(now);
+                self.elapsed = now.duration_since(self.start);
             }
-            Message::Clicked => {}
+            Message::Pressed => {
+                self.presses = self.presses.saturating_add(1);
+            }
         }
         Task::none()
     }
 
-    fn subscription(&self) -> iced::Subscription<Message> {
-        iced::time::every(std::time::Duration::from_millis(16)).map(Message::Tick)
+    fn subscription(&self) -> Subscription<Message> {
+        iced::time::every(Duration::from_millis(16)).map(Message::Tick)
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let now = self.theme_shell.now;
+        let palette = self.theme_shell.blended_theme().palette;
+
+        // Docs demo: optional Lucide ArrowRight at 24px — not baked into the widget.
+        let docs_arrow = InteractiveHoverIcon::new(
+            char::from(LucideIcon::ArrowRight),
+            Font::with_name("lucide"),
+            DOCS_ARROW_SIZE,
+        );
+
+        let body = InteractiveHoverButton::new("Hover Me")
+            .hover_icon(docs_arrow)
+            .on_press(Message::Pressed)
+            .background(self.theme_shell.blended_shiny_background(now))
+            .primary(self.theme_shell.blended_primary(now))
+            .idle_foreground(self.theme_shell.blended_primary(now))
+            .hover_foreground(palette.primary_foreground)
+            .border_color(self.theme_shell.blended_shiny_border(now))
+            .into_element(self.elapsed);
+
+        let feedback = text(format!("clicks: {}", self.presses))
+            .size(14)
+            .color(self.theme_shell.blended_foreground(now));
+
         _shared::themed_shell(
             "Interactive Hover Button",
-            column![interactive_hover_button(
-                text("Hover Me"),
-                Some(Message::Clicked),
-                InteractiveHoverButtonProps::new(),
-                self.theme_shell.theme(),
-            ),]
-            .spacing(20),
+            column![body, feedback]
+                .spacing(16)
+                .align_x(iced::Alignment::Center),
             &self.theme_shell,
             Message::ToggleTheme,
         )

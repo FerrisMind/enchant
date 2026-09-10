@@ -154,7 +154,9 @@ pub use interactive_grid_pattern::{
     InteractiveGridPatternAction, InteractiveGridPatternProps, InteractiveGridPatternState,
     interactive_grid_pattern,
 };
-pub use interactive_hover_button::{InteractiveHoverButtonProps, interactive_hover_button};
+pub use interactive_hover_button::{
+    InteractiveHoverButton, InteractiveHoverEase, InteractiveHoverIcon,
+};
 pub use kinetic_text::{KineticTextProps, KineticTextRole, KineticTextState, kinetic_text};
 pub use lens::{LensAction, LensProps, LensState, lens};
 pub use light_rays::{LightRaysProps, light_rays};
