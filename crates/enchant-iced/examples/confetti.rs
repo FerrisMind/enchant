@@ -597,15 +597,18 @@ fn bordered_stage<'a>(
     overlay: Element<'a, Message>,
 ) -> Element<'a, Message> {
     let content: Element<'a, Message> = if let Some((button_id, button)) = button {
+        // Magic UI ConfettiButton / body canvas: z-index 9999, pointer-events none.
+        // Draw button first, confetti overlay on top. EffectCanvas reports
+        // Interaction::None so clicks pass through to the button underneath.
         stack![
-            container(overlay)
-                .width(Length::Fill)
-                .height(Length::Fill),
             container(anchor(button_id, button))
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .center_x(Length::Fill)
                 .center_y(Length::Fill),
+            container(overlay)
+                .width(Length::Fill)
+                .height(Length::Fill),
         ]
         .width(Length::Fill)
         .height(Length::Fill)

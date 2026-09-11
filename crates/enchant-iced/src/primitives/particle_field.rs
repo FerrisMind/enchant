@@ -147,6 +147,19 @@ pub(crate) fn ambient_particle_out_of_bounds(
         || y > bounds.height + particle.size
 }
 
+/// canvas-confetti particle extent base (`10 * scalar` wobble offset).
+pub const CONFETTI_SIZE_FACTOR: f32 = 10.0;
+/// canvas-confetti circle ellipse scale (`ovalScalar`).
+pub const CONFETTI_OVAL_SCALAR: f32 = 0.6;
+/// canvas-confetti star outer radius factor (`8 * scalar`).
+pub const CONFETTI_STAR_OUTER_FACTOR: f32 = 8.0;
+/// canvas-confetti star inner radius factor (`4 * scalar`).
+pub const CONFETTI_STAR_INNER_FACTOR: f32 = 4.0;
+/// canvas-confetti applies `opts.gravity * 3` per tick.
+pub const CONFETTI_GRAVITY_SCALE: f32 = 3.0;
+/// Approximate canvas-confetti tick length at ~60 fps (ms).
+pub const CONFETTI_MS_PER_TICK: f32 = 16.0;
+
 #[allow(clippy::too_many_arguments)]
 pub fn confetti_particles(
     quantity: usize,
@@ -175,14 +188,21 @@ pub fn confetti_particles(
         shapes
     };
 
+    // canvas-confetti `randomPhysics`:
+    //   velocity = startVelocity*0.5 + random()*startVelocity
+    //   angle2D  = -radAngle + (0.5*radSpread - random()*radSpread)
+    // Screen-space velocity uses cos(angle2D)/sin(angle2D); equivalent to
+    // sampling θ = angle ± spread/2 then (cos θ, -sin θ).
     for index in 0..quantity {
         let direction = angle_deg - spread_deg * 0.5 + rng.next_f32() * spread_deg.max(0.0);
         let radians = direction.to_radians();
-        let speed = start_velocity.max(0.0) * (0.65 + rng.next_f32() * 0.8);
+        let start_velocity = start_velocity.max(0.0);
+        let speed = start_velocity * 0.5 + rng.next_f32() * start_velocity;
         particles.push(ConfettiParticle {
             origin,
             velocity: Vector::new(radians.cos() * speed, -radians.sin() * speed),
-            size: scalar * (4.0 + rng.next_f32() * 8.0),
+            // Deterministic visual extent matching wobble span `10 * scalar`.
+            size: CONFETTI_SIZE_FACTOR * scalar,
             rotation: rng.next_f32() * std::f32::consts::TAU,
             spin: (rng.next_f32() - 0.5) * 8.0,
             life_ms: (1400.0 + rng.next_f32() * 1600.0) as u64,
@@ -204,14 +224,26 @@ pub fn sample_confetti_particle(
         return None;
     }
 
-    let t = elapsed_ms as f32 / 1000.0;
+    // Discrete tick integration matching canvas-confetti `updateFetti`:
+    //   x += cos(angle)*velocity + drift
+    //   y += sin(angle)*velocity + gravity*3
+    //   velocity *= decay
+    // Closed form after n ticks (velocity vector decays geometrically).
+    let n = elapsed_ms as f32 / CONFETTI_MS_PER_TICK;
     let decay = decay.clamp(0.0, 1.0);
-    let drag = 1.0 - decay.powf(t.max(0.0));
+    let velocity_span = if (1.0 - decay).abs() < f32::EPSILON {
+        n
+    } else {
+        (1.0 - decay.powf(n)) / (1.0 - decay)
+    };
+    let gravity_per_tick = gravity * CONFETTI_GRAVITY_SCALE;
     let position = Point::new(
-        particle.origin.x + particle.velocity.x * t + drift * t * t * 12.0,
-        particle.origin.y + particle.velocity.y * t + gravity * 60.0 * t * t + drag * 12.0,
+        particle.origin.x + particle.velocity.x * velocity_span + drift * n,
+        particle.origin.y + particle.velocity.y * velocity_span + gravity_per_tick * n,
     );
+    // Progress fade: alpha = 1 - tick/totalTicks
     let life = 1.0 - elapsed_ms as f32 / particle.life_ms.max(1) as f32;
+    let t = elapsed_ms as f32 / 1000.0;
 
     Some(SampledConfettiParticle {
         position,
@@ -298,6 +330,79 @@ mod tests {
         assert_eq!(particle.size, 0.0);
         assert_eq!(particle.velocity.x, 0.0);
         assert_eq!(particle.velocity.y, 0.0);
+    }
+
+    #[test]
+    fn confetti_size_matches_canvas_confetti_ten_times_scalar() {
+        let origin = Point::new(0.0, 0.0);
+        for scalar in [0.5_f32, 1.0, 1.2, 2.0] {
+            let particle = confetti_particles(
+                1,
+                origin,
+                11,
+                90.0,
+                0.0,
+                45.0,
+                scalar,
+                &[ParticleShape::Square],
+            )[0];
+            assert!(
+                (particle.size - CONFETTI_SIZE_FACTOR * scalar).abs() < f32::EPSILON,
+                "scalar={scalar}: size={} expected={}",
+                particle.size,
+                CONFETTI_SIZE_FACTOR * scalar
+            );
+        }
+    }
+
+    #[test]
+    fn confetti_velocity_matches_canvas_confetti_range() {
+        let origin = Point::new(0.0, 0.0);
+        let start_velocity = 45.0;
+        let particles = confetti_particles(
+            64,
+            origin,
+            99,
+            90.0,
+            0.0,
+            start_velocity,
+            1.0,
+            &[ParticleShape::Square],
+        );
+
+        for particle in &particles {
+            // angle 90° → velocity is (0, -speed); speed ∈ [0.5*sv, 1.5*sv]
+            let speed = -particle.velocity.y;
+            assert!(
+                speed >= start_velocity * 0.5 - 1e-3
+                    && speed <= start_velocity * 1.5 + 1e-3,
+                "speed {speed} outside canvas-confetti range"
+            );
+            assert!(particle.velocity.x.abs() < 1e-3);
+        }
+    }
+
+    #[test]
+    fn confetti_gravity_uses_triple_scale_per_tick() {
+        let particle = ConfettiParticle {
+            origin: Point::new(10.0, 20.0),
+            velocity: Vector::ZERO,
+            size: 10.0,
+            rotation: 0.0,
+            spin: 0.0,
+            life_ms: 5_000,
+            shape: ParticleShape::Square,
+        };
+
+        let sample = sample_confetti_particle(particle, 160, 1.0, 0.9, 0.0)
+            .expect("still alive");
+        // n = 160/16 = 10 ticks; Δy = gravity*3*n = 30
+        assert!(
+            (sample.position.y - 50.0).abs() < 1e-3,
+            "expected y=50, got {}",
+            sample.position.y
+        );
+        assert!((sample.opacity - (1.0 - 160.0 / 5_000.0)).abs() < 1e-5);
     }
 
     #[test]

@@ -1,8 +1,9 @@
 //! Magic UI / canvas-confetti style confetti cannon for iced.
 
 use crate::primitives::{
-    ConfettiParticle, EffectCanvasProps, EffectProgram, ParticleShape, confetti_particles,
-    effect_canvas, sample_confetti_particle,
+    CONFETTI_OVAL_SCALAR, CONFETTI_SIZE_FACTOR, CONFETTI_STAR_INNER_FACTOR,
+    CONFETTI_STAR_OUTER_FACTOR, ConfettiParticle, EffectCanvasProps, EffectProgram, ParticleShape,
+    confetti_particles, effect_canvas, sample_confetti_particle,
 };
 use iced::mouse;
 use iced::time::Instant;
@@ -742,8 +743,7 @@ fn finite_or(value: f32, fallback: f32) -> f32 {
     }
 }
 
-fn star_path(outer_radius: f32) -> canvas::Path {
-    let inner_radius = outer_radius * 0.4;
+fn star_path(outer_radius: f32, inner_radius: f32) -> canvas::Path {
     canvas::Path::new(|builder| {
         for i in 0..10 {
             let radius = if i % 2 == 0 {
@@ -991,8 +991,13 @@ impl<Message> EffectProgram<Message> for ConfettiProgram<'_> {
                     frame.rotate(sample.rotation);
                     match particle.shape {
                         ConfettiShape::Circle => {
+                            // canvas-confetti: ellipse radii = |Δ| * ovalScalar (0.6)
+                            // with |Δ| ≈ size = 10*scalar → radius = size * 0.6
                             frame.fill(
-                                &canvas::Path::circle(Point::ORIGIN, sample.size / 2.0),
+                                &canvas::Path::circle(
+                                    Point::ORIGIN,
+                                    sample.size * CONFETTI_OVAL_SCALAR,
+                                ),
                                 color,
                             );
                         }
@@ -1004,17 +1009,26 @@ impl<Message> EffectProgram<Message> for ConfettiProgram<'_> {
                             );
                         }
                         ConfettiShape::Star => {
-                            frame.fill(&star_path(sample.size / 2.0), color);
+                            // size = 10*scalar → outer=8*scalar, inner=4*scalar
+                            let scalar = sample.size / CONFETTI_SIZE_FACTOR;
+                            frame.fill(
+                                &star_path(
+                                    CONFETTI_STAR_OUTER_FACTOR * scalar,
+                                    CONFETTI_STAR_INNER_FACTOR * scalar,
+                                ),
+                                color,
+                            );
                         }
                         ConfettiShape::Path { data } => {
                             frame.fill(&path_from_svg_data(data, sample.size), color);
                         }
                         ConfettiShape::Text { text } => {
+                            // canvas-confetti text bitmap: fontSize = 10 * scalar
                             frame.fill_text(canvas::Text {
                                 content: (*text).to_string(),
                                 position: Point::ORIGIN,
                                 color,
-                                size: iced::Pixels(sample.size.max(10.0)),
+                                size: iced::Pixels(sample.size.max(1.0)),
                                 align_x: iced::alignment::Horizontal::Center.into(),
                                 align_y: iced::alignment::Vertical::Center,
                                 ..canvas::Text::default()

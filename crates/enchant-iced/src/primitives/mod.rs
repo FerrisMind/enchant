@@ -31,8 +31,10 @@ pub use media_frames::{
 pub use media_timeline::FrameSequence;
 pub(crate) use particle_field::ambient_particle_out_of_bounds;
 pub use particle_field::{
-    AmbientParticle, ConfettiParticle, ParticleShape, SampledConfettiParticle, SampledParticle,
-    ambient_particles, confetti_particles, sample_ambient_particle, sample_confetti_particle,
+    AmbientParticle, CONFETTI_GRAVITY_SCALE, CONFETTI_MS_PER_TICK, CONFETTI_OVAL_SCALAR,
+    CONFETTI_SIZE_FACTOR, CONFETTI_STAR_INNER_FACTOR, CONFETTI_STAR_OUTER_FACTOR, ConfettiParticle,
+    ParticleShape, SampledConfettiParticle, SampledParticle, ambient_particles, confetti_particles,
+    sample_ambient_particle, sample_confetti_particle,
 };
 pub use pattern_grid::{
     GridCellIndex, GridPatternSpec, grid_cell_origin, grid_cell_rect, grid_dimensions,
