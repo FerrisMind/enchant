@@ -434,7 +434,7 @@ impl ConfettiExample {
     fn demo_tab(&self) -> Element<'_, Message> {
         let title = text("Confetti")
             .size(96)
-            .color(Color::from_rgb8(24, 24, 27));
+            .color(self.theme_shell.blended_foreground(self.theme_shell.now));
 
         let stage = container(
             mouse_area(
