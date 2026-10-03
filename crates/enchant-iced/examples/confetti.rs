@@ -465,11 +465,7 @@ impl ConfettiExample {
             .on_press(on_press)
             .view();
 
-        bordered_stage(
-            STAGE_ID,
-            Some((BUTTON_ID, confetti_button)),
-            self.overlay(),
-        )
+        bordered_stage(STAGE_ID, Some((BUTTON_ID, confetti_button)), self.overlay())
     }
 
     fn trigger_tab(&self, label: &'static str, on_press: Message) -> Element<'_, Message> {
@@ -515,7 +511,9 @@ fn star_shots() -> Vec<(Duration, ConfettiOptions)> {
 fn shape_shots() -> Vec<(Duration, ConfettiOptions)> {
     let scalar = 2.0;
     let path_shapes = [
-        ConfettiShape::Path { data: PATH_TRIANGLE },
+        ConfettiShape::Path {
+            data: PATH_TRIANGLE,
+        },
         ConfettiShape::Path { data: PATH_SQUARE },
         ConfettiShape::Path { data: PATH_COIN },
         ConfettiShape::Path { data: PATH_TREE },
@@ -606,9 +604,7 @@ fn bordered_stage<'a>(
                 .height(Length::Fill)
                 .center_x(Length::Fill)
                 .center_y(Length::Fill),
-            container(overlay)
-                .width(Length::Fill)
-                .height(Length::Fill),
+            container(overlay).width(Length::Fill).height(Length::Fill),
         ]
         .width(Length::Fill)
         .height(Length::Fill)

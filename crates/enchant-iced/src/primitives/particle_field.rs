@@ -374,8 +374,7 @@ mod tests {
             // angle 90° → velocity is (0, -speed); speed ∈ [0.5*sv, 1.5*sv]
             let speed = -particle.velocity.y;
             assert!(
-                speed >= start_velocity * 0.5 - 1e-3
-                    && speed <= start_velocity * 1.5 + 1e-3,
+                speed >= start_velocity * 0.5 - 1e-3 && speed <= start_velocity * 1.5 + 1e-3,
                 "speed {speed} outside canvas-confetti range"
             );
             assert!(particle.velocity.x.abs() < 1e-3);
@@ -394,8 +393,7 @@ mod tests {
             shape: ParticleShape::Square,
         };
 
-        let sample = sample_confetti_particle(particle, 160, 1.0, 0.9, 0.0)
-            .expect("still alive");
+        let sample = sample_confetti_particle(particle, 160, 1.0, 0.9, 0.0).expect("still alive");
         // n = 160/16 = 10 ticks; Δy = gravity*3*n = 30
         assert!(
             (sample.position.y - 50.0).abs() < 1e-3,

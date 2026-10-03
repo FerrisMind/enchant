@@ -653,10 +653,7 @@ impl ConfettiState {
     }
 
     /// Samples the first particle of the first burst at `elapsed` (for tests).
-    pub fn sample_first(
-        &self,
-        elapsed: Duration,
-    ) -> Option<(Point, f32, ParticleShape)> {
+    pub fn sample_first(&self, elapsed: Duration) -> Option<(Point, f32, ParticleShape)> {
         let burst = self.bursts.first()?;
         let particle = burst.particles.first()?;
         let elapsed_ms = elapsed.as_millis() as u64;
@@ -736,11 +733,7 @@ impl ConfettiBurst {
 }
 
 fn finite_or(value: f32, fallback: f32) -> f32 {
-    if value.is_finite() {
-        value
-    } else {
-        fallback
-    }
+    if value.is_finite() { value } else { fallback }
 }
 
 fn star_path(outer_radius: f32, inner_radius: f32) -> canvas::Path {
@@ -772,8 +765,7 @@ fn path_from_svg_data(data: &str, size: f32) -> canvas::Path {
     match trimmed {
         "M0 10 L5 0 L10 10z" | "M0 10 L5 0 L10 10 Z" => triangle_path(size),
         "M0 0 L10 0 L10 10 L0 10 Z" | "M0 0 L10 0 L10 10 L0 10z" => square_path(size),
-        "M5 0 A5 5 0 1 0 5 10 A5 5 0 1 0 5 0 Z"
-        | "M5 0 A5 5 0 1 0 5 10 A5 5 0 1 0 5 0 z" => {
+        "M5 0 A5 5 0 1 0 5 10 A5 5 0 1 0 5 0 Z" | "M5 0 A5 5 0 1 0 5 10 A5 5 0 1 0 5 0 z" => {
             canvas::Path::circle(Point::ORIGIN, size / 2.0)
         }
         "M5 0 L10 10 L0 10 Z" | "M5 0 L10 10 L0 10z" => tree_path(size),
@@ -864,9 +856,7 @@ fn try_parse_polyline_path(data: &str, size: f32) -> Option<canvas::Path> {
 enum SvgCommand {
     MoveTo(Point),
     LineTo(Point),
-    Arc {
-        to: Point,
-    },
+    Arc { to: Point },
     Close,
 }
 
@@ -1095,9 +1085,7 @@ mod tests {
     #[test]
     fn fire_spawns_particles_and_accumulates_bursts() {
         let mut state = ConfettiState::new();
-        let opts = ConfettiOptions::new()
-            .with_particle_count(12)
-            .with_seed(7);
+        let opts = ConfettiOptions::new().with_particle_count(12).with_seed(7);
         let now = Instant::now();
         let canvas = Size::new(400.0, 300.0);
 
@@ -1121,14 +1109,8 @@ mod tests {
         let now = Instant::now();
 
         state.fire(now, &opts, Size::new(200.0, 100.0));
-        let sample = state
-            .sample_first(Duration::ZERO)
-            .expect("particle at t0");
-        assert!(
-            (sample.0.x).abs() < 1.0,
-            "expected x≈0, got {}",
-            sample.0.x
-        );
+        let sample = state.sample_first(Duration::ZERO).expect("particle at t0");
+        assert!((sample.0.x).abs() < 1.0, "expected x≈0, got {}", sample.0.x);
         assert!(
             (sample.0.y - 50.0).abs() < 1.0,
             "expected y≈50, got {}",
@@ -1139,16 +1121,12 @@ mod tests {
     #[test]
     fn fire_at_bakes_pixel_origin() {
         let mut state = ConfettiState::new();
-        let opts = ConfettiOptions::new()
-            .with_particle_count(8)
-            .with_seed(3);
+        let opts = ConfettiOptions::new().with_particle_count(8).with_seed(3);
         let now = Instant::now();
         let origin = Point::new(120.0, 80.0);
 
         state.fire_at(now, &opts, origin);
-        let sample = state
-            .sample_first(Duration::ZERO)
-            .expect("particle at t0");
+        let sample = state.sample_first(Duration::ZERO).expect("particle at t0");
         assert!((sample.0.x - 120.0).abs() < 1.0);
         assert!((sample.0.y - 80.0).abs() < 1.0);
     }
@@ -1168,10 +1146,7 @@ mod tests {
         let now = Instant::now();
 
         state.fire_at(now, &opts, Point::new(50.0, 10.0));
-        let start = state
-            .sample_first(Duration::ZERO)
-            .expect("t0")
-            .0;
+        let start = state.sample_first(Duration::ZERO).expect("t0").0;
         let later = state
             .sample_first(Duration::from_millis(500))
             .expect("t=500ms")
