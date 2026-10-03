@@ -54,6 +54,21 @@ cargo run --example animated_beam
 `cargo run --example` with no name lists every example. The set covers 82
 components and scenarios.
 
+## Component status
+
+Two levels, tracked separately:
+
+- **Builds and runs** — every user-facing example compiles, and CI enforces that
+  each public component keeps its example and stays in the upstream Magic UI
+  registry inventory (`tests/example_inventory.rs`).
+- **Verified against the Magic UI reference** — a per-example verdict recorded by
+  hand with `python scripts/example_launcher.py`. The ledger lives in `logs/`
+  (gitignored); see the workspace README for the current verified and not-yet
+  verified lists.
+
+Three examples are internal helpers and not part of the public surface:
+`animated_subscribe_button`, `border_track`, `motion_grid`.
+
 ## Licensing
 
 Licensed under either of Apache License, Version 2.0 or MIT license, at your
