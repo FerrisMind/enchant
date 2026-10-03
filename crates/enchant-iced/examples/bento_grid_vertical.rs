@@ -1,6 +1,7 @@
 //! Magic UI `bento-demo-vertical` port — asymmetric 3×3 feature grid.
 //!
-//! Reference (MIT): `magic-refs/magicui/apps/www/registry/example/bento-demo-vertical.tsx`
+//! Reference (MIT): `magicui/apps/www/registry/example/bento-demo-vertical.tsx`
+//! https://github.com/magicuidesign/magicui/blob/main/apps/www/registry/example/bento-demo-vertical.tsx
 //! Layout (lg):
 //! ```text
 //! | search (2h) | files (3h) | calendar (1h) |

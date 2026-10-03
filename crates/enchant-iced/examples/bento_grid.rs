@@ -1,6 +1,7 @@
 //! Magic UI `bento-demo` port — feature showcase grid.
 //!
-//! Reference (MIT): `magic-refs/magicui/apps/www/registry/example/bento-demo.tsx`
+//! Reference (MIT): `magicui/apps/www/registry/example/bento-demo.tsx`
+//! https://github.com/magicuidesign/magicui/blob/main/apps/www/registry/example/bento-demo.tsx
 //! Reuses: marquee, animated_list, animated_beam (multiple outputs), iced-shadcn calendar.
 
 mod _shared;

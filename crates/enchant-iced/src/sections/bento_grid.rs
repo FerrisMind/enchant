@@ -1,6 +1,7 @@
 //! Bento grid layout — Magic UI `bento-grid` port for iced.
 //!
-//! Reference (MIT): `magic-refs/magicui/apps/www/registry/magicui/bento-grid.tsx`
+//! Reference (MIT): `magicui/apps/www/registry/magicui/bento-grid.tsx`
+//! https://github.com/magicuidesign/magicui/blob/main/apps/www/registry/magicui/bento-grid.tsx
 //! License: MIT (Magic UI) — clean-room reimplementation for iced.
 //!
 //! CSS contract (desktop / iced default):
