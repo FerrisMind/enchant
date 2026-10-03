@@ -14,9 +14,7 @@ use iced::advanced::{Clipboard, Shell, Widget};
 use iced::border::Radius;
 use iced::mouse;
 use iced::widget::canvas::{self, Fill, Text};
-use iced::{
-    Color, Element, Event, Length, Point, Pixels, Rectangle, Renderer, Size, Vector,
-};
+use iced::{Color, Element, Event, Length, Pixels, Point, Rectangle, Renderer, Size, Vector};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::f32::consts::PI;
@@ -395,12 +393,9 @@ where
             paint_particle(&mut frame, particle, &self.kind);
         }
         let geometry = frame.into_geometry();
-        renderer.with_translation(
-            Vector::new(outer_bounds.x, outer_bounds.y),
-            |renderer| {
-                renderer.draw_geometry(geometry);
-            },
-        );
+        renderer.with_translation(Vector::new(outer_bounds.x, outer_bounds.y), |renderer| {
+            renderer.draw_geometry(geometry);
+        });
     }
 
     fn mouse_interaction(

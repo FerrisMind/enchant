@@ -39,9 +39,7 @@ fn camp_lens<'a>(content: impl Into<Element<'a, Message>>) -> Lens<'a, Message> 
 }
 
 fn static_lens<'a>(content: impl Into<Element<'a, Message>>) -> Lens<'a, Message> {
-    camp_lens(content)
-        .is_static(true)
-        .position(DEMO_LENS_POINT)
+    camp_lens(content).is_static(true).position(DEMO_LENS_POINT)
 }
 
 fn default_position_lens<'a>(content: impl Into<Element<'a, Message>>) -> Lens<'a, Message> {

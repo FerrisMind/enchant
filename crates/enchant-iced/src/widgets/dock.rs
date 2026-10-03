@@ -919,12 +919,7 @@ fn dock_icon_slot_size(spring_or_target: f32) -> (f32, f32) {
     (edge, edge)
 }
 
-fn fill_icon_targets(
-    pointer_x: Option<f32>,
-    centers: &[f32],
-    dock: &Dock,
-    out: &mut [f32],
-) {
+fn fill_icon_targets(pointer_x: Option<f32>, centers: &[f32], dock: &Dock, out: &mut [f32]) {
     debug_assert_eq!(centers.len(), out.len());
     for (index, slot) in out.iter_mut().enumerate() {
         let center = centers
@@ -1059,9 +1054,7 @@ mod tests {
         assert!(v.gap >= 0.0);
         assert!(v.icon_magnification >= v.icon_size);
 
-        let d = Dock::new()
-            .icon_size(80.0)
-            .icon_magnification(50.0);
+        let d = Dock::new().icon_size(80.0).icon_magnification(50.0);
         let v = d.values();
         assert!((v.icon_size - 80.0).abs() < f32::EPSILON);
         assert!(v.icon_magnification >= v.icon_size);
@@ -1130,10 +1123,7 @@ mod tests {
         // Top pins bottom → center moves up; Bottom pins top → center moves down.
         let top_mid = reserved - inset - peak / 2.0;
         let bottom_mid = inset + peak / 2.0;
-        assert!(
-            top_mid < idle_mid - 1.0,
-            "Top peak center must move up"
-        );
+        assert!(top_mid < idle_mid - 1.0, "Top peak center must move up");
         assert!(
             bottom_mid > idle_mid + 1.0,
             "Bottom peak center must move down"
@@ -1204,10 +1194,8 @@ mod tests {
         let dock = Dock::new();
         let mut state = DockState::new();
         state.prepare(2, dock.icon_size);
-        let entries: Vec<DockEntry<'static, ()>> = vec![
-            dock_icon(text("A")).into(),
-            dock_icon(text("B")).into(),
-        ];
+        let entries: Vec<DockEntry<'static, ()>> =
+            vec![dock_icon(text("A")).into(), dock_icon(text("B")).into()];
         let idle = dock_content_width(&entries, &state, &dock);
 
         let centers = icon_centers_relative(&[40.0, 40.0], &dock);

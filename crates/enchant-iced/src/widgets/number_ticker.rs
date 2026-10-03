@@ -370,7 +370,10 @@ mod tests {
         let at_250 = t.value_at(Duration::from_millis(250));
         assert!((at_250 - 0.0).abs() < 0.01);
         let at_800 = t.value_at(Duration::from_millis(800));
-        assert!(at_800 > 1.0, "expected spring progress after delay, got {at_800}");
+        assert!(
+            at_800 > 1.0,
+            "expected spring progress after delay, got {at_800}"
+        );
     }
 
     #[test]

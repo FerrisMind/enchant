@@ -97,21 +97,23 @@ impl DockExample {
 
         let direction_middle_dock = Dock::new().direction(DockDirection::Middle);
         let mut direction_middle_state = DockState::new();
-        direction_middle_state.prepare(DIRECTION_ICON_COUNT, direction_middle_dock.values().icon_size);
+        direction_middle_state.prepare(
+            DIRECTION_ICON_COUNT,
+            direction_middle_dock.values().icon_size,
+        );
 
         let direction_bottom_dock = Dock::new().direction(DockDirection::Bottom);
         let mut direction_bottom_state = DockState::new();
-        direction_bottom_state.prepare(DIRECTION_ICON_COUNT, direction_bottom_dock.values().icon_size);
+        direction_bottom_state.prepare(
+            DIRECTION_ICON_COUNT,
+            direction_bottom_dock.values().icon_size,
+        );
 
-        let custom_dock = Dock::new()
-            .icon_magnification(60.0)
-            .icon_distance(100.0);
+        let custom_dock = Dock::new().icon_magnification(60.0).icon_distance(100.0);
         let mut custom_state = DockState::new();
         custom_state.prepare(CUSTOM_ICON_COUNT, custom_dock.values().icon_size);
 
-        let colored_dock = Dock::new()
-            .icon_magnification(70.0)
-            .icon_distance(120.0);
+        let colored_dock = Dock::new().icon_magnification(70.0).icon_distance(120.0);
         let mut colored_state = DockState::new();
         colored_state.prepare(COLORED_ICON_COUNT, colored_dock.values().icon_size);
 
@@ -175,8 +177,7 @@ impl DockExample {
         match self.active_tab {
             0 => self.preview_state.tick(now, &self.preview_dock),
             1 => {
-                self.direction_top_state
-                    .tick(now, &self.direction_top_dock);
+                self.direction_top_state.tick(now, &self.direction_top_dock);
                 self.direction_middle_state
                     .tick(now, &self.direction_middle_dock);
                 self.direction_bottom_state
@@ -205,8 +206,7 @@ impl DockExample {
                     DIRECTION_ICON_COUNT,
                     self.direction_top_dock.values().icon_size,
                 );
-                self.direction_top_state
-                    .tick(now, &self.direction_top_dock);
+                self.direction_top_state.tick(now, &self.direction_top_dock);
             }
             LiveDock::DirectionMiddle => {
                 self.direction_middle_state.apply_action(
@@ -455,9 +455,7 @@ fn direction_row<'a>(
     column![
         text(label)
             .size(14)
-            .style(move |_| iced::widget::text::Style {
-                color: Some(muted),
-            }),
+            .style(move |_| iced::widget::text::Style { color: Some(muted) }),
         dock.into_element(
             items,
             state,
@@ -529,9 +527,7 @@ fn dock_title(now: Instant, theme_shell: &_shared::ThemeShell) -> Element<'stati
 
     text("Dock")
         .size(96)
-        .style(move |_| iced::widget::text::Style {
-            color: Some(color),
-        })
+        .style(move |_| iced::widget::text::Style { color: Some(color) })
         .into()
 }
 

@@ -223,7 +223,8 @@ impl LensState {
     fn advance_anim(&mut self, now: Instant, duration_secs: f32) {
         let duration = duration_secs.max(0.01);
         let started = self.phase_started.unwrap_or(now);
-        self.anim_t = (now.saturating_duration_since(started).as_secs_f32() / duration).clamp(0.0, 1.0);
+        self.anim_t =
+            (now.saturating_duration_since(started).as_secs_f32() / duration).clamp(0.0, 1.0);
     }
 
     pub fn visibility(&self) -> LensVisibility {
@@ -667,8 +668,7 @@ where
             // square corner caps. Mid-y alone can leak: a strip spanning a corner
             // band is wider at mid than at the extreme edge. Intersect spans at
             // both strip ends so the full strip height stays inside the round.
-            let Some((x0, x1)) =
-                rounded_rect_x_span_covering_strip(bounds, border_radius, strip)
+            let Some((x0, x1)) = rounded_rect_x_span_covering_strip(bounds, border_radius, strip)
             else {
                 return;
             };
@@ -810,11 +810,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 fn chord_half_width(radius: f32, dy: f32) -> f32 {
     let r2 = radius * radius;
     let dy2 = dy * dy;
-    if dy2 >= r2 {
-        0.0
-    } else {
-        (r2 - dy2).sqrt()
-    }
+    if dy2 >= r2 { 0.0 } else { (r2 - dy2).sqrt() }
 }
 
 /// Inclusive horizontal span `[x0, x1]` inside a rounded rect at absolute `y`.
@@ -859,11 +855,7 @@ fn rounded_rect_x_span(bounds: Rectangle, radius: f32, y: f32) -> Option<(f32, f
         x1 = x1.min((bounds.x + bounds.width - r) + half);
     }
 
-    if x1 <= x0 {
-        None
-    } else {
-        Some((x0, x1))
-    }
+    if x1 <= x0 { None } else { Some((x0, x1)) }
 }
 
 /// Horizontal span that keeps the **entire** strip height inside the rounded rect.
@@ -891,11 +883,7 @@ fn rounded_rect_x_span_covering_strip(
 
     let x0 = t0.max(b0).max(m0);
     let x1 = t1.min(b1).min(m1);
-    if x1 <= x0 {
-        None
-    } else {
-        Some((x0, x1))
-    }
+    if x1 <= x0 { None } else { Some((x0, x1)) }
 }
 
 /// Clip `strip` horizontally to inclusive span `[x0, x1]`.
@@ -918,7 +906,12 @@ fn strip_step(radius: f32) -> f32 {
     (diameter / LENS_STRIP_MAX as f32).clamp(LENS_STRIP_MIN_STEP, LENS_STRIP_MAX_STEP)
 }
 
-fn for_each_chord_strip(center: Point, radius: f32, clip: Rectangle, mut emit: impl FnMut(Rectangle)) {
+fn for_each_chord_strip(
+    center: Point,
+    radius: f32,
+    clip: Rectangle,
+    mut emit: impl FnMut(Rectangle),
+) {
     let step = strip_step(radius);
     let y_start = center.y - radius;
     let y_end = center.y + radius;
@@ -1159,8 +1152,7 @@ mod tests {
         let (mid_x0, mid_x1) = rounded_rect_x_span(bounds, radius, mid_y).expect("mid");
         let (cov_x0, cov_x1) =
             rounded_rect_x_span_covering_strip(bounds, radius, strip).expect("cover");
-        let (top_x0, top_x1) =
-            rounded_rect_x_span(bounds, radius, strip.y).expect("top");
+        let (top_x0, top_x1) = rounded_rect_x_span(bounds, radius, strip.y).expect("top");
 
         assert!(
             cov_x0 > mid_x0,
@@ -1179,7 +1171,7 @@ mod tests {
     #[test]
     fn strip_step_respects_cap_bounds() {
         let step = strip_step(85.0); // diameter 170 → ~1px
-        assert!(step >= LENS_STRIP_MIN_STEP && step <= LENS_STRIP_MAX_STEP);
+        assert!((LENS_STRIP_MIN_STEP..=LENS_STRIP_MAX_STEP).contains(&step));
 
         let big = strip_step(2000.0);
         assert!((big - LENS_STRIP_MAX_STEP).abs() < f32::EPSILON);

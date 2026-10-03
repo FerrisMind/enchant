@@ -1,9 +1,9 @@
 mod _shared;
 
 use enchant_iced::NumberTicker;
+use iced::font::Weight;
 use iced::time::Instant;
 use iced::widget::{button, column, text};
-use iced::font::Weight;
 use iced::{Alignment, Background, Border, Color, Element, Font, Size, Subscription, Task};
 use std::time::Duration;
 

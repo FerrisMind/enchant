@@ -333,9 +333,7 @@ impl<Message> InteractiveHoverButton<Message> {
             .height(Length::Fill)
             .into();
 
-        let layered = stack(vec![control.into()])
-            .push(overlay_layer)
-            .clip(true);
+        let layered = stack(vec![control.into()]).push(overlay_layer).clip(true);
 
         container(layered)
             .width(width)
@@ -509,8 +507,7 @@ impl<Message> EffectProgram<Message> for InteractiveHoverProgram {
             self.primary,
         );
 
-        let idle_label_x =
-            self.padding.left + self.dot_size + self.gap + IDLE_LABEL_SLIDE_PX * t;
+        let idle_label_x = self.padding.left + self.dot_size + self.gap + IDLE_LABEL_SLIDE_PX * t;
         let idle_alpha = 1.0 - t;
         if idle_alpha > 0.01 {
             paint_label(
@@ -547,9 +544,7 @@ impl<Message> EffectProgram<Message> for InteractiveHoverProgram {
 }
 
 fn effective_pill_radius(border_radius: f32, size: Size) -> f32 {
-    border_radius
-        .min(size.width * 0.5)
-        .min(size.height * 0.5)
+    border_radius.min(size.width * 0.5).min(size.height * 0.5)
 }
 
 /// Expanding primary disk (`scale-[100.8]`), clipped to the stadium without
@@ -746,13 +741,9 @@ fn apply_ease(t: f32, ease: InteractiveHoverEase) -> f32 {
     let t = t.clamp(0.0, 1.0);
     match ease {
         InteractiveHoverEase::Linear => t,
-        InteractiveHoverEase::Ease => cubic_bezier_ease(
-            t,
-            CSS_EASE_X1,
-            CSS_EASE_Y1,
-            CSS_EASE_X2,
-            CSS_EASE_Y2,
-        ),
+        InteractiveHoverEase::Ease => {
+            cubic_bezier_ease(t, CSS_EASE_X1, CSS_EASE_Y1, CSS_EASE_X2, CSS_EASE_Y2)
+        }
         InteractiveHoverEase::EaseIn => t * t,
         InteractiveHoverEase::EaseOut => 1.0 - (1.0 - t) * (1.0 - t),
         InteractiveHoverEase::EaseInOut => {
@@ -890,7 +881,12 @@ mod tests {
         let idle = advance_progress(1.0, false, DEFAULT_DURATION_SECS, DEFAULT_DURATION_SECS);
         assert!(idle.abs() < f32::EPSILON);
 
-        let mid = advance_progress(0.0, true, DEFAULT_DURATION_SECS * 0.5, DEFAULT_DURATION_SECS);
+        let mid = advance_progress(
+            0.0,
+            true,
+            DEFAULT_DURATION_SECS * 0.5,
+            DEFAULT_DURATION_SECS,
+        );
         assert!((mid - 0.5).abs() < 0.001);
     }
 
