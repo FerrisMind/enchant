@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `confetti` ported to the builder-first API used by the rest of the crate:
+  `Confetti`, `ConfettiButton`, `ConfettiOptions`, and `ConfettiShape` replace
+  `ConfettiProps`/`ConfettiAction`/`ConfettiBurst` and the free `confetti` and
+  `confetti_button` functions. The example now follows the Magic UI
+  canvas-confetti gallery.
 - Dependency revisions moved forward: `iced-shadcn` to
   `96982c1c2a3c567d4ee847b72521711556fd98c1`, `twill` to
   `83e8ac1a00766b5304ec88d25a9f3e99274ef0e8`. The `twill` revision is deliberately
