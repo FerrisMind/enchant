@@ -6,7 +6,12 @@ Author: FerrisMind
 
 ## Crate role
 
-`enchant-iced` is the reusable library layer inside the `enchant` workspace. It exports the widgets, sections, theme helpers, and animation primitives used by the new `wasm-demo` app.
+`enchant-iced` is the library crate of the `enchant` workspace. It exports the
+widgets, sections, theme helpers, and animation primitives used by the example
+set in `examples/`.
+
+Builder-first API per component: private fields, fluent validated setters,
+`#[must_use]` builders, terminal `into_element` / `view`.
 
 ## Included surface
 
@@ -16,6 +21,8 @@ Author: FerrisMind
 - extended effects: `warp-background`, `progressive-blur`, `neon-gradient-card`, `meteors`, `grid-pattern`, `striped-pattern`, `dot-pattern`, `animated-grid-pattern`, `orbiting-circles`, `backlight`, `line-shadow-text`, `aurora-text`, `animated-shiny-text`, `hyper-text`, `sparkles-text`, `spinning-text`, `text-animate`, `highlighter`, `animated-list`
 - interactive and media widgets: `morphing-text`, `scroll-progress`, `pointer`, `smooth-cursor`, `hexagon-pattern`, `interactive-grid-pattern`, `glare-hover`, `dock`, `comic-text`, `cool-mode`, `pixel-image`, `animated-theme-toggler`, `light-rays`, `text-3d-flip`, `lens`, `globe`, `tweet-card`, `client-tweet-card`, `particles`, `retro-grid`, `flickering-grid`, `icon-cloud`, `scroll-based-velocity`, `confetti`, `video-text`, `dotted-map`
 
+Full public re-exports are listed in `src/lib.rs`.
+
 ## Platform notes
 
 - no DOM refs or `ResizeObserver`: anchor geometry is measured through widget `Id` plus runtime widget operations
@@ -24,17 +31,30 @@ Author: FerrisMind
 - `tweet-card` is data-first; remote loading stays behind the optional `tweet-adapter` feature
 - decorative surfaces stay generic in `iced-shadcn`; Magic-specific effects stay in `enchant-iced`
 
+## Features
+
+- `tweet-adapter` (off by default): enables remote tweet loading for `tweet-card`
+  and `client-tweet-card` via `reqwest` + `serde`.
+
 ## Verify
 
 ```powershell
 cargo check -p enchant-iced --all-targets
 cargo test -p enchant-iced
+cargo clippy -p enchant-iced --all-targets -- -D warnings
 ```
 
-## Demo app
-
-The old root-level phase showcases were removed. Run the workspace demo instead:
+## Run an example
 
 ```powershell
-trunk serve crates/wasm-demo/index.html
+cargo run --example magic_card
+cargo run --example animated_beam
 ```
+
+`cargo run --example` with no name lists every example. The set covers 82
+components and scenarios.
+
+## Licensing
+
+Licensed under either of Apache License, Version 2.0 or MIT license, at your
+option. See `LICENSE-APACHE` and `LICENSE-MIT`.
