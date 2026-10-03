@@ -15,6 +15,9 @@ categories = ["gui", "rendering"]
 
 include = [
     "src/**/*",
+    "assets/**/*",
+    "examples/**/*",
+    "tests/**/*",
     "Cargo.toml",
     "/README.md",
     "LICENSE*",
@@ -28,10 +31,12 @@ tweet-adapter = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 iced = { version = "0.14", features = ["advanced", "canvas", "image", "svg", "tokio", "wgpu"] }
 bytemuck = { version = "1.24", features = ["derive"] }
 iced_runtime = "0.14.0"
-iced-shadcn = { git = "https://github.com/FerrisMind/shadcn-rs", rev = "3a50642e18d5c79c9e7ab5993c2325605ed18858", default-features = false, features = ["chrono"] }
+iced-shadcn = { git = "https://github.com/FerrisMind/shadcn-rs", rev = "96982c1c2a3c567d4ee847b72521711556fd98c1", default-features = false, features = ["chrono"] }
 lucide-icons = "0.575.0"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
-twill = { git = "https://github.com/FerrisMind/twill.git", rev = "d3419a53af2b20f7c1f7e4532a5ef3afa866229f", default-features = false, features = ["iced"] }
+# Pinned to the revision that iced-shadcn pins. Using twill's own tip would resolve
+# a second copy of the crate and break type identity across the iced-shadcn boundary.
+twill = { git = "https://github.com/FerrisMind/twill.git", rev = "83e8ac1a00766b5304ec88d25a9f3e99274ef0e8", default-features = false, features = ["iced"] }
 unicode-segmentation = "1.12"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
