@@ -33,6 +33,7 @@ logs/
 
 # Agent / SDD scratch (briefs, diffs, screenshots, progress ledger)
 .superpowers/
+docs/superpowers/
 
 # Python tooling
 scripts/__pycache__/
@@ -46,9 +47,6 @@ scripts/__pycache__/
 *.dylib
 *.dll
 *.exe
-
-# Wasm demo generated output
-crates/wasm-demo/generated/
 
 # CodeGraph local DB/cache (see .codegraph/.gitignore)
 .codegraph/*.db
