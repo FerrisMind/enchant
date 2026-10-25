@@ -85,6 +85,7 @@ pub mod text_3d_flip;
 pub mod text_animate;
 pub mod text_element;
 pub mod text_reveal;
+pub mod thinking_orb;
 pub mod tweet_card;
 pub mod typing_animation;
 pub mod video_text;
@@ -212,6 +213,11 @@ pub use text_animate::{
 };
 pub use text_element::TextElementRole;
 pub use text_reveal::{TextRevealProps, text_reveal};
+pub use thinking_orb::gravity;
+pub use thinking_orb::{
+    CursorSprite, CursorSpriteError, Dot, Gravity, GravityStatus, GravityTuning, Line,
+    MotionPreference, OrbFrame, OrbKnob, OrbOptions, OrbSize, OrbState, OrbTheme, ThinkingOrb,
+};
 pub use tweet_card::{
     ClientTweetCardAction, ClientTweetCardProps, ClientTweetCardState, ClientTweetCardStatus,
     TweetAsset, TweetAuthor, TweetCardData, TweetCardProps, TweetMedia, client_tweet_card,
