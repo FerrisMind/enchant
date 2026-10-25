@@ -2,8 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-const INTERNAL_HELPER_EXAMPLES: &[&str] =
-    &["animated_subscribe_button", "border_track", "motion_grid"];
+const INTERNAL_HELPER_EXAMPLES: &[&str] = &[
+    "animated_subscribe_button",
+    "border_track",
+    "motion_grid",
+    "thinking_orb",
+];
 
 const HELPER_EXPORTS: &[&str] = &[
     "animated_subscribe_button",
