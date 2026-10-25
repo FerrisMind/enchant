@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `enchant_iced::ThinkingOrb`: full port of libraries.dev thinking-orbs. All nine
+  states (working, searching, solving, listening, connecting, weaving, composing,
+  breathing, shaping) at the 64, 32 and 20 px designs, speed, dot count and size,
+  tint, light/dark/auto theme, pause, reduced-motion static frame, accessible
+  label, custom frame functions and per-knob `OrbOptions`. Frames are checked
+  against the reference's golden fixture (`tests/thinking_orb_golden.rs`) and
+  painted by a software rasteriser that reproduces Canvas2D coverage (visual
+  comparison against libraries.dev/orbs: NCC >= 0.99 per orb).
+- `enchant_iced::gravity`: the cursor-gravity runtime (nearest-orb pull, bent
+  pointer sprite, trail, typing release, frame-budget watchdog), configured
+  with `Gravity`, `CursorSprite` and `set_tuning`.
+- `thinking_orb` example (gallery with controls). New dependency: `libm`
+  (bit-exact `sin`/`cos`/`exp` parity with the reference); `serde_json` for tests.
 - `LICENSE-MIT` and `LICENSE-APACHE`; the project now ships the license texts its
   manifest has always declared.
 - `THIRD_PARTY_NOTICES.md`, recording the license and origin of every third-party
