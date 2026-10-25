@@ -24,6 +24,7 @@ pub use sections::{
     bento_grid,
 };
 pub use theme::MagicTheme;
+pub use widgets::gravity;
 pub use widgets::{
     AndroidProps, AnimatedBeamProps, AnimatedCircularProgressBarProps,
     AnimatedCircularProgressBarState, AnimatedGradientTextProps, AnimatedGridPatternProps,
@@ -83,5 +84,9 @@ pub use widgets::{
     spinning_text, striped_pattern, terminal, text_3d_flip, text_animate, text_reveal,
     theme_transition_overlay, tweet_card, typing_animation, video_text, warp_background,
     word_rotate,
+};
+pub use widgets::{
+    CursorSprite, CursorSpriteError, Dot, Gravity, GravityStatus, GravityTuning, Line,
+    MotionPreference, OrbFrame, OrbKnob, OrbOptions, OrbSize, OrbState, OrbTheme, ThinkingOrb,
 };
 pub use widgets::{GlyphMatrixProps, glyph_matrix};

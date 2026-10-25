@@ -46,7 +46,12 @@ lyon_path = "1.0"
 resvg = "0.45"
 base64 = "0.22"
 swash = "0.2.9"
+libm = "0.2"
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[dev-dependencies]
+serde_json = "1"
+
