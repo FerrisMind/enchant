@@ -116,9 +116,7 @@ static CURSOR_SPRITE: Mutex<Option<MetalCursorSprite>> = Mutex::new(None);
 static CURSOR_REV: Mutex<u64> = Mutex::new(0);
 
 fn lock_cfg() -> MutexGuard<'static, MetalCursorLightConfig> {
-    CURSOR_LIGHT
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
+    CURSOR_LIGHT.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// Current live cursor-light config.
@@ -325,10 +323,9 @@ pub fn light_cursor_sprite(
     if out.len() < w * h * 4 || env < 0.002 || !cfg.cursor {
         return out;
     }
-    let body = sprite.center.unwrap_or([
-        sprite.width as f32 * 0.5,
-        sprite.height as f32 * 0.5,
-    ]);
+    let body = sprite
+        .center
+        .unwrap_or([sprite.width as f32 * 0.5, sprite.height as f32 * 0.5]);
     let dist = toward_ring[0].hypot(toward_ring[1]).max(0.01);
     let ux = toward_ring[0] / dist;
     let uy = toward_ring[1] / dist;
@@ -396,21 +393,15 @@ mod tests {
 
     #[test]
     fn outline_outside_is_positive() {
-        let (d, pt) = nearest_outline_point(
-            [200.0, 20.0],
-            140.0,
-            40.0,
-            20.0,
-            MetalFxVariant::Button,
-        );
+        let (d, pt) =
+            nearest_outline_point([200.0, 20.0], 140.0, 40.0, 20.0, MetalFxVariant::Button);
         assert!(d > 0.0, "outside: {d}");
         assert!((pt[0] - 140.0).abs() < 1.0, "pt={pt:?}");
     }
 
     #[test]
     fn outline_inside_is_negative() {
-        let (d, _) =
-            nearest_outline_point([70.0, 20.0], 140.0, 40.0, 20.0, MetalFxVariant::Button);
+        let (d, _) = nearest_outline_point([70.0, 20.0], 140.0, 40.0, 20.0, MetalFxVariant::Button);
         assert!(d < 0.0, "inside: {d}");
     }
 

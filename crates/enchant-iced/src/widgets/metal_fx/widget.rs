@@ -24,12 +24,12 @@ use super::geometry::MetalFxVariant;
 use super::glow::{GlowFrame, GlowSampler, GlowState, GlowTick, MaterialSampler};
 use super::glow_config::{MetalGlowConfig, glow_config};
 use super::mask::{MetalFxMask, MetalGlowMode};
-use super::reflection_anchor::{MetalReflectionAnchor, register_reflection_anchor};
 use super::material::{MetalMaterial, SheetMapping};
 use super::options::{MetalFxLayer, MetalFxOptions, MetalFxSurface};
 use super::preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode};
 use super::primitive::MetalFxPrimitive;
 use super::raster::{MetalFxHost, SceneParams};
+use super::reflection_anchor::{MetalReflectionAnchor, register_reflection_anchor};
 use super::rim::MetalRimOptions;
 use super::scene::{Layer, Scene};
 
@@ -346,13 +346,8 @@ impl Inner {
             let r_edge = radius.min(host_w.min(host_h) * 0.5);
             let signed = d - r_edge;
             let speed = self.pointer_vel[0].hypot(self.pointer_vel[1]);
-            let (mut dir, liquid) = super::bend::pointer_targets(
-                signed,
-                [-ux, -uy],
-                [ux, uy],
-                speed,
-                cfg,
-            );
+            let (mut dir, liquid) =
+                super::bend::pointer_targets(signed, [-ux, -uy], [ux, uy], speed, cfg);
             if self.pressed {
                 dir[0] -= ux * cfg.press;
                 dir[1] -= uy * cfg.press;

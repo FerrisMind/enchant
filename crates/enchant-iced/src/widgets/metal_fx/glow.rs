@@ -424,8 +424,7 @@ impl GlowState {
         };
         if cursor_on {
             let c = cl.expect("cursor_on implies Some");
-            self.cursor_target_arc =
-                arc_at_point(c.x, c.y, g.width, g.height, g.radius, g.kind);
+            self.cursor_target_arc = arc_at_point(c.x, c.y, g.width, g.height, g.radius, g.kind);
         }
 
         let dt_ms = if self.last_tick_ms > 0.0 {

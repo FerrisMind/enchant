@@ -96,12 +96,7 @@ pub fn reflection_layout(
         (intensity * INTENSITY_MULT * GLOBAL_ATTENUATION).min(MAX_ALPHA_STACK) * strength;
 
     let glyph = style == MetalReflectionStyle::Glyphs;
-    let band = if glyph {
-        RANGE_PX * 1.5
-    } else {
-        RANGE_PX
-    }
-    .min(tw.max(th));
+    let band = if glyph { RANGE_PX * 1.5 } else { RANGE_PX }.min(tw.max(th));
     let ref_w = if glyph {
         (if horiz { tw } else { th })
             .min(if horiz { a[2] } else { a[3] })
@@ -124,14 +119,7 @@ pub fn reflection_layout(
             flip_x: true,
             flip_y: false,
             g0: [if dx > 0.0 { 1.0 } else { 0.0 }, 0.5],
-            g1: [
-                if dx > 0.0 {
-                    1.0 - band / tw
-                } else {
-                    band / tw
-                },
-                0.5,
-            ],
+            g1: [if dx > 0.0 { 1.0 - band / tw } else { band / tw }, 0.5],
             reflection_alpha,
             horizontal: true,
         })
@@ -149,14 +137,7 @@ pub fn reflection_layout(
             flip_x: false,
             flip_y: true,
             g0: [0.5, if dy > 0.0 { 1.0 } else { 0.0 }],
-            g1: [
-                0.5,
-                if dy > 0.0 {
-                    1.0 - band / th
-                } else {
-                    band / th
-                },
-            ],
+            g1: [0.5, if dy > 0.0 { 1.0 - band / th } else { band / th }],
             reflection_alpha,
             horizontal: false,
         })
@@ -238,11 +219,7 @@ pub fn occluder_keep(
         } else {
             anchor[0] + anchor[2]
         };
-        let gap_end = if anchor_right {
-            anchor[0]
-        } else {
-            target[0]
-        };
+        let gap_end = if anchor_right { anchor[0] } else { target[0] };
         let band_lo = anchor[1].max(target[1]);
         let band_hi = (anchor[1] + anchor[3]).min(target[1] + target[3]);
         (gap_start, gap_end, p[0], p[1], band_lo, band_hi)
@@ -253,11 +230,7 @@ pub fn occluder_keep(
         } else {
             anchor[1] + anchor[3]
         };
-        let gap_end = if anchor_below {
-            anchor[1]
-        } else {
-            target[1]
-        };
+        let gap_end = if anchor_below { anchor[1] } else { target[1] };
         let band_lo = anchor[0].max(target[0]);
         let band_hi = (anchor[0] + anchor[2]).min(target[0] + target[2]);
         (gap_start, gap_end, p[1], p[0], band_lo, band_hi)
@@ -350,7 +323,8 @@ pub fn paint_reflection(input: MetalReflectionPaint<'_>) -> Option<(u32, u32, Ve
         } else {
             1.0
         };
-        (layout.reflection_alpha * FILL_EXTRA_ALPHA * FILL_OPACITY_MUL * circle).min(MAX_ALPHA_STACK)
+        (layout.reflection_alpha * FILL_EXTRA_ALPHA * FILL_OPACITY_MUL * circle)
+            .min(MAX_ALPHA_STACK)
     };
     let stroke_alpha = layout.reflection_alpha * STROKE_EXTRA_ALPHA;
     let band = RANGE_PX + FILL_BLUR_CSS_PX * 3.0;
@@ -361,11 +335,7 @@ pub fn paint_reflection(input: MetalReflectionPaint<'_>) -> Option<(u32, u32, Ve
         for px in 0..w {
             let lx = (px as f32 + 0.5) / density;
             let ly = (py as f32 + 0.5) / density;
-            if lx < draw[0]
-                || ly < draw[1]
-                || lx >= draw[0] + draw[2]
-                || ly >= draw[1] + draw[3]
-            {
+            if lx < draw[0] || ly < draw[1] || lx >= draw[0] + draw[2] || ly >= draw[1] + draw[3] {
                 continue;
             }
             // Map target-local draw px → mirrored anchor box.
@@ -385,7 +355,14 @@ pub fn paint_reflection(input: MetalReflectionPaint<'_>) -> Option<(u32, u32, Ve
             let on_source = if anchor.is_sheet || style == MetalReflectionStyle::Glyphs {
                 ax >= 0.0 && ay >= 0.0 && ax <= anchor.width && ay <= anchor.height
             } else {
-                in_ring(ax, ay, anchor.width, anchor.height, anchor.radius, anchor.ring_px)
+                in_ring(
+                    ax,
+                    ay,
+                    anchor.width,
+                    anchor.height,
+                    anchor.radius,
+                    anchor.ring_px,
+                )
             };
             if !on_source {
                 continue;

@@ -36,12 +36,7 @@ impl MetalBendField {
 
     /// Builds a field from a contact, directional displacement and liquid amp.
     #[must_use]
-    pub fn new(
-        contact: [f32; 2],
-        dir: [f32; 2],
-        liquid_amp: f32,
-        cfg: &MetalBendConfig,
-    ) -> Self {
+    pub fn new(contact: [f32; 2], dir: [f32; 2], liquid_amp: f32, cfg: &MetalBendConfig) -> Self {
         let blob = cfg.blob.max(0.5);
         let liquid_blob = cfg.liquid_blob.max(0.5);
         Self {
@@ -262,17 +257,14 @@ mod tests {
         let mut s = MetalBendState::new();
         let mut field = None;
         for i in 1..=120 {
-            field = s.tick(
-                i as f64 * 16.0,
-                [40.0, 0.0],
-                [5.0, 0.0],
-                4.0,
-                true,
-                &cfg,
-            );
+            field = s.tick(i as f64 * 16.0, [40.0, 0.0], [5.0, 0.0], 4.0, true, &cfg);
         }
         let f = field.expect("envelope up");
-        assert!(f.dir_x > 2.0, "spring should approach target, got {}", f.dir_x);
+        assert!(
+            f.dir_x > 2.0,
+            "spring should approach target, got {}",
+            f.dir_x
+        );
     }
 
     #[test]

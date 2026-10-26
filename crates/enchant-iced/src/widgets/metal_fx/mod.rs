@@ -131,6 +131,9 @@ pub use metal_badge::{METAL_BADGE_DEFAULTS, MetalBadge, MetalBadgeCore, MetalBad
 pub use metal_reflection::MetalReflection;
 pub use metal_text::MetalText;
 pub use options::{MetalFxLayer, MetalFxOptions, MetalFxSurface};
+pub use pipeline::{MetalFxPipeline, WGSL as METAL_FX_WGSL};
+pub use preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode, ShaderFit};
+pub use raster::{MetalFxBitmap, MetalFxHost, MetalFxLayerKind, MetalRenderOptions};
 pub use reflection::{
     MetalReflectionLayout, MetalReflectionPaint, MetalReflectionStyle, occluder_keep,
     paint_reflection, reflection_layout, shortest_rect_distance,
@@ -143,9 +146,6 @@ pub use reflection_occluder::{
     MetalReflectionOccluderConfig, reflection_occluder_config, reflection_occluder_config_revision,
     reset_reflection_occluder_config, set_reflection_occluder_config,
 };
-pub use pipeline::{MetalFxPipeline, WGSL as METAL_FX_WGSL};
-pub use preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode, ShaderFit};
-pub use raster::{MetalFxBitmap, MetalFxHost, MetalFxLayerKind, MetalRenderOptions};
 pub use rim::MetalRimOptions;
 pub use text_mask::{
     METAL_TEXT_DEFAULTS, METAL_TEXT_PAD_CSS, MetalTextDefaults, MetalTextFont, TextInnerShadow,

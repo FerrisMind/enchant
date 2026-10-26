@@ -99,11 +99,7 @@ impl Gallery {
     }
 
     fn theme(&self) -> Theme {
-        if self.dark {
-            Theme::Dark
-        } else {
-            Theme::Light
-        }
+        if self.dark { Theme::Dark } else { Theme::Light }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -218,10 +214,7 @@ impl Gallery {
         let (plan_pw, plan_ph) = plan_mask.pixel_size();
         let plan_w = plan_pw as f32 / 2.0;
         let plan_h = plan_ph as f32 / 2.0;
-        let plan_label = glyph_mask_image(
-            &plan_mask,
-            Color::from_rgba(0.9, 0.9, 0.9, 0.55),
-        );
+        let plan_label = glyph_mask_image(&plan_mask, Color::from_rgba(0.9, 0.9, 0.9, 0.55));
         let plan = MetalReflection::new(
             "pro",
             container(plan_label)
@@ -232,7 +225,10 @@ impl Gallery {
         .style(MetalReflectionStyle::Glyphs)
         .glyph_mask(plan_mask);
 
-        let badge = MetalBadge::new("New").theme(theme).strength(s).paused(paused);
+        let badge = MetalBadge::new("New")
+            .theme(theme)
+            .strength(s)
+            .paused(paused);
 
         let chip = MetalReflection::new(
             "send",
