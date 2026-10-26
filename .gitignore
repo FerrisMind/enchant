@@ -54,6 +54,9 @@ crates/enchant-iced/examples/_*.rs
 .superpowers/
 docs/superpowers/
 .swarm/
+
+# Local capture / probe workdirs (screenshots, logs, one-off scripts)
+.*-work/
 .gooey-work/
 
 # Python tooling
