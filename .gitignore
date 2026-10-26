@@ -45,6 +45,7 @@ crates/enchant-iced/examples/_*.rs
 .superpowers/
 docs/superpowers/
 .swarm/
+.gooey-work/
 
 # Python tooling
 scripts/__pycache__/
