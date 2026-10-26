@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `enchant_iced::gravity`: the cursor-gravity runtime (nearest-orb pull, bent
   pointer sprite, trail, typing release, frame-budget watchdog), configured
   with `Gravity`, `CursorSprite` and `set_tuning`.
+- `enchant_iced::widgets::gooey`: full port of libraries.dev's liquid-gooey.
+  `Liquid` / `LiquidItem` provide the merged goo surface (software goo blur and
+  alpha contrast, `box-shadow` chains with spread and inset, waviness) plus
+  every item effect from the reference: `morph`/`EvolveOptions`, `move`
+  (spring lag, trailing droplets, velocity stretch), `bend` (vertical bow and
+  horizontal cap deformation), `dissolve` (turbulence warp, edge holes, timed
+  release), image `melt`, built-in dragging, and timed or spring transitions.
+  The `gooey` example reproduces the full demo gallery (tabs, chips, plus menu,
+  split pair, email field, slider, drag card, melting cards, melt pair, avatar
+  group) with real iced widgets as children. Raster and engine behavior is
+  covered by deterministic tests (goo extent, stretch axis, bend sag, dissolve
+  proximity, move transition/velocity).
 - `thinking_orb` example (gallery with controls). New dependency: `libm`
   (bit-exact `sin`/`cos`/`exp` parity with the reference); `serde_json` for tests.
 - `LICENSE-MIT` and `LICENSE-APACHE`; the project now ships the license texts its
@@ -49,6 +61,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Liquid gooey rasters stay visible while they animate: each rendered layer now
+  holds an explicit iced image allocation, so a texture is resident on the
+  frame that records it instead of landing a frame late while its handle is
+  already replaced (the drag card's pill and the moving tabs indicator used to
+  disappear during motion).
 - `cargo test --workspace` no longer fails: the ported-helper exports were missing
   from `HELPER_EXPORTS` in the example inventory test.
 - `cargo clippy --all-targets -- -D warnings` no longer fails.

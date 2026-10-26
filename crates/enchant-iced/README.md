@@ -17,7 +17,7 @@ Builder-first API per component: private fields, fluent validated setters,
 
 - foundations: animation, text sequencing, anchor geometry, scroll/time helpers, effect canvas, media helpers
 - layout and marketing widgets: `bento-grid`, mockups, `marquee`, `number-ticker`, `text-reveal`, `terminal`
-- premium interaction widgets: `magic-card`, `animated-beam`, `file-tree`, `word-rotate`, `typing-animation`, `shimmer-button`, `shiny-button`, `avatar-circles`, `blur-fade`, `animated-circular-progress-bar`
+- premium interaction widgets: `magic-card`, `animated-beam`, `file-tree`, `word-rotate`, `typing-animation`, `shimmer-button`, `shiny-button`, `avatar-circles`, `blur-fade`, `animated-circular-progress-bar`, `liquid-gooey` (`Liquid` / `LiquidItem`)
 - extended effects: `warp-background`, `progressive-blur`, `neon-gradient-card`, `meteors`, `grid-pattern`, `striped-pattern`, `dot-pattern`, `animated-grid-pattern`, `orbiting-circles`, `backlight`, `line-shadow-text`, `aurora-text`, `animated-shiny-text`, `hyper-text`, `sparkles-text`, `spinning-text`, `text-animate`, `highlighter`, `animated-list`, `voice-glow` (sound-reactive `VoiceBeam` glow, optional `microphone` feature)
 - interactive and media widgets: `morphing-text`, `scroll-progress`, `pointer`, `smooth-cursor`, `hexagon-pattern`, `interactive-grid-pattern`, `glare-hover`, `dock`, `comic-text`, `cool-mode`, `pixel-image`, `animated-theme-toggler`, `light-rays`, `text-3d-flip`, `lens`, `globe`, `tweet-card`, `client-tweet-card`, `particles`, `retro-grid`, `flickering-grid`, `icon-cloud`, `scroll-based-velocity`, `confetti`, `video-text`, `dotted-map`
 
@@ -49,6 +49,7 @@ cargo clippy -p enchant-iced --all-targets -- -D warnings
 ```powershell
 cargo run --example magic_card
 cargo run --example animated_beam
+cargo run --example gooey
 ```
 
 `cargo run --example` with no name lists every example. The set covers 82
@@ -66,8 +67,10 @@ Two levels, tracked separately:
   (gitignored); see the workspace README for the current verified and not-yet
   verified lists.
 
-Three examples are internal helpers and not part of the public surface:
-`animated_subscribe_button`, `border_track`, `motion_grid`.
+Examples that are internal helpers, not part of the Magic UI public surface,
+are listed in `tests/example_inventory.rs` (`INTERNAL_HELPER_EXAMPLES`); the
+liquid-gooey gallery (`gooey`) and the effect benchmarks live there because
+their upstream is libraries.dev rather than Magic UI.
 
 ## Licensing
 
