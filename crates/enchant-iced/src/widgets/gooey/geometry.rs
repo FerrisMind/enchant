@@ -468,7 +468,8 @@ pub(crate) fn stretch_points(
 }
 
 /// Scales a logical-pixel rectangle into a raster of `size` pixels.
-pub(crate) fn resize(size: Size, density: f32) -> (usize, usize) {    (
+pub(crate) fn resize(size: Size, density: f32) -> (usize, usize) {
+    (
         (size.width * density).round().max(1.0) as usize,
         (size.height * density).round().max(1.0) as usize,
     )
@@ -525,6 +526,32 @@ mod tests {
         let pts = bend_polygon(rect, CornerRadii::uniform(20.0), 6.0, 4.0);
         assert!(pts.iter().all(|p| p.y > -20.0 && p.y < 60.0));
         assert!(pts.iter().all(|p| p.x > -2.0 && p.x < 102.0));
+    }
+
+    #[test]
+    fn stretch_scales_along_the_motion_axis_only() {
+        let center = Point::new(50.0, 50.0);
+        let mut points = vec![
+            Point::new(60.0, 50.0), // 10 px ahead
+            Point::new(50.0, 60.0), // 10 px to the side
+            Point::new(40.0, 50.0), // 10 px behind
+        ];
+        stretch_points(&mut points, center, 0.0, 2.0, 0.5);
+        assert!((points[0].x - 70.0).abs() < 1e-4);
+        assert!((points[0].y - 50.0).abs() < 1e-4);
+        assert!((points[1].x - 50.0).abs() < 1e-4);
+        assert!((points[1].y - 55.0).abs() < 1e-4);
+        assert!((points[2].x - 30.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn stretch_rotates_with_the_motion_axis() {
+        let center = Point::new(0.0, 0.0);
+        let mut points = vec![Point::new(0.0, 10.0)];
+        let half_pi = std::f32::consts::FRAC_PI_2;
+        stretch_points(&mut points, center, half_pi, 2.0, 1.0);
+        assert!(points[0].x.abs() < 1e-4);
+        assert!((points[0].y - 20.0).abs() < 1e-4);
     }
 
     #[test]
