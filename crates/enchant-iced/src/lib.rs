@@ -24,7 +24,14 @@ pub use sections::{
     bento_grid,
 };
 pub use theme::MagicTheme;
+pub use widgets::gooey;
 pub use widgets::gravity;
+pub use widgets::{
+    Bend, CornerRadii, DissolveOptions, EVOLVE_DEFAULTS, Easing, EvolveOptions,
+    IMAGE_MELT_DEFAULTS, ImageMeltOptions, ItemBox, ItemOptions, Liquid, LiquidItem, LiquidLayout,
+    LiquidRaster, MOVE_DEFAULTS, Morph, Move, MoveOptions, Shadow, ShadowLayer, SpringConfig,
+    Transition, TransitionPreset,
+};
 pub use widgets::{
     AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, MetalBadge, MetalBadgeCore,
     MetalBadgeDefaults, MetalFx, MetalFxLayer, MetalFxMask, MetalFxOptions, MetalFxPreset,

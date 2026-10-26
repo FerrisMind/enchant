@@ -5,6 +5,7 @@ use std::path::PathBuf;
 const INTERNAL_HELPER_EXAMPLES: &[&str] = &[
     "animated_subscribe_button",
     "border_track",
+    "gooey",
     "metal_fx",
     "motion_grid",
     "thinking_orb",

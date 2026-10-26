@@ -39,6 +39,7 @@ pub mod file_tree;
 pub mod flickering_grid;
 pub mod glare_hover;
 pub mod globe;
+pub mod gooey;
 pub mod glyph_matrix;
 pub mod grid_pattern;
 pub mod hero_video_dialog;
@@ -145,6 +146,12 @@ pub use globe::{
     GlobeAction, GlobeDemoColors, GlobeMarker, GlobeProps, GlobeState, blend_globe_demo_colors,
     globe, globe_demo, globe_demo_colors_blended, globe_demo_colors_for_controller,
     globe_demo_colors_for_mode, globe_demo_colors_from_theme,
+};
+pub use gooey::{
+    Bend, CornerRadii, DissolveOptions, EVOLVE_DEFAULTS, Easing, EvolveOptions,
+    IMAGE_MELT_DEFAULTS, ImageMeltOptions, ItemBox, ItemOptions, Liquid, LiquidItem, LiquidLayout,
+    LiquidRaster, MOVE_DEFAULTS, Morph, Move, MoveOptions, Shadow, ShadowLayer, SpringConfig,
+    Transition, TransitionPreset, parse_color,
 };
 pub use glyph_matrix::{GlyphMatrixProps, glyph_matrix};
 pub use grid_pattern::{GridPatternProps, grid_pattern};

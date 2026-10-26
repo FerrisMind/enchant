@@ -52,7 +52,7 @@
 //! ```
 
 mod audio;
-mod blur;
+pub(crate) mod blur;
 mod config;
 mod driver;
 mod frame;
@@ -60,7 +60,7 @@ mod geometry;
 mod headless;
 #[cfg(feature = "microphone")]
 mod microphone;
-mod noise;
+pub(crate) mod noise;
 mod options;
 mod paint;
 mod palette;
