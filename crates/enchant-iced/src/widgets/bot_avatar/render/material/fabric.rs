@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::sync::{Arc, Mutex, OnceLock};
 
+use rayon::prelude::*;
 use tiny_skia::{
     BlendMode, FillRule, FilterQuality, LineCap, LineJoin, Mask, Path, PathBuilder, Pixmap,
     PixmapPaint, Stroke, Transform,
@@ -275,7 +276,6 @@ impl Alpha {
 }
 
 /// The pile's layers, all alpha only at their own resolution.
-#[derive(Clone)]
 struct Fur {
     r: usize,
     mask: Alpha,
@@ -291,11 +291,74 @@ struct Fur {
     tufts: Option<Arc<Path>>,
     fringe_width: f32,
     tuft_width: f32,
+    /// The halo sprite resampled at each display size. It depends only on the
+    /// pile's mask and outline, so it outlives the frame.
+    halos: Mutex<HashMap<usize, Arc<Alpha>>>,
 }
 
-fn fur_cache() -> &'static Mutex<HashMap<String, Arc<Fur>>> {
-    static CACHE: OnceLock<Mutex<HashMap<String, Arc<Fur>>>> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+impl Fur {
+    fn halo(&self, spx: usize) -> Arc<Alpha> {
+        {
+            let cache = self
+                .halos
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(halo) = cache.get(&spx) {
+                return Arc::clone(halo);
+            }
+        }
+        let halo = Arc::new(build_halo(self, spx));
+        let mut cache = self
+            .halos
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        cache.insert(spx, Arc::clone(&halo));
+        halo
+    }
+}
+
+/// A baked pile and the tick that last asked for it.
+struct FurEntry {
+    fur: Arc<Fur>,
+    used: u64,
+    bytes: usize,
+}
+
+impl FurEntry {
+    fn weight(fur: &Fur) -> usize {
+        let alpha = |a: &Alpha| a.a.len();
+        alpha(&fur.mask)
+            + alpha(&fur.haze)
+            + alpha(&fur.core)
+            + alpha(&fur.soft)
+            + alpha(&fur.dark)
+            + alpha(&fur.light)
+            + alpha(&fur.glint)
+            + alpha(&fur.back)
+            + alpha(&fur.back_soft)
+    }
+}
+
+/// Piles are large and keyed by the light direction, so a fixed entry count
+/// either thrashes or wastes memory. Keep the most recently used bakes
+/// within a byte budget instead.
+struct FurCache {
+    entries: HashMap<String, FurEntry>,
+    tick: u64,
+    bytes: usize,
+}
+
+const FUR_CACHE_BYTES: usize = 64 * 1024 * 1024;
+
+fn fur_cache() -> &'static Mutex<FurCache> {
+    static CACHE: OnceLock<Mutex<FurCache>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        Mutex::new(FurCache {
+            entries: HashMap::new(),
+            tick: 0,
+            bytes: 0,
+        })
+    })
 }
 
 fn style_id(s: &FurStyle) -> String {
@@ -327,17 +390,43 @@ fn fur_for(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Arc<Fur>
         light_bin(lx, ly),
         style_id(&style)
     );
-    if let Ok(c) = fur_cache().lock()
-        && let Some(f) = c.get(&key)
-    {
-        return Arc::clone(f);
+    if let Ok(mut c) = fur_cache().lock() {
+        c.tick += 1;
+        let tick = c.tick;
+        if let Some(entry) = c.entries.get_mut(&key) {
+            entry.used = tick;
+            return Arc::clone(&entry.fur);
+        }
     }
     let fur = Arc::new(build_fur(form, r, lx, ly, style));
+    let bytes = FurEntry::weight(&fur);
     if let Ok(mut c) = fur_cache().lock() {
-        if c.len() > 8 {
-            c.clear();
+        c.tick += 1;
+        let tick = c.tick;
+        if let Some(old) = c.entries.insert(
+            key,
+            FurEntry {
+                fur: Arc::clone(&fur),
+                used: tick,
+                bytes,
+            },
+        ) {
+            c.bytes = c.bytes.saturating_sub(old.bytes);
         }
-        c.insert(key, Arc::clone(&fur));
+        c.bytes += bytes;
+        while c.bytes > FUR_CACHE_BYTES {
+            let Some(oldest) = c
+                .entries
+                .iter()
+                .min_by_key(|(_, e)| e.used)
+                .map(|(k, _)| k.clone())
+            else {
+                break;
+            };
+            if let Some(entry) = c.entries.remove(&oldest) {
+                c.bytes = c.bytes.saturating_sub(entry.bytes);
+            }
+        }
     }
     fur
 }
@@ -2073,6 +2162,7 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
         tufts: tufts_path,
         fringe_width: fringe_w,
         tuft_width: tuft_w,
+        halos: Mutex::new(HashMap::new()),
     }
 }
 
@@ -2117,32 +2207,65 @@ fn rays_of(tex: &[u8], form: &Form, c0: (f32, f32)) -> Rays {
     Rays { d: d_out, c: c_out }
 }
 
-fn ray_color(rays: &Rays, angle: f32, inset: f32, dark: f32) -> [f32; 3] {
+/// The 24 ray colours for one fixed inset and shade, ready to interpolate.
+/// This is `ray_color`'s expensive part hoisted out of the pixel loop.
+fn ray_lut(rays: &Rays, inset: f32, dark: f32) -> [[f32; 3]; 24] {
+    std::array::from_fn(|s| ray_color_ray(rays, s, inset, dark))
+}
+
+/// `atan(z)` on [-1, 1]. Halving the angle first keeps the series inside
+/// `tan(π/8)`, where its truncation error is below the f32 resolution.
+#[allow(clippy::excessive_precision)] // the series terms as 1/3, 1/5, ...
+fn atan_poly(z: f32) -> f32 {
+    let u = z / (1.0 + (1.0 + z * z).sqrt());
+    let u2 = u * u;
+    2.0 * u
+        * (1.0
+            + u2 * (-0.333_333_33
+                + u2 * (0.2
+                    + u2 * (-0.142_857_14
+                        + u2 * (0.111_111_11
+                            + u2 * (-0.090_909_09
+                                + u2 * (0.076_923_08
+                                    + u2 * (-0.066_666_664 + u2 * 0.058_823_53))))))))
+}
+
+/// `atan2` without a libm call. Used only to index a smooth colour table,
+/// and accurate to f32 rounding there.
+fn atan2_fast(y: f32, x: f32) -> f32 {
+    let ax = x.abs();
+    let ay = y.abs();
+    if ax == 0.0 && ay == 0.0 {
+        return 0.0;
+    }
+    if ax >= ay {
+        let a = atan_poly(ay / ax);
+        if x > 0.0 {
+            if y < 0.0 { -a } else { a }
+        } else if y < 0.0 {
+            a - PI
+        } else {
+            PI - a
+        }
+    } else {
+        let a = std::f32::consts::FRAC_PI_2 - atan_poly(ax / ay);
+        if y >= 0.0 {
+            if x >= 0.0 { a } else { PI - a }
+        } else if x >= 0.0 {
+            -a
+        } else {
+            a - PI
+        }
+    }
+}
+
+fn ray_lut_color(lut: &[[f32; 3]; 24], angle: f32) -> [f32; 3] {
     let f = ((angle / (2.0 * PI)).rem_euclid(1.0)) * 24.0;
     let s0 = f.floor() as usize % 24;
     let s1 = (s0 + 1) % 24;
     let t = f - f.floor();
-    let color = |s: usize| -> [f32; 3] {
-        let d = &rays.d[s];
-        let c = &rays.c[s];
-        if c.is_empty() {
-            return [0.0, 0.0, 0.0];
-        }
-        let mut j = 0;
-        for (i, &v) in d.iter().enumerate() {
-            if v >= inset {
-                j = i;
-            }
-        }
-        let k = 1.0 - dark;
-        [
-            f32::from(c[j][0]) * k,
-            f32::from(c[j][1]) * k,
-            f32::from(c[j][2]) * k,
-        ]
-    };
-    let a = color(s0);
-    let b = color(s1);
+    let a = lut[s0];
+    let b = lut[s1];
     [
         a[0] + (b[0] - a[0]) * t,
         a[1] + (b[1] - a[1]) * t,
@@ -2215,20 +2338,9 @@ fn linear_to_srgb(v: f64) -> f32 {
     }
 }
 
-fn blend_over_px(pixmap: &mut Pixmap, x: usize, y: usize, color: [f32; 3], alpha: f32) {
-    if alpha <= 0.0 {
-        return;
-    }
-    let idx = (y * pixmap.width() as usize + x) * 4;
-    let data = pixmap.data_mut();
-    let a = alpha.clamp(0.0, 1.0);
-    for ch in 0..3 {
-        let dst = f32::from(data[idx + ch]) / 255.0;
-        let src = color[ch] / 255.0 * a;
-        data[idx + ch] = ((src + dst * (1.0 - a)).clamp(0.0, 1.0) * 255.0).round() as u8;
-    }
-    let da = f32::from(data[idx + 3]) / 255.0;
-    data[idx + 3] = ((a + da * (1.0 - a)).clamp(0.0, 1.0) * 255.0).round() as u8;
+/// Exact rounded division by 255 for the 8-bit blend products below.
+fn div255(v: u32) -> u8 {
+    ((v + 128 + ((v + 128) >> 8)) >> 8) as u8
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2254,28 +2366,45 @@ fn fill_angular(
     let y0 = (bounds.top().floor() as i32).clamp(0, h as i32) as usize;
     let y1 = (bounds.bottom().ceil() as i32).clamp(0, h as i32) as usize;
     let mdata = mask.data();
-    for y in y0..y1 {
-        for x in x0..x1 {
-            let cov = f32::from(mdata[y * w + x]) / 255.0;
-            if cov <= 0.0 {
-                continue;
+    let lut = ray_lut(rays, inset, dark);
+    let data = body.data_mut();
+    let row_len = w * 4;
+    data.par_chunks_mut(row_len)
+        .enumerate()
+        .skip(y0)
+        .take(y1.saturating_sub(y0))
+        .for_each(|(y, row)| {
+            for x in x0..x1 {
+                let cov = f32::from(mdata[y * w + x]) / 255.0;
+                if cov <= 0.0 {
+                    continue;
+                }
+                let (dx, dy) = inverse.point(x as f32 + 0.5, y as f32 + 0.5);
+                let mut a = cov;
+                if let Some((sm, scale)) = soft {
+                    // soft mask covers [-PAD, 100 + PAD] at its own resolution
+                    let sx = ((dx + PAD) / SPAN * sm.w as f32 * scale) - 0.5;
+                    let sy = ((dy + PAD) / SPAN * sm.h as f32 * scale) - 0.5;
+                    a *= sm.sample(sx, sy);
+                }
+                if a <= 0.0 {
+                    continue;
+                }
+                let angle = atan2_fast(dy - c0.1, dx - c0.0);
+                let color = ray_lut_color(&lut, angle);
+                let a8 = (a.clamp(0.0, 1.0) * 255.0).round() as u32;
+                if a8 == 0 {
+                    continue;
+                }
+                let inv = 255 - a8;
+                let idx = x * 4;
+                for ch in 0..3 {
+                    let c = color[ch].clamp(0.0, 255.0).round() as u32;
+                    row[idx + ch] = div255(c * a8 + u32::from(row[idx + ch]) * inv);
+                }
+                row[idx + 3] = div255(a8 * 255 + u32::from(row[idx + 3]) * inv);
             }
-            let (dx, dy) = inverse.point(x as f32 + 0.5, y as f32 + 0.5);
-            let mut a = cov;
-            if let Some((sm, scale)) = soft {
-                // soft mask covers [-PAD, 100 + PAD] at its own resolution
-                let sx = ((dx + PAD) / SPAN * sm.w as f32 * scale) - 0.5;
-                let sy = ((dy + PAD) / SPAN * sm.h as f32 * scale) - 0.5;
-                a *= sm.sample(sx, sy);
-            }
-            if a <= 0.0 {
-                continue;
-            }
-            let angle = (dy - c0.1).atan2(dx - c0.0);
-            let color = ray_color(rays, angle, inset, dark);
-            blend_over_px(body, x, y, color, a);
-        }
-    }
+        });
 }
 
 fn apply_dark_ramp(
@@ -2559,8 +2688,36 @@ pub(crate) fn draw(
             .map(|p| (p, full))
     };
     // far half
+    // A far slice that lies wholly inside the equator cannot show: its
+    // outline is hidden by the equator's soft edge. The reference tests
+    // the rim against the form's distance field and leaves those out.
+    let hide_by = 1.5
+        / (rot.0[0] * rot.0[3] - rot.0[1] * rot.0[2])
+            .abs()
+            .sqrt()
+            .max(1e-6)
+        + 0.4;
+    let texel = SPAN / form.n as f32;
+    let to_g = |v: f32| ((v + PAD) / SPAN) * form.n as f32 - 0.5;
+    let rim = rim_of(&form);
     for k in (1..levels).rev() {
         let z = -near * rel.z[k];
+        let sk = rel.scale[k];
+        let bx = rel.cx[k] - sk * rel.cx[0] + z * dxs;
+        let by = rel.cy[k] - sk * rel.cy[0] + z * dys;
+        let mut hidden = bx.is_finite() && by.is_finite();
+        if hidden {
+            for p in rim.rim.chunks_exact(3) {
+                let d = bilerp(&form.sd, form.n, to_g(sk * p[0] + bx), to_g(sk * p[1] + by));
+                if d < hide_by + sk * (p[2] + texel) {
+                    hidden = false;
+                    break;
+                }
+            }
+        }
+        if hidden {
+            continue;
+        }
         if let Some((path, full)) = slice_path(k, z) {
             let inset = HALO_INSET.max(rel.inset[k]);
             fill_angular(
@@ -2653,7 +2810,7 @@ pub(crate) fn draw(
 
     // the halo
     let spx = cap_px.round().max(1.0) as usize;
-    let dev_halo = halo_dev(&fur, spx);
+    let dev_halo = fur.halo(spx);
     let [miss_cut, miss_over] = if dl1 > 1e-4 {
         halo_miss(
             &form,
@@ -2678,6 +2835,8 @@ pub(crate) fn draw(
     let s_aff = Affine(halos).then(slice_at(0.0)).then(body);
     let s_inv = s_aff.inverse();
     let c0 = (rel.cx[0], rel.cy[0]);
+    let hr_lut: [[f32; 3]; 24] =
+        std::array::from_fn(|s| ray_color_ray(&rays, s, hr.inset[s], hr.dark[s]));
     let halo_sample = |x: f32, y: f32| -> (f32, f32, f32, [f32; 3]) {
         // x,y already in the halo's design space (canvas -> design is done
         // by the caller through `s_inv`); returns alpha, core, haze alpha
@@ -2694,13 +2853,13 @@ pub(crate) fn draw(
             (x + PAD) * (fur.r as f32 / SPAN) - 0.5,
             (y + PAD) * (fur.r as f32 / SPAN) - 0.5,
         );
-        let angle = (y - c0.1).atan2(x - c0.0);
+        let angle = atan2_fast(y - c0.1, x - c0.0);
         let f = (angle / (2.0 * PI)).rem_euclid(1.0) * 24.0;
         let s0 = (f.floor() as usize) % 24;
         let s1 = (s0 + 1) % 24;
         let t = f - f.floor();
-        let a = ray_color_ray(&rays, s0, hr.inset[s0], hr.dark[s0]);
-        let b = ray_color_ray(&rays, s1, hr.inset[s1], hr.dark[s1]);
+        let a = hr_lut[s0];
+        let b = hr_lut[s1];
         let base = [
             a[0] + (b[0] - a[0]) * t,
             a[1] + (b[1] - a[1]) * t,
@@ -2978,7 +3137,7 @@ fn stack_center(rel: &Relief, body: Affine) -> (f32, f32) {
     ((x0 + x1) * 0.5, (y0 + y1) * 0.5)
 }
 
-fn halo_dev(fur: &Fur, spx: usize) -> Alpha {
+fn build_halo(fur: &Fur, spx: usize) -> Alpha {
     let mut out = Alpha::new(spx, spx);
     let k = spx as f32 / fur.r as f32;
     for y in 0..spx {

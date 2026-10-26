@@ -356,16 +356,17 @@ mod tests {
 
     /// `(label, colour, face, faceX, faceY, faceScale, brightness, saturation)`
     /// from `presets.ts`.
-    const EXPECTED: [(
-        &str,
-        &str,
+    type Expected = (
+        &'static str,
+        &'static str,
         BotAvatarFace,
         f32,
         f32,
         f32,
         Option<f32>,
         Option<f32>,
-    ); 18] = [
+    );
+    const EXPECTED: [Expected; 18] = [
         (
             "Clover",
             "#41C4FF",

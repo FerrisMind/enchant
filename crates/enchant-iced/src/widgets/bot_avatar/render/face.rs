@@ -325,8 +325,8 @@ mod tests {
             idle.update(1.0 / 60.0);
             sleep.update(1.0 / 60.0);
         }
-        let open = eye_numbers(&idle.pose(), BotAvatarFace::Eyes);
-        let shut = eye_numbers(&sleep.pose(), BotAvatarFace::Eyes);
+        let open = eye_numbers(idle.pose(), BotAvatarFace::Eyes);
+        let shut = eye_numbers(sleep.pose(), BotAvatarFace::Eyes);
         assert!(open[0].3 > shut[0].3, "{open:?} {shut:?}");
         assert!((open[0].2 - shut[0].2).abs() > 1.0, "{open:?} {shut:?}");
         let rest = rest_pose(BotAvatarState::Sleeping);

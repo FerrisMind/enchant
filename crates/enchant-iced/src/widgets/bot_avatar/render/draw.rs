@@ -596,8 +596,8 @@ mod tests {
         for _ in 0..20 {
             sim.update(1.0 / 60.0);
         }
-        let a = draw_frame(80.0, 2.0, &sim.pose(), &cfg);
-        let b = draw_frame(80.0, 2.0, &sim.pose(), &cfg);
+        let a = draw_frame(80.0, 2.0, sim.pose(), &cfg);
+        let b = draw_frame(80.0, 2.0, sim.pose(), &cfg);
         assert!(a.data() == b.data());
     }
 }

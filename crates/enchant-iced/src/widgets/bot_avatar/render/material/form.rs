@@ -765,8 +765,6 @@ pub(crate) fn cap_frame(rig: &Rig) -> Frame {
     }
 }
 
-/// The light defaults for the materials.
-
 #[cfg(test)]
 mod tests {
     use super::*;

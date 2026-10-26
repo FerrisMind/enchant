@@ -208,7 +208,7 @@ mod tests {
         let mut pixmap = Pixmap::new(64, 64).unwrap();
         draw(
             &mut pixmap,
-            &sim.pose(),
+            sim.pose(),
             Rgba::from_rgb(65, 196, 255),
             0.0,
             0.0,

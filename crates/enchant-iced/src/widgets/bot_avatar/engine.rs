@@ -1269,6 +1269,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::excessive_precision)] // pinned reference values
     fn same_seed_replays_identical_sequence() {
         let mut a = BotAvatarSim::new(0.42, BotAvatarState::Idle);
         let mut b = BotAvatarSim::new(0.42, BotAvatarState::Idle);
