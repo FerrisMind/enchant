@@ -1,9 +1,12 @@
 mod _shared;
 
-use enchant_iced::BorderBeam;
+use enchant_iced::{
+    BorderBeam, BorderBeamCanvas, BorderBeamOptions, BorderBeamPalette, BorderBeamSize,
+    BorderBeamTheme, ResolvedBeamTheme,
+};
 use iced::time::Instant;
-use iced::widget::{column, container, stack};
-use iced::{Element, Length, Size, Subscription, Task};
+use iced::widget::{button, column, container, row, stack, text};
+use iced::{Alignment, Element, Length, Size, Subscription, Task};
 use std::time::Duration;
 
 pub fn main() -> iced::Result {
@@ -14,7 +17,7 @@ pub fn main() -> iced::Result {
     )
     .title("Border Beam")
     .window(iced::window::Settings {
-        size: Size::new(900.0, 520.0),
+        size: Size::new(980.0, 720.0),
         ..Default::default()
     })
     .subscription(BorderBeamExample::subscription)
@@ -27,6 +30,11 @@ struct BorderBeamExample {
     elapsed: Duration,
     email: String,
     password: String,
+    size: BorderBeamSize,
+    palette: BorderBeamPalette,
+    static_colors: bool,
+    active: bool,
+    lit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +46,12 @@ enum Message {
     PasswordChanged(String),
     Register,
     Login,
+    NextSize,
+    NextPalette,
+    ToggleStatic,
+    ToggleActive,
+    Lit,
+    Dark,
 }
 
 impl BorderBeamExample {
@@ -50,6 +64,11 @@ impl BorderBeamExample {
                 elapsed: Duration::ZERO,
                 email: String::new(),
                 password: String::new(),
+                size: BorderBeamSize::PulseOutside,
+                palette: BorderBeamPalette::Colorful,
+                static_colors: false,
+                active: true,
+                lit: false,
             },
             Task::none(),
         )
@@ -71,6 +90,24 @@ impl BorderBeamExample {
             Message::EmailChanged(value) => self.email = value,
             Message::PasswordChanged(value) => self.password = value,
             Message::Register | Message::Login => {}
+            Message::NextSize => {
+                let current = BorderBeamSize::ALL
+                    .iter()
+                    .position(|size| *size == self.size)
+                    .unwrap_or(0);
+                self.size = BorderBeamSize::ALL[(current + 1) % BorderBeamSize::ALL.len()];
+            }
+            Message::NextPalette => {
+                let current = BorderBeamPalette::ALL
+                    .iter()
+                    .position(|palette| *palette == self.palette)
+                    .unwrap_or(0);
+                self.palette = BorderBeamPalette::ALL[(current + 1) % BorderBeamPalette::ALL.len()];
+            }
+            Message::ToggleStatic => self.static_colors = !self.static_colors,
+            Message::ToggleActive => self.active = !self.active,
+            Message::Lit => self.lit = true,
+            Message::Dark => self.lit = false,
         }
         Task::none()
     }
@@ -82,6 +119,13 @@ impl BorderBeamExample {
     fn view(&self) -> Element<'_, Message> {
         let now = self.theme_shell.now;
         let transition = self.theme_shell.controller.is_transition_active(now);
+        let background = self.theme_shell.blended_theme().palette.background;
+        let luminance = 0.299 * background.r + 0.587 * background.g + 0.114 * background.b;
+        let system = if luminance < 0.5 {
+            ResolvedBeamTheme::Dark
+        } else {
+            ResolvedBeamTheme::Light
+        };
         let login = _shared::shadcn_forms::login_card_dual_footer(
             &self.email,
             &self.password,
@@ -92,29 +136,86 @@ impl BorderBeamExample {
             self.theme_shell.blended_theme(),
         );
 
-        let card = container(stack(vec![
-            login,
-            container(
-                BorderBeam::new()
-                    .size(100.0)
-                    .duration_secs(8.0)
-                    .radius(12.0)
-                    .beam_enabled(!transition)
-                    .into_element(self.elapsed),
-            )
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into(),
-        ]))
-        .width(Length::Fixed(350.0))
-        .height(Length::Fixed(380.0))
-        .clip(true);
-
-        _shared::themed_shell(
-            "Border Beam",
-            column![card].spacing(24),
-            &self.theme_shell,
-            Message::ToggleTheme,
+        // Widget backend: owns the clock and the 0.6s/0.5s fade, wraps the child.
+        let widget_card = BorderBeam::new(
+            container(login)
+                .width(Length::Fixed(350.0))
+                .height(Length::Fixed(380.0)),
         )
+        .size(self.size)
+        .palette(self.palette)
+        .theme(BorderBeamTheme::Auto)
+        .static_colors(self.static_colors)
+        .radius(16.0)
+        .active(self.active && !transition)
+        .on_activate(|| Message::Lit)
+        .on_deactivate(|| Message::Dark)
+        .pixel_density(2.0);
+
+        // Canvas backend: caller-driven clock, same frame model and rasterizer.
+        let canvas_options = BorderBeamOptions::new()
+            .size(self.size)
+            .palette(self.palette)
+            .static_colors(self.static_colors)
+            .radius(16.0)
+            .active(self.active);
+        let canvas_card = stack(vec![
+            container(
+                text("Canvas backend")
+                    .size(18)
+                    .color(self.theme_shell.blended_foreground(self.theme_shell.now)),
+            )
+            .width(Length::Fixed(280.0))
+            .height(Length::Fixed(160.0))
+            .center(Length::Fill)
+            .into(),
+            BorderBeamCanvas::new(canvas_options.clone())
+                .host(280.0, 160.0)
+                .elapsed(self.elapsed)
+                .system(system)
+                .pixel_density(2.0)
+                .into_element(),
+        ]);
+
+        let controls = row![
+            button(text(format!("size · {}", self.size))).on_press(Message::NextSize),
+            button(text(format!("palette · {}", self.palette))).on_press(Message::NextPalette),
+            button(text(if self.static_colors {
+                "static colors · on"
+            } else {
+                "static colors · off"
+            }))
+            .on_press(Message::ToggleStatic),
+            button(text(if self.active {
+                "active · on"
+            } else {
+                "active · off"
+            }))
+            .on_press(Message::ToggleActive),
+        ]
+        .spacing(12);
+
+        let status = text(if !self.active {
+            "beam off (faded out)"
+        } else if transition {
+            "paused while the theme crossfades"
+        } else if self.lit {
+            "fade-in finished callback fired"
+        } else {
+            "beam on"
+        })
+        .size(14);
+
+        let body = column![
+            row![widget_card, container(canvas_card).padding(24)]
+                .spacing(48)
+                .align_y(Alignment::Center),
+            controls,
+            status,
+        ]
+        .spacing(24)
+        .align_x(Alignment::Center);
+
+        _shared::themed_shell("Border Beam", body, &self.theme_shell, Message::ToggleTheme)
     }
 }

@@ -1,8 +1,8 @@
 mod _shared;
 
-use enchant_iced::BorderBeam;
+use enchant_iced::{BorderBeam, BorderBeamPalette, BorderBeamSize};
 use iced::time::Instant;
-use iced::widget::{column, container, stack, text};
+use iced::widget::{column, container, text};
 use iced::{Alignment, Border, Element, Length, Size, Subscription, Task};
 use std::time::Duration;
 
@@ -73,40 +73,30 @@ impl BorderTrackExample {
         let transition = self.theme_shell.controller.is_transition_active(now);
         let border_color = self.theme_shell.blended_border(now);
         let label_color = self.theme_shell.blended_foreground(now);
-        let border_radius = radius;
-        container(stack(vec![
-            container(text(label).size(16).style({
-                let color = label_color;
-                move |_| iced::widget::text::Style { color: Some(color) }
-            }))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .into(),
-            container(
-                BorderBeam::new()
-                    .radius(radius)
-                    .size(80.0)
-                    .duration_secs(6.0)
-                    .beam_enabled(!transition)
-                    .into_element(self.elapsed),
-            )
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into(),
-        ]))
+        let label = container(text(label).size(16).style({
+            let color = label_color;
+            move |_| iced::widget::text::Style { color: Some(color) }
+        }))
         .width(Length::Fixed(220.0))
         .height(Length::Fixed(120.0))
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
         .style(move |_| container::Style {
             border: Border {
                 width: 1.0,
-                radius: border_radius.into(),
+                radius: radius.into(),
                 color: border_color,
             },
             ..container::Style::default()
-        })
-        .into()
+        });
+
+        BorderBeam::new(label)
+            .size(BorderBeamSize::Line)
+            .palette(BorderBeamPalette::Ocean)
+            .radius(radius)
+            .duration(Duration::from_secs(6))
+            .active(!transition)
+            .into()
     }
 
     fn view(&self) -> Element<'_, Message> {
