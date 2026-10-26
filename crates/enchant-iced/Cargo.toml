@@ -49,6 +49,8 @@ base64 = "0.22"
 swash = "0.2.9"
 libm = "0.2"
 cpal = { version = "0.16", optional = true }
+# `primitive::Renderer` (draw_primitive) is not re-exported by `iced`; same version/features as iced's own.
+iced_wgpu = { version = "0.14", default-features = false }
 
 [package.metadata.docs.rs]
 all-features = true
@@ -56,4 +58,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dev-dependencies]
 serde_json = "1"
+# Offline validation of the metal-fx WGSL (same naga wgpu uses).
+naga = { version = "27", default-features = false, features = ["wgsl-in"] }
 

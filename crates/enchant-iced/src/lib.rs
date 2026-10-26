@@ -96,3 +96,7 @@ pub use widgets::{
     VoiceGlowRaster, VoiceGlowTheme, VoiceGlowType,
 };
 pub use widgets::{GlyphMatrixProps, glyph_matrix};
+pub use widgets::{
+    MetalFx, MetalFxLayer, MetalFxOptions, MetalFxPreset, MetalFxResolvedTheme, MetalFxSurface,
+    MetalFxTheme, MetalFxVariant, MetalGlowConfig,
+};

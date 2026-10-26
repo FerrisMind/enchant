@@ -54,6 +54,7 @@ pub mod light_rays;
 pub mod line_shadow_text;
 pub mod magic_card;
 pub mod marquee;
+pub mod metal_fx;
 pub mod meteors;
 pub mod mockups;
 pub mod morphing_text;
@@ -167,6 +168,10 @@ pub use light_rays::{LightRaysProps, light_rays};
 pub use line_shadow_text::{LineShadowTextProps, line_shadow_color_for_mode, line_shadow_text};
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
 pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee, marquee_indexed};
+pub use metal_fx::{
+    MetalFx, MetalFxLayer, MetalFxOptions, MetalFxPreset, MetalFxResolvedTheme, MetalFxSurface,
+    MetalFxTheme, MetalFxVariant, MetalGlowConfig,
+};
 pub use meteors::{MeteorsProps, meteors};
 pub use mockups::{AndroidProps, IphoneProps, SafariMode, SafariProps, android, iphone, safari};
 pub use morphing_text::{MorphingTextProps, morphing_text};
