@@ -77,18 +77,23 @@ mod bake;
 mod bend;
 mod bend_config;
 mod color;
+mod cursor_light;
 mod geometry;
 mod glow;
 mod glow_config;
 mod mask;
 mod material;
 mod metal_badge;
+mod metal_reflection;
 mod metal_text;
 mod options;
 mod pipeline;
 mod preset;
 mod primitive;
 mod raster;
+mod reflection;
+mod reflection_anchor;
+mod reflection_occluder;
 mod rim;
 mod scene;
 mod text_mask;
@@ -102,6 +107,12 @@ pub use bend_config::{
     set_bend_config,
 };
 pub use color::{hex_to_rgb, hex_to_rgba};
+pub use cursor_light::{
+    MetalCursorLight, MetalCursorLightConfig, MetalCursorSpill, MetalCursorSprite,
+    cursor_light_config, cursor_light_config_revision, cursor_sprite, fade_alpha,
+    light_cursor_sprite, nearest_outline_point, proximity_weight, reset_cursor_light_config,
+    set_cursor_light_config, set_cursor_sprite, spill_frame,
+};
 pub use geometry::{
     ARC_SEGMENTS, Deform, EDGE_STEP, MetalFxVariant, arc_at_point, round_rect_outline,
     rr_perimeter, sample_at_arc, shape_perimeter, smoothstep, tangent_angle_at_arc,
@@ -117,8 +128,21 @@ pub use material::{
     SheetMapping, SheetUvs, sheet_uvs,
 };
 pub use metal_badge::{METAL_BADGE_DEFAULTS, MetalBadge, MetalBadgeCore, MetalBadgeDefaults};
+pub use metal_reflection::MetalReflection;
 pub use metal_text::MetalText;
 pub use options::{MetalFxLayer, MetalFxOptions, MetalFxSurface};
+pub use reflection::{
+    MetalReflectionLayout, MetalReflectionPaint, MetalReflectionStyle, occluder_keep,
+    paint_reflection, reflection_layout, shortest_rect_distance,
+};
+pub use reflection_anchor::{
+    MetalReflectionAnchor, reflection_anchor, register_reflection_anchor,
+    unregister_reflection_anchor,
+};
+pub use reflection_occluder::{
+    MetalReflectionOccluderConfig, reflection_occluder_config, reflection_occluder_config_revision,
+    reset_reflection_occluder_config, set_reflection_occluder_config,
+};
 pub use pipeline::{MetalFxPipeline, WGSL as METAL_FX_WGSL};
 pub use preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode, ShaderFit};
 pub use raster::{MetalFxBitmap, MetalFxHost, MetalFxLayerKind, MetalRenderOptions};

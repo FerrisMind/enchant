@@ -570,9 +570,11 @@ mod tests {
                 _ => None,
             })
             .expect("Uniforms members");
-        assert_eq!(names.len(), 26);
+        assert_eq!(names.len(), 28);
         assert_eq!(names[0], "rect");
         assert_eq!(names[25], "shadow_misc");
+        assert_eq!(names[26], "bend0");
+        assert_eq!(names[27], "bend1");
     }
 
     struct Gpu {

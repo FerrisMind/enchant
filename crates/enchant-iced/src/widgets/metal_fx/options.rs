@@ -98,6 +98,10 @@ pub struct MetalFxOptions {
     pub(crate) mode: Option<MetalPresetMode>,
     pub(crate) mask: MetalFxMask,
     pub(crate) glow_mode: MetalGlowMode,
+    /// Cursor-driven liquid dent (`useMetalBend`).
+    pub(crate) bend: bool,
+    /// Optional id published into the reflection anchor store.
+    pub(crate) anchor_id: Option<String>,
 }
 
 impl Default for MetalFxOptions {
@@ -120,6 +124,8 @@ impl Default for MetalFxOptions {
             mode: None,
             mask: MetalFxMask::Ring,
             glow_mode: MetalGlowMode::Mask,
+            bend: true,
+            anchor_id: None,
         }
     }
 }
@@ -274,6 +280,36 @@ impl MetalFxOptions {
     pub fn glow_mode(mut self, mode: MetalGlowMode) -> Self {
         self.glow_mode = mode;
         self
+    }
+
+    /// Enables the cursor liquid dent (`useMetalBend`; default on).
+    pub fn bend(mut self, bend: bool) -> Self {
+        self.bend = bend;
+        self
+    }
+
+    /// Whether bend is enabled on this instance.
+    #[must_use]
+    pub fn has_bend(&self) -> bool {
+        self.bend
+    }
+
+    /// Publishes this instance under `id` for [`super::MetalReflection`].
+    pub fn anchor_id(mut self, id: impl Into<String>) -> Self {
+        self.anchor_id = Some(id.into());
+        self
+    }
+
+    /// Clears the reflection anchor id.
+    pub fn clear_anchor_id(mut self) -> Self {
+        self.anchor_id = None;
+        self
+    }
+
+    /// Current reflection anchor id, if any.
+    #[must_use]
+    pub fn anchor_id_value(&self) -> Option<&str> {
+        self.anchor_id.as_deref()
     }
 
     /// The variant.

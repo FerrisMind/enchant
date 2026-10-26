@@ -261,6 +261,7 @@ pub(crate) struct SceneParams<'a> {
     pub glow: Option<GlowFrame>,
     pub config: &'a MetalGlowConfig,
     pub target_srgb: bool,
+    pub bend: Option<super::bend::MetalBendField>,
 }
 
 impl MetalFxOptions {
@@ -274,6 +275,7 @@ impl MetalFxOptions {
             glow,
             config,
             target_srgb,
+            bend,
         } = *params;
         let (w, h) = (host.width, host.height);
         let mode = self.resolved_mode(theme);
@@ -314,6 +316,7 @@ impl MetalFxOptions {
             dither: false,
             mask: self.mask.clone(),
             glow_mode: self.glow_mode,
+            bend,
         }
     }
 
@@ -361,6 +364,7 @@ impl MetalFxOptions {
                 theme,
                 sampler: &sampler,
                 config,
+                cursor_light: None,
             });
         }
         last
@@ -411,6 +415,7 @@ impl MetalFxOptions {
             glow,
             config: &config,
             target_srgb: false,
+            bend: None,
         });
         scene.dither = render.dither;
         let layers: Vec<Layer> = match render.solo {

@@ -40,6 +40,8 @@ struct Uniforms {
     surf: vec4<f32>,         // surface rgba (straight)
     shadow: vec4<f32>,       // ::before shadow rgba (straight)
     shadow_misc: vec4<f32>,  // sigma, _, _, _
+    bend0: vec4<f32>,        // contact xy, dir xy
+    bend1: vec4<f32>,        // rad_k, s2_blob, s2_liquid, enabled
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -385,6 +387,20 @@ fn band_cover(p: vec2<f32>, inset: f32) -> f32 {
     return cover(box_sd(p)) * (1.0 - cover(inset_sd(p, inset)));
 }
 
+// Approximate inverse of the bend field (small-displacement): sample undeformed
+// space so the ring surface moves with the dent (`useMetalBend` vector path).
+fn bend_sample(p: vec2<f32>) -> vec2<f32> {
+    if (u.bend1.w < 0.5) {
+        return p;
+    }
+    let d = p - u.bend0.xy;
+    let q = dot(d, d);
+    let gb = exp(-q / max(u.bend1.y, 1e-4));
+    let gl = exp(-q / max(u.bend1.z, 1e-4));
+    let delta = u.bend0.zw * gb + d * u.bend1.x * gl;
+    return p - delta;
+}
+
 // premultiplied `over`
 fn over(top: vec4<f32>, bottom: vec4<f32>) -> vec4<f32> {
     return top + bottom * (1.0 - top.a);
@@ -420,14 +436,15 @@ fn mask_cover(p: vec2<f32>) -> f32 {
 }
 
 fn layer_ring(p: vec2<f32>, frag_px: vec2<f32>) -> vec4<f32> {
-    let sd_o = box_sd(p);
+    let q = bend_sample(p);
+    let sd_o = box_sd(q);
     let co = cover(sd_o);
     var a: f32;
     if (u.glow_misc.w > 0.5) {
         // Sheet fill: full rounded-rect (or custom mask) — no ring punch.
-        a = co * mask_cover(p);
+        a = co * mask_cover(q);
     } else {
-        a = co * (1.0 - cover(inset_sd(p, u.shape.y)));
+        a = co * (1.0 - cover(inset_sd(q, u.shape.y)));
     }
     var out = vec4<f32>(0.0);
     if (a > 0.0) {
@@ -485,13 +502,14 @@ fn rim_raw(p: vec2<f32>, ring: f32, offset_y: f32) -> f32 {
 }
 
 fn layer_rim(p: vec2<f32>) -> vec4<f32> {
+    let q = bend_sample(p);
     let ring = u.shape.y;
     var out = vec4<f32>(0.0);
     if (u.rim.w > 0.5) {
-        let a0 = band_cover(p, ring);
+        let a0 = band_cover(q, ring);
         if (a0 > 0.0) {
             let sigma = u.rim.y * u.metrics.z;
-            var blurred = rim_raw(p, ring, u.rim.x);
+            var blurred = rim_raw(q, ring, u.rim.x);
             if (sigma > 0.05) {
                 let radius = i32(min(ceil(3.0 * sigma), 3.0));
                 var acc = 0.0;
@@ -500,7 +518,7 @@ fn layer_rim(p: vec2<f32>) -> vec4<f32> {
                     for (var i = -radius; i <= radius; i = i + 1) {
                         let dpx = vec2<f32>(f32(i), f32(j));
                         let w = exp(-dot(dpx, dpx) / (2.0 * sigma * sigma));
-                        acc = acc + w * rim_raw(p + dpx / u.metrics.z, ring, u.rim.x);
+                        acc = acc + w * rim_raw(q + dpx / u.metrics.z, ring, u.rim.x);
                         wsum = wsum + w;
                     }
                 }
@@ -510,7 +528,7 @@ fn layer_rim(p: vec2<f32>) -> vec4<f32> {
             out = vec4<f32>(u.rim_color.rgb * a, a);
         }
     }
-    let after = band_cover(p, u.shape.z) * u.hair.a;
+    let after = band_cover(q, u.shape.z) * u.hair.a;
     out = over(vec4<f32>(u.hair.rgb * after, after), out);
     return out;
 }

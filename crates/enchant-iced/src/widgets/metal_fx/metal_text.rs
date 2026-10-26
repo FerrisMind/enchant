@@ -7,7 +7,8 @@ use super::mask::{MetalFxMask, MetalGlowMode};
 use super::options::MetalFxSurface;
 use super::preset::MetalFxTheme;
 use super::text_mask::{
-    METAL_TEXT_DEFAULTS, MetalTextFont, TextInnerShadow, rasterize_text_mask, text_inner_shadow_mask,
+    METAL_TEXT_DEFAULTS, MetalTextFont, TextInnerShadow, rasterize_text_mask,
+    text_inner_shadow_mask,
 };
 use super::widget::MetalFx;
 
@@ -44,6 +45,7 @@ pub struct MetalText {
     glow: bool,
     glow_gain: f32,
     paused: bool,
+    anchor_id: Option<String>,
 }
 
 impl MetalText {
@@ -61,6 +63,7 @@ impl MetalText {
             glow: false,
             glow_gain: METAL_TEXT_DEFAULTS.glow_gain,
             paused: false,
+            anchor_id: None,
         }
     }
 
@@ -132,6 +135,12 @@ impl MetalText {
         self
     }
 
+    /// Publishes this text as a reflection anchor.
+    pub fn anchor_id(mut self, id: impl Into<String>) -> Self {
+        self.anchor_id = Some(id.into());
+        self
+    }
+
     /// Builds the iced element.
     pub fn into_element<'a, Message>(self) -> Element<'a, Message>
     where
@@ -162,7 +171,7 @@ impl MetalText {
                 ..container::Style::default()
             });
 
-        MetalFx::new(body)
+        let mut fx = MetalFx::new(body)
             .theme(self.theme)
             .strength(self.strength * self.metal_opacity)
             .shader_scale(self.shader_scale)
@@ -173,8 +182,11 @@ impl MetalText {
             .mask(MetalFxMask::Custom(mask))
             .glow_mode(MetalGlowMode::Mask)
             .surface(MetalFxSurface::Transparent)
-            .paused(self.paused)
-            .into()
+            .paused(self.paused);
+        if let Some(id) = self.anchor_id {
+            fx = fx.anchor_id(id);
+        }
+        fx.into()
     }
 }
 

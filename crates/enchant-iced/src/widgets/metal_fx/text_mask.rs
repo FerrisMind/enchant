@@ -110,12 +110,7 @@ impl Default for MetalTextFont {
 /// assert!(mask.pixel_size().0 > 8 && mask.interior_points(2.0).len() > 4);
 /// ```
 #[must_use]
-pub fn rasterize_text_mask(
-    text: &str,
-    font: &MetalTextFont,
-    density: f32,
-    pad: f32,
-) -> AlphaMask {
+pub fn rasterize_text_mask(text: &str, font: &MetalTextFont, density: f32, pad: f32) -> AlphaMask {
     let density = if density.is_finite() && density > 0.0 {
         density
     } else {

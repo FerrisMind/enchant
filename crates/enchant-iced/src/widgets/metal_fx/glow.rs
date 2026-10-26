@@ -13,13 +13,14 @@
 //! The result is a [`GlowFrame`]: positions, angle, opacities, envelope and
 //! tints, which the renderer draws with the baked sprites.
 //!
-//! Masked text/glyph glow ("point mode") and the cursor-light tracking mode
-//! belong to the text and cursor-light features and are not part of this
-//! module yet.
+//! Masked text/glyph glow ("point mode") lives on MetalText. Cursor-light
+//! catch mode is driven by [`GlowTick::cursor_light`].
 
 use super::color::{hsv_to_rgb, rgb_to_hsv};
+use super::cursor_light::{MetalCursorLight, cursor_light_config};
 use super::geometry::{
-    MetalFxVariant, rr_perimeter, sample_at_arc, shape_perimeter, smoothstep, tangent_angle_at_arc,
+    MetalFxVariant, arc_at_point, rr_perimeter, sample_at_arc, shape_perimeter, smoothstep,
+    tangent_angle_at_arc,
 };
 use super::glow_config::MetalGlowConfig;
 use super::material::{MetalMaterial, SHEET_RESOLUTION, SheetMapping};
@@ -180,6 +181,8 @@ pub struct GlowTick<'a> {
     pub sampler: &'a dyn GlowSampler,
     /// Tuning.
     pub config: &'a MetalGlowConfig,
+    /// Catch-light source from the cursor-light tracker (`None` = luminance hunt).
+    pub cursor_light: Option<MetalCursorLight>,
 }
 
 impl std::fmt::Debug for GlowTick<'_> {
@@ -188,8 +191,17 @@ impl std::fmt::Debug for GlowTick<'_> {
             .field("now_ms", &self.now_ms)
             .field("strength", &self.strength)
             .field("theme", &self.theme)
+            .field("cursor_light", &self.cursor_light)
             .finish_non_exhaustive()
     }
+}
+
+/// Relocation target after a fade-out (`relocNextIdx` / cursor sentinels).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RelocNext {
+    Index(usize),
+    CursorEnter,
+    CursorExit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -239,7 +251,10 @@ impl Rng {
 /// let mut glow = GlowState::new(1);
 /// glow.configure(140.0, 40.0, 20.0, MetalFxVariant::Button, 1.0, &config);
 /// let frame = glow
-///     .tick(&GlowTick { now_ms: 16.0, strength: 1.0, theme, sampler: &sampler, config: &config })
+///     .tick(&GlowTick {
+///         now_ms: 16.0, strength: 1.0, theme, sampler: &sampler, config: &config,
+///         cursor_light: None,
+///     })
 ///     .expect("a non-empty perimeter always yields a frame");
 /// assert_eq!(frame.envelope, 0.0, "the first appearance fades in from nothing");
 /// ```
@@ -251,7 +266,7 @@ pub struct GlowState {
     appeared_at: f64,
     glow_opacity: f32,
     reloc_tween: Option<Tween>,
-    reloc_next_idx: usize,
+    reloc_next: RelocNext,
     reloc_mul: f32,
     env_clock: f64,
     last_tick_ms: f64,
@@ -265,6 +280,10 @@ pub struct GlowState {
     lum_cache: Vec<f32>,
     last_hunt_ms: Option<f64>,
     rng: Rng,
+    /// Catch-light follows the pointer (`cursorMode`).
+    cursor_mode: bool,
+    cursor_arc: f32,
+    cursor_target_arc: f32,
 }
 
 impl GlowState {
@@ -278,7 +297,7 @@ impl GlowState {
             appeared_at: 0.0,
             glow_opacity: 0.0,
             reloc_tween: None,
-            reloc_next_idx: 0,
+            reloc_next: RelocNext::Index(0),
             reloc_mul: 0.0,
             env_clock: 0.0,
             last_tick_ms: 0.0,
@@ -292,6 +311,9 @@ impl GlowState {
             lum_cache: Vec::new(),
             last_hunt_ms: None,
             rng: Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1),
+            cursor_mode: false,
+            cursor_arc: 0.0,
+            cursor_target_arc: 0.0,
         }
     }
 
@@ -389,6 +411,23 @@ impl GlowState {
         let target_op = lit(cur_lum);
         let rival_dominates = !dwell_active && max_lum - cur_lum > RELOCATE_DELTA;
 
+        // Cursor as light source: hotspot faces the nearest outline point.
+        let cl_cfg = cursor_light_config();
+        let cl = input.cursor_light.filter(|c| c.weight > 0.02);
+        let cursor_on = cl_cfg.enabled && cl_cfg.catch_light && cl.is_some();
+        let perim_len = shape_perimeter(g.width, g.height, g.radius, g.kind);
+        let cursor_op = if cursor_on {
+            let w = cl.map_or(0.0, |c| c.weight);
+            (cfg.peak_op * cl_cfg.catch_gain * w).min(1.0)
+        } else {
+            0.0
+        };
+        if cursor_on {
+            let c = cl.expect("cursor_on implies Some");
+            self.cursor_target_arc =
+                arc_at_point(c.x, c.y, g.width, g.height, g.radius, g.kind);
+        }
+
         let dt_ms = if self.last_tick_ms > 0.0 {
             (now - self.last_tick_ms).clamp(0.5, 200.0)
         } else {
@@ -406,28 +445,73 @@ impl GlowState {
             && t.is_done()
             && t.target() == 0.0
         {
-            // Faded out at the old spot: switch, then fade in at the new one.
-            self.current_idx = self.reloc_next_idx.min(points.len() - 1);
-            self.glow_opacity = lit(self.lum_cache[self.current_idx]);
-            self.fade_in(now, fade_ms);
+            let mut next = self.reloc_next;
+            if next == RelocNext::CursorEnter && !cursor_on {
+                next = RelocNext::CursorExit;
+            }
+            match next {
+                RelocNext::CursorExit => {
+                    self.cursor_mode = false;
+                    self.appeared_at = 0.0;
+                    self.reloc_tween = None;
+                }
+                RelocNext::CursorEnter => {
+                    self.cursor_mode = true;
+                    self.cursor_arc = self.cursor_target_arc;
+                    self.glow_opacity = cursor_op;
+                    self.fade_in(now, fade_ms);
+                }
+                RelocNext::Index(idx) => {
+                    self.current_idx = idx.min(points.len() - 1);
+                    self.glow_opacity = lit(self.lum_cache[self.current_idx]);
+                    self.fade_in(now, fade_ms);
+                }
+            }
         }
         let idle = self.reloc_tween.is_none_or(|t| t.is_done());
         if idle {
             if self.appeared_at == 0.0 {
-                // First appearance: face the brightest point.
-                self.current_idx = max_idx;
-                self.glow_opacity = target_op;
+                if cursor_on {
+                    self.cursor_mode = true;
+                    self.cursor_arc = self.cursor_target_arc;
+                    self.glow_opacity = cursor_op;
+                } else {
+                    self.cursor_mode = false;
+                    self.current_idx = max_idx;
+                    self.glow_opacity = target_op;
+                }
                 self.fade_in(now, fade_ms);
-            } else if rival_dominates {
-                self.reloc_next_idx = max_idx;
+            } else if cursor_on != self.cursor_mode {
+                self.reloc_next = if cursor_on {
+                    RelocNext::CursorEnter
+                } else {
+                    RelocNext::CursorExit
+                };
+                let mut t = Tween::new(1.0, 0.0, fade_out_ms, Ease::Smoothstep);
+                t.start(self.env_clock);
+                self.reloc_tween = Some(t);
+            } else if !self.cursor_mode && rival_dominates {
+                self.reloc_next = RelocNext::Index(max_idx);
                 let mut t = Tween::new(1.0, 0.0, fade_out_ms, Ease::Smoothstep);
                 t.start(self.env_clock);
                 self.reloc_tween = Some(t);
             }
         }
 
-        // Luminance tracking runs continuously; the envelope handles appear/disappear.
-        self.glow_opacity += (target_op - self.glow_opacity) * rate(cfg.fade_rate);
+        if self.cursor_mode {
+            if cursor_on {
+                self.glow_opacity = cursor_op;
+            }
+            let follow = cl_cfg.catch_follow.clamp(0.01, 1.0);
+            let fa = 1.0 - (1.0 - f64::from(follow)).powf(dt_ms / (1000.0 / 60.0)) as f32;
+            let mut diff = (self.cursor_target_arc - self.cursor_arc).rem_euclid(perim_len);
+            if diff > perim_len * 0.5 {
+                diff -= perim_len;
+            }
+            self.cursor_arc += diff * fa;
+        } else {
+            self.glow_opacity += (target_op - self.glow_opacity) * rate(cfg.fade_rate);
+        }
         self.glow_opacity = self.glow_opacity.clamp(0.0, 1.0);
         self.reloc_mul = match self.reloc_tween.as_mut() {
             Some(t) => t.tick(self.env_clock) as f32,
@@ -444,7 +528,11 @@ impl GlowState {
         }
         self.wander_s += (self.wander_target_s - self.wander_s) * rate(cfg.wander_lerp);
 
-        let arc = self.perim[self.current_idx].arc + self.wander_s;
+        let arc = if self.cursor_mode {
+            self.cursor_arc
+        } else {
+            self.perim[self.current_idx].arc + self.wander_s
+        };
         let blob = sample_at_arc(arc, g.width, g.height, g.radius, g.inset, 0.0, g.kind);
         let tangent = tangent_angle_at_arc(arc, g.width, g.height, g.radius, g.inset, g.kind);
         let extra_out = cfg.extra_outward * ratio * g.scale;
@@ -595,6 +683,7 @@ mod tests {
             theme,
             sampler,
             config: cfg,
+            cursor_light: None,
         })
         .unwrap()
     }
@@ -610,7 +699,8 @@ mod tests {
                 strength: 1.0,
                 theme: MetalFxResolvedTheme::Dark,
                 sampler: &sampler,
-                config: &cfg
+                config: &cfg,
+                cursor_light: None,
             })
             .is_none()
         );
@@ -723,6 +813,7 @@ mod tests {
                 theme: MetalFxResolvedTheme::Dark,
                 sampler: &sampler,
                 config: &cfg,
+                cursor_light: None,
             })
             .unwrap();
         let mut t = state(MetalFxVariant::Button, 140.0, 40.0, 20.0, &cfg);
@@ -831,5 +922,47 @@ mod tests {
         );
         let chroma = sampler.rgb_chromatic([70.0, 20.0]);
         assert!(chroma.iter().all(|c| (0.0..=1.0).contains(c)));
+    }
+
+    #[test]
+    fn catch_light_faces_the_cursor() {
+        use crate::widgets::metal_fx::{
+            MetalCursorLight, reset_cursor_light_config, set_cursor_light_config,
+        };
+        set_cursor_light_config(|c| {
+            c.catch_light = true;
+            c.catch_follow = 1.0;
+            c.catch_gain = 1.0;
+        });
+        let cfg = MetalGlowConfig::DEFAULTS;
+        // Uniform luminance so the hunt wouldn't prefer a side.
+        let sampler = Fn2(|_| 0.4);
+        let mut s = state(MetalFxVariant::Button, 140.0, 40.0, 20.0, &cfg);
+        let cl = MetalCursorLight {
+            x: 140.0,
+            y: 20.0,
+            weight: 1.0,
+        };
+        let mut now = 16.0;
+        let mut frame = None;
+        for _ in 0..40 {
+            frame = s.tick(&GlowTick {
+                now_ms: now,
+                strength: 1.0,
+                theme: MetalFxResolvedTheme::Dark,
+                sampler: &sampler,
+                config: &cfg,
+                cursor_light: Some(cl),
+            });
+            now += 16.0;
+        }
+        let f = frame.expect("cursor catch-light yields a frame");
+        // Right edge of a 140×40 pill sits near x≈138–140 after inset.
+        assert!(
+            f.position[0] > 120.0,
+            "catch-light should face the right edge, got {:?}",
+            f.position
+        );
+        reset_cursor_light_config();
     }
 }

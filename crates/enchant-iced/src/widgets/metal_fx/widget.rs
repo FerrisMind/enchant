@@ -10,13 +10,24 @@ use iced::advanced::overlay;
 use iced::advanced::renderer::{self, Renderer as _};
 use iced::advanced::widget::{self, Operation, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
-use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme, Vector, mouse, window};
+use iced::border::Radius;
+use iced::{
+    Background, Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Theme, Vector,
+    mouse, window,
+};
 use iced_wgpu::primitive::Renderer as _;
 
+use super::bend::{MetalBendField, MetalBendState};
+use super::bend_config::{MetalBendConfig, bend_config};
+use super::cursor_light::{
+    MetalCursorLight, MetalCursorSpill, cursor_light_config, fade_alpha, nearest_outline_point,
+    proximity_weight, spill_frame,
+};
 use super::geometry::MetalFxVariant;
-use super::glow::{GlowFrame, GlowState, GlowTick, MaterialSampler};
+use super::glow::{GlowFrame, GlowSampler, GlowState, GlowTick, MaterialSampler};
 use super::glow_config::{MetalGlowConfig, glow_config};
 use super::mask::{MetalFxMask, MetalGlowMode};
+use super::reflection_anchor::{MetalReflectionAnchor, register_reflection_anchor};
 use super::material::{MetalMaterial, SheetMapping};
 use super::options::{MetalFxLayer, MetalFxOptions, MetalFxSurface};
 use super::preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode};
@@ -178,6 +189,18 @@ impl<'a, Message> MetalFx<'a, Message> {
         self
     }
 
+    /// Enables the cursor liquid dent (`useMetalBend`).
+    pub fn bend(mut self, bend: bool) -> Self {
+        self.options = self.options.bend(bend);
+        self
+    }
+
+    /// Publishes this instance for neighbour reflections.
+    pub fn anchor_id(mut self, id: impl Into<String>) -> Self {
+        self.options = self.options.anchor_id(id);
+        self
+    }
+
     /// Overrides the ring thickness, logical px.
     pub fn ring_px(mut self, px: f32) -> Self {
         self.options = self.options.ring_px(px);
@@ -227,6 +250,17 @@ struct Inner {
     last: Option<Instant>,
     glow: GlowState,
     glow_frame: Option<GlowFrame>,
+    bend: MetalBendState,
+    bend_field: Option<MetalBendField>,
+    /// Pointer in box-local CSS px, if inside the reach of this instance.
+    pointer: Option<[f32; 2]>,
+    pointer_vel: [f32; 2],
+    last_pointer: Option<([f32; 2], Instant)>,
+    pressed: bool,
+    /// Smoothed proximity for catch-light / spill (`uS` in light.ts).
+    cursor_env: f32,
+    cursor_light: Option<MetalCursorLight>,
+    spill: Option<MetalCursorSpill>,
 }
 
 impl Inner {
@@ -236,7 +270,108 @@ impl Inner {
             last: None,
             glow: GlowState::new(seed),
             glow_frame: None,
+            bend: MetalBendState::new(),
+            bend_field: None,
+            pointer: None,
+            pointer_vel: [0.0; 2],
+            last_pointer: None,
+            pressed: false,
+            cursor_env: 0.0,
+            cursor_light: None,
+            spill: None,
         }
+    }
+
+    fn tick_cursor_light(
+        &mut self,
+        host_w: f32,
+        host_h: f32,
+        radius: f32,
+        kind: MetalFxVariant,
+        dt_secs: f32,
+        sampler: &MaterialSampler,
+    ) {
+        let cfg = cursor_light_config();
+        let a = fade_alpha(dt_secs.max(0.001), cfg.fade_ms);
+        let (target_u, outline, signed) = if let Some(p) = self.pointer {
+            let (d, pt) = nearest_outline_point(p, host_w, host_h, radius, kind);
+            (proximity_weight(d.abs(), cfg.reach), pt, d)
+        } else {
+            (0.0, [host_w * 0.5, 0.0], 0.0)
+        };
+        self.cursor_env += (target_u - self.cursor_env) * a;
+        if !cfg.enabled || self.cursor_env < 0.002 {
+            self.cursor_light = None;
+            self.spill = None;
+            if self.cursor_env < 0.002 {
+                self.cursor_env = 0.0;
+            }
+            return;
+        }
+        if cfg.catch_light {
+            self.cursor_light = Some(MetalCursorLight {
+                x: outline[0],
+                y: outline[1],
+                weight: self.cursor_env,
+            });
+        } else {
+            self.cursor_light = None;
+        }
+        if cfg.spill {
+            let rgb = sampler.rgb(outline);
+            let lum = sampler.luminance(outline);
+            let inside = signed < 0.0;
+            self.spill = spill_frame(
+                &cfg,
+                self.pointer.unwrap_or(outline),
+                outline,
+                self.cursor_env,
+                rgb,
+                lum,
+                inside,
+            );
+        } else {
+            self.spill = None;
+        }
+    }
+
+    fn tick_bend(&mut self, host_w: f32, host_h: f32, radius: f32, cfg: &MetalBendConfig) {
+        let now_ms = self.clock * 1000.0;
+        let ecx = host_w * 0.5;
+        let ecy = host_h * 0.5;
+        let (contact, target_disp, target_liquid, active) = if let Some(p) = self.pointer {
+            let ddx = p[0] - ecx;
+            let ddy = p[1] - ecy;
+            let d = ddx.hypot(ddy).max(1e-3);
+            let ux = ddx / d;
+            let uy = ddy / d;
+            // Signed distance to the rounded-rect edge (circle-ish for pills).
+            let r_edge = radius.min(host_w.min(host_h) * 0.5);
+            let signed = d - r_edge;
+            let speed = self.pointer_vel[0].hypot(self.pointer_vel[1]);
+            let (mut dir, liquid) = super::bend::pointer_targets(
+                signed,
+                [-ux, -uy],
+                [ux, uy],
+                speed,
+                cfg,
+            );
+            if self.pressed {
+                dir[0] -= ux * cfg.press;
+                dir[1] -= uy * cfg.press;
+            }
+            (p, dir, liquid, true)
+        } else {
+            ([ecx, ecy], [0.0, 0.0], 0.0, false)
+        };
+        self.bend_field = self.bend.tick(
+            now_ms,
+            contact,
+            target_disp,
+            target_liquid,
+            active && cfg.enabled,
+            cfg,
+        );
     }
 }
 
@@ -277,8 +412,26 @@ impl<Message> MetalFx<'_, Message> {
         let u_seconds = inner.clock as f32;
         let mut frame = inner.glow_frame;
 
+        let radius = options.resolved_radius(host.width(), host.height());
+        let mapping =
+            SheetMapping::new(host.width(), host.height(), options.resolved_shader_scale());
+        let sampler = MaterialSampler::new(material, mapping, material.u_time(u_seconds));
+
+        // Cursor-light proximity (catch + spill) — runs even when glow is off
+        // so spill/sprite APIs stay live; catch needs glow below.
+        if !options.is_paused() {
+            let dt = 1.0 / 60.0;
+            inner.tick_cursor_light(
+                host.width(),
+                host.height(),
+                radius,
+                options.variant,
+                dt,
+                &sampler,
+            );
+        }
+
         if options.has_glow() {
-            let radius = options.resolved_radius(host.width(), host.height());
             inner.glow.configure(
                 host.width(),
                 host.height(),
@@ -290,18 +443,26 @@ impl<Message> MetalFx<'_, Message> {
             // A paused instance keeps its halo frozen (but still shows the
             // frame it had); the very first frame is ticked once regardless.
             if !options.is_paused() || frame.is_none() {
-                let mapping =
-                    SheetMapping::new(host.width(), host.height(), options.resolved_shader_scale());
-                let sampler = MaterialSampler::new(material, mapping, material.u_time(u_seconds));
                 frame = inner.glow.tick(&GlowTick {
                     now_ms: inner.clock * 1000.0,
                     strength: (options.strength * options.glow_gain).clamp(0.0, 1.0),
                     theme,
                     sampler: &sampler,
                     config: &config,
+                    cursor_light: inner.cursor_light,
                 });
                 inner.glow_frame = frame;
             }
+        }
+
+        if options.has_bend() {
+            let radius = options.resolved_radius(host.width(), host.height());
+            let bend_cfg = bend_config();
+            if !options.is_paused() || inner.bend_field.is_none() {
+                inner.tick_bend(host.width(), host.height(), radius, &bend_cfg);
+            }
+        } else {
+            inner.bend_field = None;
         }
 
         options.scene(&SceneParams {
@@ -312,7 +473,34 @@ impl<Message> MetalFx<'_, Message> {
             glow: frame,
             config: &config,
             target_srgb: false,
+            bend: inner.bend_field,
         })
+    }
+
+    fn publish_anchor(&self, inner: &Inner, bounds: Rectangle, theme: MetalFxResolvedTheme) {
+        let Some(id) = self.options.anchor_id_value() else {
+            return;
+        };
+        let host = MetalFxHost::new(bounds.width, bounds.height);
+        let radius = self.options.resolved_radius(host.width(), host.height());
+        let is_sheet = !matches!(self.options.mask, MetalFxMask::Ring);
+        register_reflection_anchor(
+            id,
+            MetalReflectionAnchor {
+                origin: [bounds.x, bounds.y],
+                width: host.width(),
+                height: host.height(),
+                radius,
+                variant: self.options.variant,
+                mode: self.options.resolved_mode(theme),
+                theme,
+                clock: inner.clock as f32,
+                strength: self.options.strength,
+                ring_px: self.options.resolved_ring_px(),
+                shader_scale: self.options.resolved_shader_scale(),
+                is_sheet,
+            },
+        );
     }
 }
 
@@ -330,6 +518,45 @@ fn place(renderer: &mut Renderer, scene: &Arc<Scene>, bounds: Rectangle, layer: 
         },
         MetalFxPrimitive::new(Arc::clone(scene), layer),
     );
+}
+
+/// Soft radial glint under the pointer (`spill` effect).
+fn draw_spill(renderer: &mut Renderer, bounds: Rectangle, spill: MetalCursorSpill) {
+    // Three concentric discs approximate the CSS radial-gradient.
+    let rings = [
+        (1.0_f32, spill.opacity),
+        (0.55, spill.opacity * 0.35),
+        (0.2, spill.opacity * 0.08),
+    ];
+    for (scale, alpha) in rings {
+        if alpha < 0.01 {
+            continue;
+        }
+        let r = spill.radius * scale;
+        let rect = Rectangle {
+            x: bounds.x + spill.position[0] - r,
+            y: bounds.y + spill.position[1] - r,
+            width: r * 2.0,
+            height: r * 2.0,
+        };
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: rect,
+                border: Border {
+                    radius: Radius::from(r),
+                    ..Border::default()
+                },
+                shadow: iced::Shadow::default(),
+                snap: false,
+            },
+            Background::Color(Color::from_rgba(
+                spill.tint[0],
+                spill.tint[1],
+                spill.tint[2],
+                alpha,
+            )),
+        );
+    }
 }
 
 impl<Message> Widget<Message, Theme, Renderer> for MetalFx<'_, Message> {
@@ -411,12 +638,62 @@ impl<Message> Widget<Message, Theme, Renderer> for MetalFx<'_, Message> {
             viewport,
         );
 
+        let bounds = layout.bounds();
+        let state = tree.state.downcast_ref::<MetalState>();
+        {
+            let mut inner = state.inner.borrow_mut();
+            match event {
+                Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                    let local = [position.x - bounds.x, position.y - bounds.y];
+                    let now = Instant::now();
+                    if let Some((prev, t0)) = inner.last_pointer {
+                        let dt = now.saturating_duration_since(t0).as_secs_f32().max(0.004);
+                        let a = 1.0 - (-dt / 0.04).exp();
+                        let vx = (local[0] - prev[0]) / dt;
+                        let vy = (local[1] - prev[1]) / dt;
+                        inner.pointer_vel[0] += (vx - inner.pointer_vel[0]) * a;
+                        inner.pointer_vel[1] += (vy - inner.pointer_vel[1]) * a;
+                    }
+                    inner.last_pointer = Some((local, now));
+                    let cl = cursor_light_config();
+                    let reach = bend_config().reach.max(cl.reach).max(cl.cursor_distance)
+                        + bounds.width.max(bounds.height) * 0.5;
+                    let cx = bounds.width * 0.5;
+                    let cy = bounds.height * 0.5;
+                    let d = (local[0] - cx).hypot(local[1] - cy);
+                    inner.pointer = (d < reach).then_some(local);
+                    if self.options.has_bend() || cl.enabled {
+                        shell.request_redraw();
+                    }
+                }
+                Event::Mouse(mouse::Event::CursorLeft) => {
+                    inner.pointer = None;
+                    inner.last_pointer = None;
+                    if self.options.has_bend() || cursor_light_config().enabled {
+                        shell.request_redraw();
+                    }
+                }
+                Event::Mouse(mouse::Event::ButtonPressed(_)) => {
+                    inner.pressed = true;
+                    if self.options.has_bend() {
+                        shell.request_redraw();
+                    }
+                }
+                Event::Mouse(mouse::Event::ButtonReleased(_)) => {
+                    inner.pressed = false;
+                    if self.options.has_bend() {
+                        shell.request_redraw();
+                    }
+                }
+                _ => {}
+            }
+        }
+
         let Event::Window(window::Event::RedrawRequested(now)) = event else {
             return;
         };
-        let state = tree.state.downcast_ref::<MetalState>();
         let mut inner = state.inner.borrow_mut();
-        if !within_margin(layout.bounds(), viewport) {
+        if !within_margin(bounds, viewport) {
             // Off-screen instances cost nothing and don't keep the loop alive.
             inner.last = None;
             return;
@@ -425,11 +702,16 @@ impl<Message> Widget<Message, Theme, Renderer> for MetalFx<'_, Message> {
             now.saturating_duration_since(last).as_secs_f64()
         });
         inner.last = Some(*now);
+        // Velocity decay (matches useMetalBend's exp(-dt*12)).
+        let decay = (-(dt as f32) * 12.0).exp();
+        inner.pointer_vel[0] *= decay;
+        inner.pointer_vel[1] *= decay;
         if self.options.is_paused() {
             return;
         }
         inner.clock += dt.min(0.25);
         drop(inner);
+        // Continuous clock + bend springs need a steady redraw cadence.
         shell.request_redraw_at(*now + FRAME);
     }
 
@@ -461,10 +743,12 @@ impl<Message> Widget<Message, Theme, Renderer> for MetalFx<'_, Message> {
         }
 
         let resolved = self.options.resolved_theme(ambient_is_dark(theme));
-        let scene = {
+        let (scene, spill) = {
             let state = tree.state.downcast_ref::<MetalState>();
             let mut inner = state.inner.borrow_mut();
-            Arc::new(self.scene_for(&mut inner, bounds, resolved))
+            let scene = Arc::new(self.scene_for(&mut inner, bounds, resolved));
+            self.publish_anchor(&inner, bounds, resolved);
+            (scene, inner.spill)
         };
 
         match self.options.layer {
@@ -496,6 +780,9 @@ impl<Message> Widget<Message, Theme, Renderer> for MetalFx<'_, Message> {
                     });
                 }
             }
+        }
+        if let Some(spill) = spill {
+            draw_spill(renderer, bounds, spill);
         }
     }
 

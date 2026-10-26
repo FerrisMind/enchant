@@ -17,6 +17,7 @@ use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
 
 use super::bake::GlowSprite;
+use super::bend::MetalBendField;
 use super::glow::GlowFrame;
 use super::mask::{MetalFxMask, MetalGlowMode};
 use super::material::{MetalMaterial, SHEET_PIXEL_RATIO, SHEET_RESOLUTION, SheetMapping};
@@ -66,6 +67,8 @@ pub(crate) struct Scene {
     pub mask: MetalFxMask,
     /// Glow placement when [`mask`](Self::mask) is a fill.
     pub glow_mode: MetalGlowMode,
+    /// Active liquid dent (`useMetalBend`); `None` = rigid.
+    pub bend: Option<MetalBendField>,
 }
 
 /// GPU uniform block (matches `Uniforms` in the WGSL; every field is a vec4).
@@ -98,10 +101,12 @@ pub(crate) struct Uniforms {
     pub surf: [f32; 4],
     pub shadow: [f32; 4],
     pub shadow_misc: [f32; 4],
+    pub bend0: [f32; 4],
+    pub bend1: [f32; 4],
 }
 
-/// Size of [`Uniforms`] in bytes (26 × vec4).
-pub(crate) const UNIFORM_SIZE: u64 = 26 * 16;
+/// Size of [`Uniforms`] in bytes (28 × vec4).
+pub(crate) const UNIFORM_SIZE: u64 = 28 * 16;
 const _: () = assert!(std::mem::size_of::<Uniforms>() as u64 == UNIFORM_SIZE);
 
 const SHADOW_SIGMA: f32 = 25.0;
@@ -113,10 +118,15 @@ const EDGE_MARGIN: f32 = 2.0;
 impl Scene {
     /// The `(origin, size)` of the quad `layer` is drawn into, box-local CSS px.
     pub fn quad(&self, layer: Layer) -> ([f32; 2], [f32; 2]) {
+        let bend_margin = self.bend.map_or(0.0, |b| b.reach.ceil() + 2.0);
         let margin = match layer {
             Layer::Surface => 0.0,
-            Layer::Ring | Layer::Rim => EDGE_MARGIN,
-            Layer::Glow => self.glow.as_ref().map_or(0.0, |g| g.margin),
+            Layer::Ring | Layer::Rim => EDGE_MARGIN.max(bend_margin),
+            Layer::Glow => self
+                .glow
+                .as_ref()
+                .map_or(0.0, |g| g.margin)
+                .max(bend_margin),
         };
         (
             [-margin, -margin],
@@ -246,7 +256,24 @@ impl Scene {
         u.surf = self.surface.unwrap_or([0.0; 4]);
         u.shadow = self.shadow_color();
         u.shadow_misc = [SHADOW_SIGMA, 0.0, 0.0, 0.0];
+        if let Some(bend) = self.bend {
+            u.bend0 = [bend.cx, bend.cy, bend.dir_x, bend.dir_y];
+            u.bend1 = [bend.rad_k, bend.s2_blob, bend.s2_liquid, 1.0];
+        }
         u
+    }
+
+    fn bend_sample(&self, p: [f32; 2]) -> [f32; 2] {
+        let Some(b) = self.bend else {
+            return p;
+        };
+        let d = [p[0] - b.cx, p[1] - b.cy];
+        let q = d[0] * d[0] + d[1] * d[1];
+        let gb = (-q / b.s2_blob.max(1e-4)).exp();
+        let gl = (-q / b.s2_liquid.max(1e-4)).exp();
+        let dx = b.dir_x * gb + d[0] * b.rad_k * gl;
+        let dy = b.dir_y * gb + d[1] * b.rad_k * gl;
+        [p[0] - dx, p[1] - dy]
     }
 }
 
@@ -356,12 +383,13 @@ impl Scene {
     }
 
     fn shade_ring(&self, p: [f32; 2], frag_px: [f32; 2]) -> [f32; 4] {
-        let sd_o = self.box_sd(p);
+        let q = self.bend_sample(p);
+        let sd_o = self.box_sd(q);
         let co = self.cover(sd_o);
         let a = if self.mask.is_fill() {
-            co * self.mask_cover(p)
+            co * self.mask_cover(q)
         } else {
-            co * (1.0 - self.cover(self.inset_sd(p, self.ring)))
+            co * (1.0 - self.cover(self.inset_sd(q, self.ring)))
         };
         let mut out = [0.0; 4];
         if a > 0.0 {
@@ -428,6 +456,7 @@ impl Scene {
     }
 
     fn shade_rim(&self, p: [f32; 2]) -> [f32; 4] {
+        let p = self.bend_sample(p);
         let ring = self.ring;
         let mut out = [0.0; 4];
         if let Some(rim) = &self.rim {
@@ -511,13 +540,14 @@ pub(crate) mod tests {
             dither: false,
             mask: MetalFxMask::Ring,
             glow_mode: MetalGlowMode::Mask,
+            bend: None,
         }
     }
 
     #[test]
-    fn uniform_block_is_26_vec4() {
-        assert_eq!(std::mem::size_of::<Uniforms>(), 416);
-        assert_eq!(bytemuck::bytes_of(&Uniforms::zeroed()).len(), 416);
+    fn uniform_block_is_28_vec4() {
+        assert_eq!(std::mem::size_of::<Uniforms>(), 448);
+        assert_eq!(bytemuck::bytes_of(&Uniforms::zeroed()).len(), 448);
     }
 
     #[test]
