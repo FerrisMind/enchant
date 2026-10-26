@@ -74,12 +74,16 @@
 //! ```
 
 mod bake;
+mod bend;
+mod bend_config;
 mod color;
 mod geometry;
 mod glow;
 mod glow_config;
 mod mask;
 mod material;
+mod metal_badge;
+mod metal_text;
 mod options;
 mod pipeline;
 mod preset;
@@ -90,10 +94,13 @@ mod scene;
 mod text_mask;
 mod tween;
 mod widget;
-mod metal_badge;
-mod metal_text;
 
 pub use bake::{GlowSprite, SPRITE_DENSITY, bake_extra, bake_halo};
+pub use bend::{MetalBendField, MetalBendState, pointer_targets};
+pub use bend_config::{
+    MetalBendApplyTo, MetalBendConfig, bend_config, bend_config_revision, reset_bend_config,
+    set_bend_config,
+};
 pub use color::{hex_to_rgb, hex_to_rgba};
 pub use geometry::{
     ARC_SEGMENTS, Deform, EDGE_STEP, MetalFxVariant, arc_at_point, round_rect_outline,
