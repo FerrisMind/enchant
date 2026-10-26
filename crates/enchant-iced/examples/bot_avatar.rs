@@ -79,7 +79,6 @@ enum Message {
     ToggleTheme,
     AnchorsMeasured(enchant_iced::AnchorMeasurements),
     Tick(iced::time::Instant),
-    Select(BotAvatarType),
     Poke(BotAvatarType),
     SetState(BotAvatarState),
     SetShading(BotAvatarShading),
@@ -126,7 +125,6 @@ impl Demo {
                 self.theme_shell.apply_anchor_and_toggle(&measurements);
             }
             Message::Tick(now) => self.theme_shell.tick(now),
-            Message::Select(bot_type) => self.selected = bot_type,
             Message::Poke(bot_type) => {
                 self.selected = bot_type;
                 self.pokes = self.pokes.saturating_add(1);
@@ -206,10 +204,7 @@ impl Demo {
         };
         let selected_preset = bot_avatar_preset(self.selected);
 
-        let hero = self
-            .avatar(self.selected)
-            .size(HERO_SIZE)
-            .seed(0.37);
+        let hero = self.avatar(self.selected).size(HERO_SIZE).seed(0.37);
         let hero_info = column![
             text(selected_preset.label).size(26),
             text(format!(
@@ -218,16 +213,10 @@ impl Demo {
                 self.state_label()
             ))
             .size(13)
-            .style({
-                let muted = muted;
-                move |_| iced::widget::text::Style { color: Some(muted) }
-            }),
+            .style(move |_| iced::widget::text::Style { color: Some(muted) }),
             text(format!("Pokes: {}", self.pokes))
                 .size(13)
-                .style({
-                    let muted = muted;
-                    move |_| iced::widget::text::Style { color: Some(muted) }
-                }),
+                .style(move |_| iced::widget::text::Style { color: Some(muted) }),
             Space::new().height(6),
             row![
                 self.control(
@@ -385,10 +374,7 @@ impl Demo {
                  The raster is overscanned 1.5× and pulled back with negative margins, as on the web."
             )
             .size(12)
-            .style({
-                let muted = muted;
-                move |_| iced::widget::text::Style { color: Some(muted) }
-            }),
+            .style(move |_| iced::widget::text::Style { color: Some(muted) }),
         ]
         .spacing(20)
         .align_x(Alignment::Center);
