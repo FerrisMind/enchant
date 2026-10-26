@@ -34,7 +34,10 @@ use enchant_iced::{
     IMAGE_MELT_DEFAULTS, ItemBox, Liquid, LiquidItem, Morph, Move, Transition,
 };
 use iced::widget::{Space, button, column, container, image, row, scrollable, text, text_input};
-use iced::{Alignment, Border, Color, Element, Length, Size, Subscription, Task, Theme, Vector};
+use iced::{
+    Alignment, Border, Color, Element, Font, Length, Size, Subscription, Task, Theme, Vector,
+};
+use lucide_icons::{Icon as LucideIcon, LUCIDE_FONT_BYTES};
 
 const PAPER: Color = Color::from_rgb(0.949, 0.953, 0.961);
 const INK: Color = Color::from_rgb(0.075, 0.086, 0.106);
@@ -67,6 +70,7 @@ pub fn main() -> iced::Result {
             ..Default::default()
         })
         .subscription(GooeyExample::subscription)
+        .font(LUCIDE_FONT_BYTES)
         .run()
 }
 
@@ -358,14 +362,22 @@ impl GooeyExample {
             .contrast(18.0)
             .fill(SURFACE)
             .shadow("0 2px 6px rgba(0, 0, 0, 0.08)");
-        for (index, label) in ["A", "B", "C"].iter().enumerate() {
+        for (index, glyph) in [LucideIcon::File, LucideIcon::Image, LucideIcon::Folder]
+            .iter()
+            .enumerate()
+        {
             let targets = [(26.0, 46.0), (80.0, 16.0), (134.0, 46.0)];
             let (x, y) = if open { targets[index] } else { main };
+            // The closed satellites sit exactly under the main button; an
+            // empty element keeps their glyphs from showing through it.
+            let body = if open {
+                lucide(*glyph, 16.0, INK)
+            } else {
+                Space::new().into()
+            };
             liquid = liquid.push(
                 LiquidItem::new(
-                    button(icon(
-                        text(if open { *label } else { "" }).size(15).color(INK),
-                    ))
+                    button(icon(body))
                     .padding(0)
                     .width(Length::Fixed(40.0))
                     .height(Length::Fixed(40.0))
@@ -383,7 +395,11 @@ impl GooeyExample {
         }
         liquid = liquid.push(
             LiquidItem::new(
-                button(icon(text(if open { "×" } else { "+" }).size(18).color(INK)))
+                button(icon(lucide(
+                    if open { LucideIcon::X } else { LucideIcon::Plus },
+                    18.0,
+                    INK,
+                )))
                     .padding(0)
                     .width(Length::Fixed(40.0))
                     .height(Length::Fixed(40.0))
@@ -474,17 +490,19 @@ impl GooeyExample {
             .transition(transition)
             .radius(CornerRadii::uniform(24.0));
         let submit = LiquidItem::new(
-            button(icon(
-                text(if !open {
-                    ""
-                } else if self.submitted {
-                    "✓"
-                } else {
-                    "→"
-                })
-                .size(17)
-                .color(INK),
-            ))
+            button(icon(if !open {
+                Space::new().into()
+            } else {
+                lucide(
+                    if self.submitted {
+                        LucideIcon::Check
+                    } else {
+                        LucideIcon::ArrowRight
+                    },
+                    17.0,
+                    INK,
+                )
+            }))
             .padding(0)
             .width(Length::Fixed(44.0))
             .height(Length::Fixed(44.0))
@@ -788,6 +806,16 @@ fn icon<'a>(body: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
         .height(Length::Fill)
         .align_x(Alignment::Center)
         .align_y(Alignment::Center)
+        .into()
+}
+
+/// A Lucide glyph; the example app loads `LUCIDE_FONT_BYTES` in `main`.
+fn lucide<'a>(icon: LucideIcon, size: f32, color: Color) -> Element<'a, Message> {
+    text(char::from(icon).to_string())
+        .font(Font::with_name("lucide"))
+        .size(size)
+        .line_height(iced::widget::text::LineHeight::Absolute(iced::Pixels(size)))
+        .style(move |_| iced::widget::text::Style { color: Some(color) })
         .into()
 }
 

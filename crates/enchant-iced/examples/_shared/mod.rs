@@ -10,6 +10,8 @@ pub mod theme_shell;
 use iced::widget::{button, column, container, row, text};
 use iced::{Alignment, Element, Length};
 
+// Not every example that includes this module needs the shell helper.
+#[allow(unused_imports)]
 pub use theme_shell::{ThemeShell, themed_shell};
 
 pub fn shell<'a, Message>(
