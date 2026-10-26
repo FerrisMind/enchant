@@ -26,6 +26,7 @@ include = [
 [features]
 default = []
 tweet-adapter = ["dep:reqwest", "dep:serde", "dep:serde_json"]
+microphone = ["dep:cpal"]
 
 [dependencies]
 iced = { version = "0.14", features = ["advanced", "canvas", "image", "svg", "tokio", "wgpu"] }
@@ -47,6 +48,7 @@ resvg = "0.45"
 base64 = "0.22"
 swash = "0.2.9"
 libm = "0.2"
+cpal = { version = "0.16", optional = true }
 
 [package.metadata.docs.rs]
 all-features = true

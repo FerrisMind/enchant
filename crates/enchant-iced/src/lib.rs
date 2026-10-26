@@ -90,3 +90,7 @@ pub use widgets::{
     MotionPreference, OrbFrame, OrbKnob, OrbOptions, OrbSize, OrbState, OrbTheme, ThinkingOrb,
 };
 pub use widgets::{GlyphMatrixProps, glyph_matrix};
+pub use widgets::{
+    GlowLayering, VoiceBeam, VoiceGlow, VoiceGlowEngine, VoiceGlowFrame, VoiceGlowMotion,
+    VoiceGlowRaster, VoiceGlowTheme, VoiceGlowType,
+};
