@@ -8,7 +8,9 @@
 
 use std::f32::consts::PI;
 
-use super::blur::blur;
+use rayon::prelude::*;
+
+use super::blur::{BlurScratch, blur};
 use super::data::{
     PALETTES, PULSE_INNER_BLOOM, PULSE_INNER_SIZES, PULSE_OUTER_BLOOM, PULSE_OUTER_CORE,
     PULSE_RING_MAP,
@@ -16,7 +18,8 @@ use super::data::{
 use super::frame::{BorderBeamFrame, LineFrame, PulseFrame};
 use super::options::BorderBeamSpec;
 use super::paint::{
-    Fx, GradientStop, Plane, Px, coverage, over, paint_conic, paint_radial, sd_round_rect, stop,
+    Fx, GradientStop, Plane, Px, apply_conic_mask, coverage, over, paint_conic_masked,
+    paint_radial, sd_round_rect, stop,
 };
 use super::palette::{
     BorderBeamSize, GradientDef, LineBloomSpike, PaletteColors, PulseGradientDef,
@@ -172,7 +175,7 @@ pub struct BorderBeamRaster {
 #[derive(Clone, Debug, Default)]
 struct Scratch {
     plane: Plane,
-    tmp: Vec<Px>,
+    blur: BlurScratch,
 }
 
 impl std::fmt::Debug for BorderBeamRaster {
@@ -300,7 +303,11 @@ impl BorderBeamRaster {
         }
 
         // The wrapper clips every above-child layer to its rounded border.
-        apply_rounded_clip(&mut self.above, 0.0, 0.0, host_w, host_h, radius);
+        // A `pulse-outside` stroke is already ring-masked to the same rounded
+        // rectangle, so its clip can only touch transparent pixels.
+        if spec.size != BorderBeamSize::PulseOutside {
+            apply_rounded_clip(&mut self.above, 0.0, 0.0, host_w, host_h, radius);
+        }
 
         let above = bitmap_from_plane(&self.above, 0.0, 0.0, density);
         let behind = (behind_margin > 0.0)
@@ -331,19 +338,20 @@ fn device_size(host_w: f32, host_h: f32, density: f32) -> (usize, usize) {
 }
 
 fn bitmap_from_plane(plane: &Plane, left: f32, top: f32, density: f32) -> BeamBitmap {
-    let mut rgba = Vec::with_capacity(plane.w * plane.h * 4);
-    for p in &plane.px {
-        let a = p[3].clamp(0.0, 1.0);
-        if a <= 1e-6 {
-            rgba.extend_from_slice(&[0, 0, 0, 0]);
-        } else {
+    let mut rgba = vec![0_u8; plane.w * plane.h * 4];
+    rgba.par_chunks_mut(4)
+        .zip(plane.px.par_iter())
+        .for_each(|(out, p)| {
+            let a = p[3].clamp(0.0, 1.0);
+            if a <= 1e-6 {
+                return;
+            }
             let inv = 1.0 / a;
-            rgba.push(((p[0] * inv).clamp(0.0, 1.0) * 255.0).round() as u8);
-            rgba.push(((p[1] * inv).clamp(0.0, 1.0) * 255.0).round() as u8);
-            rgba.push(((p[2] * inv).clamp(0.0, 1.0) * 255.0).round() as u8);
-            rgba.push((a * 255.0).round() as u8);
-        }
-    }
+            out[0] = to_srgb8(p[0] * inv);
+            out[1] = to_srgb8(p[1] * inv);
+            out[2] = to_srgb8(p[2] * inv);
+            out[3] = (a * 255.0 + 0.5) as u8;
+        });
     BeamBitmap {
         width: plane.w as u32,
         height: plane.h as u32,
@@ -352,6 +360,12 @@ fn bitmap_from_plane(plane: &Plane, left: f32, top: f32, density: f32) -> BeamBi
         density,
         rgba,
     }
+}
+
+/// `round(clamp(v, 0, 1) * 255)` without a float-to-float round call.
+#[inline]
+fn to_srgb8(v: f32) -> u8 {
+    (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8
 }
 
 // ── layer plumbing ─────────────────────────────────────────────────────────
@@ -379,7 +393,7 @@ fn blur_layer(scratch: &mut Scratch, sigma_x: f32, sigma_y: f32) {
         scratch.plane.h,
         sx,
         sy,
-        &mut scratch.tmp,
+        &mut scratch.blur,
     );
 }
 
@@ -388,19 +402,55 @@ fn fx_layer(scratch: &mut Scratch, hue: f32, brightness: f32, saturation: f32) {
 }
 
 fn composite_crop(out: &mut Plane, layer: &Plane, pad: usize, opacity: f32) {
-    for j in 0..out.h {
-        for i in 0..out.w {
-            let src = layer.px[(j + pad) * layer.w + (i + pad)];
-            over_scaled(&mut out.px[j * out.w + i], src, opacity);
-        }
-    }
+    let (out_w, layer_w) = (out.w, layer.w);
+    out.px
+        .par_chunks_mut(out_w)
+        .enumerate()
+        .for_each(|(j, row)| {
+            let src_row = (j + pad) * layer_w + pad;
+            for (i, dst) in row.iter_mut().enumerate() {
+                over_scaled(dst, layer.px[src_row + i], opacity);
+            }
+        });
 }
 
 fn composite_same(out: &mut Plane, layer: &Plane, opacity: f32) {
-    let n = out.w.min(layer.w) * out.h.min(layer.h);
-    for i in 0..n {
-        over_scaled(&mut out.px[i], layer.px[i], opacity);
+    let width = out.w.min(layer.w);
+    let rows = out.h.min(layer.h);
+    let (out_w, layer_w) = (out.w, layer.w);
+    out.px
+        .par_chunks_mut(out_w)
+        .take(rows)
+        .enumerate()
+        .for_each(|(j, row)| {
+            let src_row = j * layer_w;
+            for (i, dst) in row.iter_mut().take(width).enumerate() {
+                over_scaled(dst, layer.px[src_row + i], opacity);
+            }
+        });
+}
+
+/// Composites a smaller padded layer into `out` at a device-pixel offset.
+fn composite_at(out: &mut Plane, layer: &Plane, dx: usize, dy: usize, opacity: f32) {
+    if dx >= out.w || dy >= out.h {
+        return;
     }
+    let width = layer.w.min(out.w - dx);
+    let out_w = out.w;
+    out.px
+        .par_chunks_mut(out_w)
+        .enumerate()
+        .for_each(|(oj, dst)| {
+            let j = oj as isize - dy as isize;
+            if j < 0 || j as usize >= layer.h {
+                return;
+            }
+            let src_row = j as usize * layer.w;
+            let src = &layer.px[src_row..src_row + width];
+            for (d, s) in dst[dx..dx + width].iter_mut().zip(src) {
+                over_scaled(d, *s, opacity);
+            }
+        });
 }
 
 #[inline]
@@ -452,21 +502,22 @@ fn paint_background(plane: &mut Plane, defs: &[GradientDef], host_w: f32, host_h
 
 // ── masks ──────────────────────────────────────────────────────────────────
 
-fn apply_mask(plane: &mut Plane, mask: impl Fn(f32, f32) -> f32) {
-    for j in 0..plane.h {
-        let y = plane.y(j);
-        for i in 0..plane.w {
-            let m = mask(plane.x(i), y).clamp(0.0, 1.0);
+fn apply_mask(plane: &mut Plane, mask: impl Fn(f32, f32) -> f32 + Sync) {
+    let (w, ox, oy, kx, ky) = (plane.w, plane.ox, plane.oy, plane.kx, plane.ky);
+    plane.px.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+        let y = oy + (j as f32 + 0.5) / ky;
+        for (i, p) in row.iter_mut().enumerate() {
+            let x = ox + (i as f32 + 0.5) / kx;
+            let m = mask(x, y).clamp(0.0, 1.0);
             if m <= 0.0 {
-                let p = &mut plane.px[j * plane.w + i];
                 *p = [0.0; 4];
             } else if m < 1.0 {
-                for c in &mut plane.px[j * plane.w + i] {
+                for c in p.iter_mut() {
                     *c *= m;
                 }
             }
         }
-    }
+    });
 }
 
 fn apply_rounded_clip(plane: &mut Plane, x0: f32, y0: f32, x1: f32, y1: f32, radius: f32) {
@@ -477,16 +528,26 @@ fn apply_rounded_clip(plane: &mut Plane, x0: f32, y0: f32, x1: f32, y1: f32, rad
 }
 
 /// `outer_radius` ring minus a rounded inner box inset by `inset`.
-fn ring_mask(
-    plane: &mut Plane,
+#[derive(Clone, Copy)]
+struct Ring {
     host_w: f32,
     host_h: f32,
     outer_radius: f32,
     inset: f32,
     inner_radius: f32,
-) {
-    let k = (plane.kx + plane.ky) * 0.5;
-    apply_mask(plane, |x, y| {
+    k: f32,
+}
+
+impl Ring {
+    fn coverage(self, x: f32, y: f32) -> f32 {
+        let Self {
+            host_w,
+            host_h,
+            outer_radius,
+            inset,
+            inner_radius,
+            k,
+        } = self;
         let outer = coverage(
             sd_round_rect(x, y, 0.0, 0.0, host_w, host_h, outer_radius),
             k,
@@ -504,20 +565,44 @@ fn ring_mask(
             k,
         );
         outer * (1.0 - inner)
-    });
+    }
+}
+
+/// `outer_radius` ring minus a rounded inner box inset by `inset`.
+fn ring_mask(
+    plane: &mut Plane,
+    host_w: f32,
+    host_h: f32,
+    outer_radius: f32,
+    inset: f32,
+    inner_radius: f32,
+) {
+    let k = (plane.kx + plane.ky) * 0.5;
+    let ring = Ring {
+        host_w,
+        host_h,
+        outer_radius,
+        inset,
+        inner_radius,
+        k,
+    };
+    apply_mask(plane, |x, y| ring.coverage(x, y));
+}
+
+/// The two 28px-wide edge bands, unioned.
+fn edge_band(x: f32, y: f32, host_w: f32, host_h: f32, band: f32) -> f32 {
+    let v = (1.0 - y / band)
+        .clamp(0.0, 1.0)
+        .max(((y - (host_h - band)) / band).clamp(0.0, 1.0));
+    let h = (1.0 - x / band)
+        .clamp(0.0, 1.0)
+        .max(((x - (host_w - band)) / band).clamp(0.0, 1.0));
+    v.max(h)
 }
 
 /// The two 28px-wide edge bands, unioned.
 fn apply_edge_bands(plane: &mut Plane, host_w: f32, host_h: f32, band: f32) {
-    apply_mask(plane, |x, y| {
-        let v = (1.0 - y / band)
-            .clamp(0.0, 1.0)
-            .max(((y - (host_h - band)) / band).clamp(0.0, 1.0));
-        let h = (1.0 - x / band)
-            .clamp(0.0, 1.0)
-            .max(((x - (host_w - band)) / band).clamp(0.0, 1.0));
-        v.max(h)
-    });
+    apply_mask(plane, |x, y| edge_band(x, y, host_w, host_h, band));
 }
 
 /// A radial alpha mask with explicit `(position, alpha)` stops.
@@ -674,29 +759,25 @@ fn draw_rotating(
     } else {
         WHITE_CONIC_LIGHT
     };
-    paint_conic(
+    let mask_stops = if small { SMALL_MASK } else { BEAM_MASK };
+    let k = (scratch.plane.kx + scratch.plane.ky) * 0.5;
+    let inner_inset = (inner_radius - bw).max(0.0);
+    let ring = Ring {
+        host_w: w,
+        host_h: h,
+        outer_radius: inner_radius,
+        inset: bw,
+        inner_radius: inner_inset,
+        k,
+    };
+    paint_conic_masked(
         &mut scratch.plane,
         w * 0.5,
         h * 0.5,
         frame.angle_degrees,
         white,
-    );
-    if small {
-        apply_mask(&mut scratch.plane, |x, y| {
-            conic_mask(w, h, x, y, frame.angle_degrees, SMALL_MASK)
-        });
-    } else {
-        apply_mask(&mut scratch.plane, |x, y| {
-            conic_mask(w, h, x, y, frame.angle_degrees, BEAM_MASK)
-        });
-    }
-    ring_mask(
-        &mut scratch.plane,
-        w,
-        h,
-        inner_radius,
-        bw,
-        (inner_radius - bw).max(0.0),
+        |x, y| ring.coverage(x, y),
+        |_, _, phase| sample_alpha(mask_stops, phase),
     );
     if let Some(fx) = fx {
         fx.apply_plane(&mut scratch.plane.px);
@@ -718,16 +799,20 @@ fn draw_rotating(
         if small { 5.0 } else { 9.0 },
         spec.inner_shadow,
     );
-    if small {
-        apply_mask(&mut scratch.plane, |x, y| {
-            conic_mask(w, h, x, y, frame.angle_degrees, SMALL_MASK)
-        });
-    } else {
-        apply_mask(&mut scratch.plane, |x, y| {
-            conic_mask(w, h, x, y, frame.angle_degrees, BEAM_MASK)
-        });
-        apply_edge_bands(&mut scratch.plane, w, h, 28.0);
-    }
+    apply_conic_mask(
+        &mut scratch.plane,
+        w * 0.5,
+        h * 0.5,
+        frame.angle_degrees,
+        |x, y| {
+            if small {
+                1.0
+            } else {
+                edge_band(x, y, w, h, 28.0)
+            }
+        },
+        |_, _, phase| sample_alpha(mask_stops, phase),
+    );
     if let Some(fx) = fx {
         fx.apply_plane(&mut scratch.plane.px);
     }
@@ -741,32 +826,18 @@ fn draw_rotating(
     } else {
         BLOOM_CONIC_LIGHT
     };
-    paint_conic(
+    paint_conic_masked(
         &mut scratch.plane,
         w * 0.5,
         h * 0.5,
         frame.angle_degrees,
         bloom,
-    );
-    ring_mask(
-        &mut scratch.plane,
-        w,
-        h,
-        inner_radius,
-        bw,
-        (inner_radius - bw).max(0.0),
+        |x, y| ring.coverage(x, y),
+        |_, _, _| 1.0,
     );
     blur_layer(scratch, bloom_blur, bloom_blur);
     fx_layer(scratch, 0.0, spec.brightness, spec.saturation);
     composite_crop(out, &scratch.plane, pad, opacity * spec.bloom_opacity);
-}
-
-fn conic_mask(w: f32, h: f32, x: f32, y: f32, angle: f32, stops: &[GradientStop]) -> f32 {
-    let dx = x - w * 0.5;
-    let dy = y - h * 0.5;
-    let deg = dx.atan2(-dy).to_degrees().rem_euclid(360.0);
-    let p = ((deg - angle).rem_euclid(360.0)) / 360.0;
-    sample_alpha(stops, p)
 }
 
 fn sample_alpha(stops: &[GradientStop], p: f32) -> f32 {
@@ -821,24 +892,29 @@ fn paint_inset_shadow(plane: &mut Plane, w: f32, h: f32, radius: f32, blur: f32,
     let sigma = blur * 0.5;
     let inset = 1.0_f32;
     let inner_radius = (radius - inset).max(0.0);
-    for j in 0..plane.h {
-        let y = plane.y(j);
-        for i in 0..plane.w {
-            let x = plane.x(i);
-            let sd = sd_round_rect(x, y, inset, inset, w - inset, h - inset, inner_radius);
-            if sd < -3.0 * sigma {
-                continue;
+    let (pw, ox, oy, kx, ky) = (plane.w, plane.ox, plane.oy, plane.kx, plane.ky);
+    plane
+        .px
+        .par_chunks_mut(pw)
+        .enumerate()
+        .for_each(|(j, row)| {
+            let y = oy + (j as f32 + 0.5) / ky;
+            for (i, p) in row.iter_mut().enumerate() {
+                let x = ox + (i as f32 + 0.5) / kx;
+                let sd = sd_round_rect(x, y, inset, inset, w - inset, h - inset, inner_radius);
+                if sd < -3.0 * sigma {
+                    continue;
+                }
+                let inside = 0.5 * (1.0 - libm::erff(sd / (sigma * std::f32::consts::SQRT_2)));
+                let alpha = color.a * (1.0 - inside);
+                if alpha > 0.0 {
+                    over(
+                        p,
+                        [color.r * alpha, color.g * alpha, color.b * alpha, alpha],
+                    );
+                }
             }
-            let inside = 0.5 * (1.0 - libm::erff(sd / (sigma * std::f32::consts::SQRT_2)));
-            let alpha = color.a * (1.0 - inside);
-            if alpha > 0.0 {
-                over(
-                    &mut plane.px[j * plane.w + i],
-                    [color.r * alpha, color.g * alpha, color.b * alpha, alpha],
-                );
-            }
-        }
-    }
+        });
 }
 
 // ── line ───────────────────────────────────────────────────────────────────
@@ -1574,12 +1650,17 @@ fn draw_pulse_outside(
     let (sx, sy) = pulse.glow_scale;
     let behind_pad = ((behind.w as f32 - out.w as f32) * 0.5 / density).max(0.0);
 
-    // Outward core (inset -10, scale .95/.9), behind the child.
-    let core_pad = behind_pad;
-    begin_layer(scratch, w, h, density, core_pad);
+    // Outward core (inset -10, scale .95/.9), behind the child. The core is
+    // clipped to a box just outside the host and blurred far less than the
+    // wide bloom, so it only needs its own tight padding; using the bloom's
+    // 75-98px padding here would rasterize mostly empty pixels.
     let core_box = (-10.0, -10.0, w + 20.0, h + 20.0);
-    let core_scale = (0.95, 0.9);
+    let core_scale: (f32, f32) = (0.95, 0.9);
     let core_radius = (radius + 10.0) * core_scale.1;
+    let glow_blur = scale_blur(if dark { 3.0 } else { 6.0 }, spec.glow_size);
+    let core_sigma = glow_blur * core_scale.0.max(core_scale.1);
+    let core_pad = (10.0 + 3.0 * core_sigma + 1.0).ceil();
+    let core_pad_px = begin_layer(scratch, w, h, density, core_pad);
     for def in PULSE_OUTER_CORE.iter().rev() {
         let base = palette.border[usize::from(def.palette_index)];
         let (cx, cy) = pulse_scaled_center(def, &base, core_box, &pulse, core_scale);
@@ -1604,10 +1685,16 @@ fn draw_pulse_outside(
     }
     let (bx0, by0, bx1, by1) = scaled_box(core_box, (w * 0.5, h * 0.5), core_scale);
     apply_rounded_clip(&mut scratch.plane, bx0, by0, bx1, by1, core_radius);
-    let glow_blur = scale_blur(if dark { 3.0 } else { 6.0 }, spec.glow_size);
     blur_layer(scratch, glow_blur * core_scale.0, glow_blur * core_scale.1);
     pulse_fx(scratch, frame);
-    composite_same(behind, &scratch.plane, opacity * spec.inner_opacity);
+    let behind_pad_px = behind.w.saturating_sub(out.w) / 2;
+    composite_at(
+        behind,
+        &scratch.plane,
+        behind_pad_px.saturating_sub(core_pad_px),
+        behind_pad_px.saturating_sub(core_pad_px),
+        opacity * spec.inner_opacity,
+    );
 
     // Wide bloom (inset -30, scale .95/.9), behind the core's child.
     let bloom_blur = bloom_blur(spec);
@@ -1750,37 +1837,42 @@ fn scaled_box(
 
 fn paint_ring_solid(plane: &mut Plane, w: f32, h: f32, radius: f32, inset: f32, color: Rgba) {
     let k = (plane.kx + plane.ky) * 0.5;
-    for j in 0..plane.h {
-        let y = plane.y(j);
-        for i in 0..plane.w {
-            let x = plane.x(i);
-            let outer = coverage(sd_round_rect(x, y, 0.0, 0.0, w, h, radius), k);
-            let inner = coverage(
-                sd_round_rect(
-                    x,
-                    y,
-                    inset,
-                    inset,
-                    w - inset,
-                    h - inset,
-                    (radius - inset).max(0.0),
-                ),
-                k,
-            );
-            let m = outer * (1.0 - inner);
-            if m > 0.0 {
-                over(
-                    &mut plane.px[j * plane.w + i],
-                    [
-                        color.r * color.a * m,
-                        color.g * color.a * m,
-                        color.b * color.a * m,
-                        color.a * m,
-                    ],
+    let (pw, ox, oy, kx, ky) = (plane.w, plane.ox, plane.oy, plane.kx, plane.ky);
+    plane
+        .px
+        .par_chunks_mut(pw)
+        .enumerate()
+        .for_each(|(j, row)| {
+            let y = oy + (j as f32 + 0.5) / ky;
+            for (i, p) in row.iter_mut().enumerate() {
+                let x = ox + (i as f32 + 0.5) / kx;
+                let outer = coverage(sd_round_rect(x, y, 0.0, 0.0, w, h, radius), k);
+                let inner = coverage(
+                    sd_round_rect(
+                        x,
+                        y,
+                        inset,
+                        inset,
+                        w - inset,
+                        h - inset,
+                        (radius - inset).max(0.0),
+                    ),
+                    k,
                 );
+                let m = outer * (1.0 - inner);
+                if m > 0.0 {
+                    over(
+                        p,
+                        [
+                            color.r * color.a * m,
+                            color.g * color.a * m,
+                            color.b * color.a * m,
+                            color.a * m,
+                        ],
+                    );
+                }
             }
-        }
-    }
+        });
 }
 
 #[cfg(test)]

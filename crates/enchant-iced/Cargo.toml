@@ -44,6 +44,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 lyon_path = "1.0"
+rayon = "1.12"
 resvg = "0.45"
 base64 = "0.22"
 swash = "0.2.9"

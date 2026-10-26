@@ -2,9 +2,14 @@
 //! conic gradients, rounded-rect distances and the
 //! `hue-rotate() brightness() saturate()` filter chain.
 //!
+//! Whole-plane passes are row-parallel; each pixel is independent, so the
+//! result is identical to the serial loop.
+//!
 //! The plane/filter code follows the proven implementation in
 //! `widgets::voice_glow::paint`; it is duplicated here so the two widgets can
 //! evolve independently.
+
+use rayon::prelude::*;
 
 /// Premultiplied RGBA.
 pub(crate) type Px = [f32; 4];
@@ -54,18 +59,6 @@ impl Plane {
         self.px.clear();
         self.px.resize(self.w * self.h, [0.0; 4]);
     }
-
-    /// Host-space x of the centre of pixel column `i`.
-    #[inline]
-    pub(crate) fn x(&self, i: usize) -> f32 {
-        self.ox + (i as f32 + 0.5) / self.kx
-    }
-
-    /// Host-space y of the centre of pixel row `j`.
-    #[inline]
-    pub(crate) fn y(&self, j: usize) -> f32 {
-        self.oy + (j as f32 + 0.5) / self.ky
-    }
 }
 
 /// Premultiplied source-over of `src` onto `dst`.
@@ -113,43 +106,123 @@ pub(crate) fn paint_radial(
         return;
     }
     let (inv_rx, inv_ry) = (1.0 / rx, 1.0 / ry);
-    for j in y0..y1 {
-        let ny = (plane.y(j) - cy) * inv_ry;
-        for i in x0..x1 {
-            let nx = (plane.x(i) - cx) * inv_rx;
+    let (w, ox, oy, kx, ky) = (plane.w, plane.ox, plane.oy, plane.kx, plane.ky);
+    // Keep small gradient bounding boxes on one thread: the pulse/line tables
+    // contain many of them, and a parallel region per ellipse costs more than
+    // the ellipse itself.
+    if (x1 - x0) * (y1 - y0) < 32_768 {
+        for j in y0..y1 {
+            let ny = (oy + (j as f32 + 0.5) / ky - cy) * inv_ry;
+            for i in x0..x1 {
+                let nx = (ox + (i as f32 + 0.5) / kx - cx) * inv_rx;
+                let d = (nx * nx + ny * ny).sqrt();
+                let c = sample_stops(stops, d);
+                if c[3] > 0.0 {
+                    over(&mut plane.px[j * w + i], c);
+                }
+            }
+        }
+        return;
+    }
+    let rows = &mut plane.px[y0 * w..y1 * w];
+    rows.par_chunks_mut(w).enumerate().for_each(|(jj, row)| {
+        let j = y0 + jj;
+        let ny = (oy + (j as f32 + 0.5) / ky - cy) * inv_ry;
+        for (ii, p) in row[x0..x1].iter_mut().enumerate() {
+            let i = x0 + ii;
+            let nx = (ox + (i as f32 + 0.5) / kx - cx) * inv_rx;
             let d = (nx * nx + ny * ny).sqrt();
             let c = sample_stops(stops, d);
             if c[3] > 0.0 {
-                over(&mut plane.px[j * plane.w + i], c);
+                over(p, c);
             }
         }
-    }
+    });
 }
 
-/// Paints `conic-gradient(from <angle>, stops...)` centred on `(cx, cy)`.
-pub(crate) fn paint_conic(
+/// Paints `conic-gradient(from <angle>, stops...)` centred on `(cx, cy)` and
+/// applies `mask(x, y, phase)` to every pixel after compositing. `geometry` is
+/// evaluated first; when it is zero the pixel is cleared without computing
+/// `atan2` or sampling the gradient. The reference paints the conic colour and
+/// then masks it, so the result is unchanged, but ring/edge layers skip most
+/// of the plane.
+pub(crate) fn paint_conic_masked(
     plane: &mut Plane,
     cx: f32,
     cy: f32,
     angle_degrees: f32,
     stops: &[GradientStop],
+    geometry: impl Fn(f32, f32) -> f32 + Sync,
+    mask: impl Fn(f32, f32, f32) -> f32 + Sync,
 ) {
-    if stops.is_empty() {
-        return;
-    }
     let angle = angle_degrees.rem_euclid(360.0);
-    for j in 0..plane.h {
-        let dy = plane.y(j) - cy;
-        for i in 0..plane.w {
-            let dx = plane.x(i) - cx;
+    let (w, ox, oy, kx, ky) = (plane.w, plane.ox, plane.oy, plane.kx, plane.ky);
+    plane.px.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+        let y = oy + (j as f32 + 0.5) / ky;
+        let dy = y - cy;
+        for (i, p) in row.iter_mut().enumerate() {
+            let x = ox + (i as f32 + 0.5) / kx;
+            let g = geometry(x, y).clamp(0.0, 1.0);
+            if g <= 0.0 {
+                *p = [0.0; 4];
+                continue;
+            }
+            let dx = x - cx;
             let deg = dx.atan2(-dy).to_degrees().rem_euclid(360.0);
-            let p = ((deg - angle).rem_euclid(360.0)) / 360.0;
-            let c = sample_stops(stops, p);
+            let phase = ((deg - angle).rem_euclid(360.0)) / 360.0;
+            let c = sample_stops(stops, phase);
             if c[3] > 0.0 {
-                over(&mut plane.px[j * plane.w + i], c);
+                over(p, c);
+            }
+            let m = (g * mask(x, y, phase)).clamp(0.0, 1.0);
+            if m <= 0.0 {
+                *p = [0.0; 4];
+            } else if m < 1.0 {
+                for channel in p.iter_mut() {
+                    *channel *= m;
+                }
             }
         }
-    }
+    });
+}
+
+/// Multiplies an existing plane by `mask(x, y, phase)` of a conic gradient.
+/// `geometry` culls pixels before the `atan2`; used when the layer's colour
+/// comes from radial gradients and only the conic alpha keyframes plus a
+/// geometric mask remain.
+pub(crate) fn apply_conic_mask(
+    plane: &mut Plane,
+    cx: f32,
+    cy: f32,
+    angle_degrees: f32,
+    geometry: impl Fn(f32, f32) -> f32 + Sync,
+    mask: impl Fn(f32, f32, f32) -> f32 + Sync,
+) {
+    let angle = angle_degrees.rem_euclid(360.0);
+    let (w, ox, oy, kx, ky) = (plane.w, plane.ox, plane.oy, plane.kx, plane.ky);
+    plane.px.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+        let y = oy + (j as f32 + 0.5) / ky;
+        let dy = y - cy;
+        for (i, p) in row.iter_mut().enumerate() {
+            let x = ox + (i as f32 + 0.5) / kx;
+            let g = geometry(x, y).clamp(0.0, 1.0);
+            if g <= 0.0 {
+                *p = [0.0; 4];
+                continue;
+            }
+            let dx = x - cx;
+            let deg = dx.atan2(-dy).to_degrees().rem_euclid(360.0);
+            let phase = ((deg - angle).rem_euclid(360.0)) / 360.0;
+            let m = (g * mask(x, y, phase)).clamp(0.0, 1.0);
+            if m <= 0.0 {
+                *p = [0.0; 4];
+            } else if m < 1.0 {
+                for channel in p.iter_mut() {
+                    *channel *= m;
+                }
+            }
+        }
+    });
 }
 
 fn sample_stops(stops: &[GradientStop], d: f32) -> Px {
@@ -248,6 +321,7 @@ impl Fx {
         }
     }
 
+    #[cfg(test)]
     #[inline]
     fn mul(m: &[[f32; 3]; 3], v: [f32; 3]) -> [f32; 3] {
         [
@@ -257,7 +331,8 @@ impl Fx {
         ]
     }
 
-    /// Filters a straight colour.
+    /// Filters a straight colour. Test oracle for the unrolled plane path.
+    #[cfg(test)]
     #[inline]
     pub(crate) fn apply(&self, c: [f32; 3]) -> [f32; 3] {
         let rotated = Self::mul(&self.hue, c).map(|v| v.clamp(0.0, 1.0));
@@ -267,16 +342,31 @@ impl Fx {
 
     /// Filters every pixel of a premultiplied plane.
     pub(crate) fn apply_plane(&self, px: &mut [Px]) {
-        for p in px {
-            if p[3] <= 1e-6 {
-                continue;
+        let h = &self.hue;
+        let s = &self.sat;
+        let brightness = self.brightness;
+        px.par_iter_mut().for_each(|p| {
+            let a = p[3];
+            if a <= 1e-6 {
+                return;
             }
-            let inv = 1.0 / p[3];
-            let c = self.apply([p[0] * inv, p[1] * inv, p[2] * inv]);
-            p[0] = c[0] * p[3];
-            p[1] = c[1] * p[3];
-            p[2] = c[2] * p[3];
-        }
+            let inv = 1.0 / a;
+            let r = p[0] * inv;
+            let g = p[1] * inv;
+            let b = p[2] * inv;
+
+            let hr = (h[0][0] * r + h[0][1] * g + h[0][2] * b).clamp(0.0, 1.0);
+            let hg = (h[1][0] * r + h[1][1] * g + h[1][2] * b).clamp(0.0, 1.0);
+            let hb = (h[2][0] * r + h[2][1] * g + h[2][2] * b).clamp(0.0, 1.0);
+
+            let lr = (hr * brightness).clamp(0.0, 1.0);
+            let lg = (hg * brightness).clamp(0.0, 1.0);
+            let lb = (hb * brightness).clamp(0.0, 1.0);
+
+            p[0] = (s[0][0] * lr + s[0][1] * lg + s[0][2] * lb).clamp(0.0, 1.0) * a;
+            p[1] = (s[1][0] * lr + s[1][1] * lg + s[1][2] * lb).clamp(0.0, 1.0) * a;
+            p[2] = (s[2][0] * lr + s[2][1] * lg + s[2][2] * lb).clamp(0.0, 1.0) * a;
+        });
     }
 }
 
@@ -331,7 +421,7 @@ mod tests {
     fn conic_starts_at_the_top_and_runs_clockwise() {
         let mut plane = Plane::default();
         plane.reset(100, 100, 100.0, 100.0);
-        paint_conic(
+        paint_conic_masked(
             &mut plane,
             50.0,
             50.0,
@@ -350,6 +440,8 @@ mod tests {
                     color: rgba(0, 0, 255, 1.0),
                 },
             ],
+            |_, _| 1.0,
+            |_, _, _| 1.0,
         );
         let top = plane.px[50];
         let right = plane.px[50 * 100 + 98];
