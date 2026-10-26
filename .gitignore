@@ -31,14 +31,23 @@ logs/
 *.log
 *.pid
 
+# Visual-parity PNG captures (regenerate via harness; keep golden JSON)
+**/tests/fixtures/**/ref/
+**/tests/fixtures/**/ref-fixed/
+
 # Agent / SDD scratch (briefs, diffs, screenshots, progress ledger)
 .superpowers/
 docs/superpowers/
+.swarm/
 
 # Python tooling
 scripts/__pycache__/
 **/__pycache__/
 *.py[cod]
+
+# JS tooling (visual-verify harness, etc.)
+node_modules/
+**/node_modules/
 
 # Build artifacts
 *.o
@@ -48,9 +57,5 @@ scripts/__pycache__/
 *.dll
 *.exe
 
-# CodeGraph local DB/cache (see .codegraph/.gitignore)
-.codegraph/*.db
-.codegraph/*.db-wal
-.codegraph/*.db-shm
-.codegraph/cache/
-.codegraph/.dirty
+# CodeGraph local index / DB / cache
+.codegraph/
