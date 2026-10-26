@@ -259,6 +259,8 @@ fn local_example_binaries() -> BTreeSet<String> {
             }
             path.file_stem()
                 .and_then(|stem| stem.to_str())
+                // Local `_foo.rs` debug probes stay out of inventory (and gitignore).
+                .filter(|stem| !stem.starts_with('_'))
                 .map(|stem| stem.to_string())
         })
         .collect()

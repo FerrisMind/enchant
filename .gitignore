@@ -38,6 +38,9 @@ logs/
 **/tests/fixtures/**/ref/
 **/tests/fixtures/**/ref-fixed/
 
+# Local one-shot debug example probes (not shipped)
+crates/enchant-iced/examples/_*.rs
+
 # Agent / SDD scratch (briefs, diffs, screenshots, progress ledger)
 .superpowers/
 docs/superpowers/
