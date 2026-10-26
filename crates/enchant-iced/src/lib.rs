@@ -27,12 +27,6 @@ pub use theme::MagicTheme;
 pub use widgets::gooey;
 pub use widgets::gravity;
 pub use widgets::{
-    Bend, CornerRadii, DissolveOptions, EVOLVE_DEFAULTS, Easing, EvolveOptions,
-    IMAGE_MELT_DEFAULTS, ImageMeltOptions, ItemBox, ItemOptions, Liquid, LiquidItem, LiquidLayout,
-    LiquidRaster, MOVE_DEFAULTS, Morph, Move, MoveOptions, Shadow, ShadowLayer, SpringConfig,
-    Transition, TransitionPreset,
-};
-pub use widgets::{
     AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, MetalBadge, MetalBadgeCore,
     MetalBadgeDefaults, MetalFx, MetalFxLayer, MetalFxMask, MetalFxOptions, MetalFxPreset,
     MetalFxResolvedTheme, MetalFxSurface, MetalFxTheme, MetalFxVariant, MetalGlowConfig,
@@ -100,6 +94,12 @@ pub use widgets::{
     shiny_text_color_for_mode, smooth_cursor, sparkles_text, spinning_text, striped_pattern,
     terminal, text_3d_flip, text_animate, text_reveal, theme_transition_overlay, tweet_card,
     typing_animation, video_text, warp_background, word_rotate,
+};
+pub use widgets::{
+    Bend, CornerRadii, DissolveOptions, EVOLVE_DEFAULTS, Easing, EvolveOptions,
+    IMAGE_MELT_DEFAULTS, ImageMeltOptions, ItemBox, ItemOptions, Liquid, LiquidItem, LiquidLayout,
+    LiquidRaster, MOVE_DEFAULTS, Morph, Move, MoveOptions, Shadow, ShadowLayer, SpringConfig,
+    Transition, TransitionPreset,
 };
 pub use widgets::{
     CursorSprite, CursorSpriteError, Dot, Gravity, GravityStatus, GravityTuning, Line,

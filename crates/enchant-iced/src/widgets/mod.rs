@@ -40,8 +40,8 @@ pub mod file_tree;
 pub mod flickering_grid;
 pub mod glare_hover;
 pub mod globe;
-pub mod gooey;
 pub mod glyph_matrix;
+pub mod gooey;
 pub mod grid_pattern;
 pub mod hero_video_dialog;
 pub mod hexagon_pattern;
@@ -148,13 +148,13 @@ pub use globe::{
     globe, globe_demo, globe_demo_colors_blended, globe_demo_colors_for_controller,
     globe_demo_colors_for_mode, globe_demo_colors_from_theme,
 };
+pub use glyph_matrix::{GlyphMatrixProps, glyph_matrix};
 pub use gooey::{
     Bend, CornerRadii, DissolveOptions, EVOLVE_DEFAULTS, Easing, EvolveOptions,
     IMAGE_MELT_DEFAULTS, ImageMeltOptions, ItemBox, ItemOptions, Liquid, LiquidItem, LiquidLayout,
     LiquidRaster, MOVE_DEFAULTS, Morph, Move, MoveOptions, Shadow, ShadowLayer, SpringConfig,
     Transition, TransitionPreset, parse_color,
 };
-pub use glyph_matrix::{GlyphMatrixProps, glyph_matrix};
 pub use grid_pattern::{GridPatternProps, grid_pattern};
 pub use hero_video_dialog::{
     HeroVideoAnimationStyle, HeroVideoDialogProps, HeroVideoDialogState, hero_video_dialog,
@@ -180,12 +180,12 @@ pub use metal_fx::{
     AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, METAL_TEXT_PAD_CSS, MetalBadge,
     MetalBadgeCore, MetalBadgeDefaults, MetalBendApplyTo, MetalBendConfig, MetalCursorLight,
     MetalCursorLightConfig, MetalCursorSpill, MetalCursorSprite, MetalFx, MetalFxLayer,
-    MetalFxMask, MetalFxOptions, MetalFxPreset, MetalFxResolvedTheme, MetalFxSurface,
-    MetalFxTheme, MetalFxVariant, MetalGlowConfig, MetalGlowMode, MetalReflection,
-    MetalReflectionAnchor, MetalReflectionOccluderConfig, MetalReflectionStyle, MetalText,
-    MetalTextDefaults, MetalTextFont, TextInnerShadow, bend_config, bend_config_revision,
-    cursor_light_config, cursor_light_config_revision, cursor_sprite, glyph_mask_image,
-    rasterize_text_mask, reflection_occluder_config, reset_bend_config, reset_cursor_light_config,
+    MetalFxMask, MetalFxOptions, MetalFxPreset, MetalFxResolvedTheme, MetalFxSurface, MetalFxTheme,
+    MetalFxVariant, MetalGlowConfig, MetalGlowMode, MetalReflection, MetalReflectionAnchor,
+    MetalReflectionOccluderConfig, MetalReflectionStyle, MetalText, MetalTextDefaults,
+    MetalTextFont, TextInnerShadow, bend_config, bend_config_revision, cursor_light_config,
+    cursor_light_config_revision, cursor_sprite, glyph_mask_image, rasterize_text_mask,
+    reflection_occluder_config, reset_bend_config, reset_cursor_light_config,
     reset_reflection_occluder_config, set_bend_config, set_cursor_light_config, set_cursor_sprite,
     set_reflection_occluder_config, text_inner_shadow_mask,
 };
