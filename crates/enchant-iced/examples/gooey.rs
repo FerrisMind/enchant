@@ -10,6 +10,7 @@
 //!   lags, stretches and drops its trailing tongue.
 //! - **Plus menu**: three satellites spring out of the main button with
 //!   staggered delayed transitions.
+//! - **Split pair**: one blank circle divides into two and merges back.
 //! - **Email field**: the field and submit button share one gooey pill and
 //!   grow apart when the field is used.
 //! - **Slider**: a draggable thumb rides the track with the `move` effect.
@@ -29,8 +30,8 @@ mod _shared;
 use std::time::Duration;
 
 use enchant_iced::{
-    Bend, CornerRadii, DissolveOptions, ImageMeltOptions, ItemBox, Liquid, LiquidItem, Morph,
-    Move, TransitionPreset, IMAGE_MELT_DEFAULTS,
+    Bend, CornerRadii, DissolveOptions, Easing, ItemBox, Liquid, LiquidItem, Morph, Move,
+    Transition, IMAGE_MELT_DEFAULTS,
 };
 use iced::widget::{
     button, column, container, image, row, scrollable, text, text_input, Space,
@@ -46,7 +47,21 @@ const ACCENT: Color = Color::from_rgb(0.30, 0.47, 0.96);
 const SURFACE: Color = Color::from_rgb(1.0, 1.0, 1.0);
 
 const SHADOW: &str = "0 1px 2px rgba(0, 0, 0, 0.05), 0 10px 30px rgba(0, 0, 0, 0.10)";
-const SLIDER_TRAVEL: f32 = 252.0;
+const SLIDER_TRAVEL: f32 = 188.0;
+
+/// Upstream plus-menu / split-pair motion curves.
+const BOUNCY_OPEN: Easing = Easing::CubicBezier {
+    x1: 0.34,
+    y1: 1.56,
+    x2: 0.64,
+    y2: 1.0,
+};
+const SNAPPY_CLOSE: Easing = Easing::CubicBezier {
+    x1: 0.22,
+    y1: 1.0,
+    x2: 0.36,
+    y2: 1.0,
+};
 
 pub fn main() -> iced::Result {
     iced::application(GooeyExample::new, GooeyExample::update, GooeyExample::view)
@@ -68,6 +83,7 @@ enum Message {
     Submit,
     Tick,
     Slider(Vector),
+    ToggleSplit,
 }
 
 struct GooeyExample {
@@ -75,6 +91,7 @@ struct GooeyExample {
     tab: usize,
     nudged: bool,
     menu_open: bool,
+    split_open: bool,
     email_open: bool,
     email: String,
     submitted: bool,
@@ -92,6 +109,7 @@ impl GooeyExample {
                 tab: 0,
                 nudged: false,
                 menu_open: false,
+                split_open: false,
                 email_open: false,
                 email: String::new(),
                 submitted: false,
@@ -123,6 +141,7 @@ impl GooeyExample {
             Message::Slider(offset) => {
                 self.slider = offset.x.clamp(0.0, SLIDER_TRAVEL);
             }
+            Message::ToggleSplit => self.split_open = !self.split_open,
         }
         Task::none()
     }
@@ -133,6 +152,12 @@ impl GooeyExample {
 
     fn view(&self) -> Element<'_, Message> {
         let _ = &self.theme_shell;
+        if let Ok(name) = std::env::var("GOOEY_PROBE") {
+            return container(self.probe_demo(&name))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into();
+        }
         let content = column(vec![
             text("Liquid gooey").size(30).color(INK).into(),
             text("A full Rust port of Libraries.dev liquid-gooey.")
@@ -142,6 +167,7 @@ impl GooeyExample {
             self.tabs_demo(),
             self.move_demo(),
             self.plus_menu_demo(),
+            self.split_pair_demo(),
             self.email_demo(),
             self.slider_demo(),
             self.drag_card_demo(),
@@ -156,6 +182,22 @@ impl GooeyExample {
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
+    }
+
+    fn probe_demo(&self, name: &str) -> Element<'_, Message> {
+        match name {
+            "tabs" => self.tabs_demo(),
+            "move" => self.move_demo(),
+            "plus" => self.plus_menu_demo(),
+            "split" => self.split_pair_demo(),
+            "email" => self.email_demo(),
+            "slider" => self.slider_demo(),
+            "drag" => self.drag_card_demo(),
+            "cards" => self.cards_melt_demo(),
+            "melt" => self.melt_pair_demo(),
+            "avatars" => self.avatar_group_demo(),
+            _ => self.tabs_demo(),
+        }
     }
 
     fn tabs_demo(&self) -> Element<'_, Message> {
@@ -237,37 +279,51 @@ impl GooeyExample {
         section(
             "Move chips",
             "The surface lags, stretches and drops a trailing tongue.",
-            column(vec![header.into(), liquid.into_element()])
+            column(vec![header.into(), centered(liquid.into_element())])
                 .spacing(10)
                 .into(),
         )
     }
 
     fn plus_menu_demo(&self) -> Element<'_, Message> {
-        let main = (90.0, 70.0);
+        let main = (80.0, 80.0);
         let open = self.menu_open;
+        let transition = if open {
+            Transition::Timed {
+                duration: Duration::from_millis(550),
+                easing: BOUNCY_OPEN,
+            }
+        } else {
+            Transition::Timed {
+                duration: Duration::from_millis(250),
+                easing: SNAPPY_CLOSE,
+            }
+        };
         let mut liquid = Liquid::free()
-            .size(Size::new(220.0, 160.0))
+            .size(Size::new(200.0, 140.0))
             .blur(6.0)
             .contrast(18.0)
             .fill(SURFACE)
             .shadow("0 2px 6px rgba(0, 0, 0, 0.08)");
         for (index, label) in ["A", "B", "C"].iter().enumerate() {
-            let targets = [(36.0, 36.0), (90.0, 6.0), (144.0, 36.0)];
+            let targets = [(26.0, 46.0), (80.0, 16.0), (134.0, 46.0)];
             let (x, y) = if open { targets[index] } else { main };
             liquid = liquid.push(
                 LiquidItem::new(
-                    button(text(*label).size(15).color(INK))
+                    button(text(if open { *label } else { "" }).size(15).color(INK))
                         .padding(0)
                         .width(Length::Fixed(40.0))
                         .height(Length::Fixed(40.0))
                         .style(transparent_button)
-                        .on_press(Message::ToggleMenu),
+                        .on_press_maybe(open.then_some(Message::ToggleMenu)),
                 )
                 .position(x, y)
-                .scale(if open { 1.0 } else { 0.0 })
-                .transition(TransitionPreset::Bouncy)
-                .delay(Duration::from_millis(40 * index as u64)),
+                .transition(transition)
+                .delay(Duration::from_millis(if open {
+                    40 * index as u64
+                } else {
+                    0
+                })),
             );
         }
         liquid = liquid.push(
@@ -289,35 +345,100 @@ impl GooeyExample {
         )
     }
 
+    fn split_pair_demo(&self) -> Element<'_, Message> {
+        let open = self.split_open;
+        let transition = if open {
+            Transition::Timed {
+                duration: Duration::from_millis(825),
+                easing: BOUNCY_OPEN,
+            }
+        } else {
+            Transition::Timed {
+                duration: Duration::from_millis(375),
+                easing: SNAPPY_CLOSE,
+            }
+        };
+        let mut liquid = Liquid::free()
+            .size(Size::new(200.0, 140.0))
+            .blur(6.0)
+            .contrast(18.0)
+            .fill(SURFACE)
+            .shadow("0 2px 6px rgba(0, 0, 0, 0.08)");
+        for direction in [-1.0_f32, 1.0] {
+            liquid = liquid.push(
+                LiquidItem::new(
+                    button(text("").size(15))
+                        .padding(0)
+                        .width(Length::Fixed(40.0))
+                        .height(Length::Fixed(40.0))
+                        .style(transparent_button)
+                        .on_press(Message::ToggleSplit),
+                )
+                .position(80.0, 80.0)
+                .offset(Vector::new(if open { direction * 34.0 } else { 0.0 }, 0.0))
+                .transition(transition),
+            );
+        }
+        section(
+            "Split pair",
+            "One circle divides into two; the liquid necks, stretches and lets go.",
+            liquid.into_element(),
+        )
+    }
+
     fn email_demo(&self) -> Element<'_, Message> {
         let open = self.email_open;
+        let transition = Transition::Timed {
+            duration: Duration::from_millis(600),
+            easing: Easing::CubicBezier {
+                x1: 0.22,
+                y1: 1.3,
+                x2: 0.71,
+                y2: 1.0,
+            },
+        };
         let field = container(
             text_input("you@example.com", &self.email)
                 .size(14)
-                .padding(0)
+                .padding(iced::Padding { top: 0.0, right: 44.0, bottom: 0.0, left: 18.0 })
                 .style(typed_input)
                 .on_input(Message::EmailChanged)
                 .on_submit(Message::Submit),
         )
-        .width(Length::Fixed(if open { 270.0 } else { 170.0 }))
-        .height(Length::Fixed(42.0))
+        .width(Length::Fixed(202.0))
+        .height(Length::Fixed(48.0))
         .align_y(Alignment::Center);
         let field = LiquidItem::new(field)
-            .transition(TransitionPreset::Snappy)
-            .radius(CornerRadii::uniform(21.0));
+            .position(44.0, 81.0)
+            .offset(Vector::new(if open { -32.0 } else { 0.0 }, 0.0))
+            .transition(transition)
+            .radius(CornerRadii::uniform(24.0));
         let submit = LiquidItem::new(
-            button(text(if self.submitted { "✓" } else { "→" }).size(17).color(INK))
-                .padding(0)
-                .width(Length::Fixed(48.0))
-                .height(Length::Fixed(42.0))
-                .style(transparent_button)
-                .on_press(Message::Submit),
+            button(
+                text(if !open {
+                    ""
+                } else if self.submitted {
+                    "✓"
+                } else {
+                    "→"
+                })
+                .size(17)
+                .color(INK),
+            )
+            .padding(0)
+            .width(Length::Fixed(44.0))
+            .height(Length::Fixed(44.0))
+            .style(transparent_button)
+            .on_press_maybe(open.then_some(Message::Submit)),
         )
-        .radius(CornerRadii::uniform(21.0));
-        let liquid = Liquid::row(0.0)
-            .padding(3.0)
-            .blur(4.0)
-            .contrast(20.0)
+        .position(200.0, 83.0)
+        .offset(Vector::new(if open { 34.0 } else { 0.0 }, 0.0))
+        .transition(transition)
+        .radius(CornerRadii::uniform(22.0));
+        let liquid = Liquid::free()
+            .size(Size::new(290.0, 210.0))
+            .blur(8.0)
+            .contrast(22.0)
             .fill(SURFACE)
             .shadow(SHADOW)
             .extend([field, submit]);
@@ -331,42 +452,42 @@ impl GooeyExample {
     fn slider_demo(&self) -> Element<'_, Message> {
         let thumb = LiquidItem::new(
             Space::new()
-                .width(Length::Fixed(26.0))
-                .height(Length::Fixed(26.0)),
+                .width(Length::Fixed(24.0))
+                .height(Length::Fixed(24.0)),
         )
-        .position(0.0, 9.0)
+        .position(14.0, 30.0)
         .offset(Vector::new(self.slider, 0.0))
-        .radius(13.0)
+        .radius(12.0)
         .draggable(true)
         .drag_bounds(ItemBox::new(0.0, 0.0, SLIDER_TRAVEL, 0.0))
         .on_drag(|_, offset| Message::Slider(offset))
         .move_effect(
             Move::new()
-                .springiness(0.76)
-                .wobble(0.58)
-                .stretch(0.32)
-                .trail(0.52),
+                .springiness(0.5)
+                .stretch(0.6)
+                .trail(0.35),
         );
         let track = LiquidItem::content(
-            container(Space::new().width(Length::Fixed(280.0)).height(Length::Fixed(8.0))).style(
+            container(Space::new().width(Length::Fixed(212.0)).height(Length::Fixed(8.0))).style(
                 |_theme| container::Style {
-                    background: Some(Color::from_rgba(0.10, 0.12, 0.16, 0.10).into()),
+                    background: Some(Color::from_rgba8(234, 234, 234, 179.0 / 255.0).into()),
                     border: Border {
+                        color: Color::from_rgba8(0, 0, 0, 14.0 / 255.0),
+                        width: 1.0,
                         radius: 4.0.into(),
-                        ..Border::default()
                     },
                     ..container::Style::default()
                 },
             ),
         )
-        .position(0.0, 18.0)
+        .position(14.0, 38.0)
         .behind(true);
         let liquid = Liquid::free()
-            .size(Size::new(300.0, 44.0))
-            .blur(3.0)
-            .contrast(22.0)
+            .size(Size::new(240.0, 80.0))
+            .blur(6.0)
+            .contrast(18.0)
             .fill(SURFACE)
-            .shadow("0 1px 5px rgba(0, 0, 0, 0.08)")
+            .shadow("0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 5px rgba(0, 0, 0, 0.08)")
             .extend([track, thumb]);
         let percent = (self.slider / SLIDER_TRAVEL * 100.0).round();
         let header = row(vec![
@@ -378,47 +499,54 @@ impl GooeyExample {
         section(
             "Move thumb",
             "Drag the thumb: the liquid trails, stretches and settles.",
-            column(vec![header.into(), liquid.into_element()])
-                .spacing(10)
-                .into(),
+            column(vec![
+                header.into(),
+                centered(liquid.into_element()),
+            ])
+            .spacing(10)
+            .into(),
         )
     }
 
     fn drag_card_demo(&self) -> Element<'_, Message> {
         let card = container(
-            column(vec![
-                text("Gooey Project").size(16).color(INK).into(),
-                text("45 files").size(12).color(MUTED).into(),
-                Space::new().height(Length::Fixed(12.0)).into(),
-                text("Drag me").size(11).color(ACCENT).into(),
+            row(vec![
+                container(text("G").size(11).color(MUTED))
+                    .width(Length::Fixed(32.0))
+                    .height(Length::Fixed(32.0))
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .style(chip_style)
+                    .into(),
+                text("Gooey Project").size(13).color(INK).into(),
+                text("45 files").size(13).color(MUTED).into(),
             ])
-            .spacing(4),
+            .spacing(8)
+            .align_y(Alignment::Center),
         )
-        .padding(18)
-        .width(Length::Fixed(220.0))
-        .height(Length::Fixed(140.0))
-        .style(card_style);
+        .padding(iced::Padding { top: 0.0, right: 16.0, bottom: 0.0, left: 8.0 })
+        .width(Length::Fixed(261.0))
+        .height(Length::Fixed(46.0))
+        .align_y(Alignment::Center);
         let liquid = Liquid::free()
-            .size(Size::new(380.0, 220.0))
-            .blur(5.0)
-            .contrast(20.0)
-            .waviness(1.2)
+            .size(Size::new(380.0, 210.0))
+            .blur(6.0)
+            .contrast(18.0)
             .fill(SURFACE)
-            .shadow("0 18px 40px rgba(15, 23, 42, 0.16)")
+            .shadow("0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)")
             .push(
                 LiquidItem::new(card)
-                    .position(80.0, 40.0)
-                    .radius(18.0)
+                    .position(59.5, 82.0)
+                    .radius(23.0)
                     .draggable(true)
-                    .drag_bounds(ItemBox::new(-150.0, -80.0, 300.0, 160.0))
+                    .drag_bounds(ItemBox::new(-59.5, -82.0, 119.0, 164.0))
                     .move_effect(
                         Move::new()
-                            .springiness(0.52)
-                            .wobble(0.62)
-                            .stretch(0.55)
-                            .trail(0.64),
+                            .springiness(1.0)
+                            .stretch(0.0)
+                            .trail(0.0),
                     )
-                    .bend(Bend::new().vertical(0.7).horizontal(0.45)),
+                    .bend(Bend::new().vertical(0.6).horizontal(0.35)),
             );
         section(
             "Drag card",
@@ -428,22 +556,39 @@ impl GooeyExample {
     }
 
     fn cards_melt_demo(&self) -> Element<'_, Message> {
+        let dissolve = DissolveOptions {
+            warp: 26.0,
+            blur: 5.0,
+            mix: 0.7,
+            gravity: 60.0,
+            taper: 0.95,
+            warp_freq: 1.0,
+            flow_speed: 26.0,
+            detail: 2,
+            zone: Some(26.0),
+            range: Some(44.0),
+            release_ms: 110.0,
+            fade_ms: Some(320.0),
+            ..DissolveOptions::default()
+        };
         let mut liquid = Liquid::free()
-            .size(Size::new(380.0, 220.0))
-            .blur(5.0)
-            .contrast(20.0)
+            .size(Size::new(320.0, 210.0))
+            .blur(6.0)
+            .contrast(18.0)
             .fill(SURFACE)
             .shadow(SHADOW);
-        for (index, handle) in self.photos.iter().take(3).enumerate() {
+        for (index, handle) in self.photos.iter().take(2).enumerate() {
+            let rest = if index == 0 { -78.0 } else { 78.0 };
             liquid = liquid.push(
                 LiquidItem::image(handle.clone())
-                    .size(100.0, 100.0)
-                    .position(20.0 + index as f32 * 120.0, 60.0)
-                    .radius(18.0)
-                    .morph(Morph::new().blob_inset(2.0).bridge_grow(12.0))
-                    .dissolve(DissolveOptions::new().range(90.0))
+                    .size(96.0, 96.0)
+                    .position(112.0, 57.0)
+                    .offset(Vector::new(rest, 0.0))
+                    .radius(16.0)
+                    .morph(Morph::new().blob_inset(2.0).bridge_grow(10.0))
+                    .dissolve(dissolve)
                     .draggable(true)
-                    .drag_bounds(ItemBox::new(-100.0, -55.0, 200.0, 110.0)),
+                    .drag_bounds(ItemBox::new(-106.0, -51.0, 212.0, 102.0)),
             );
         }
         section(
@@ -454,26 +599,26 @@ impl GooeyExample {
     }
 
     fn melt_pair_demo(&self) -> Element<'_, Message> {
-        let options = ImageMeltOptions {
-            waviness: 14.0,
-            reach: 0.9,
-            ..IMAGE_MELT_DEFAULTS
-        };
         let mut liquid = Liquid::free()
-            .size(Size::new(380.0, 240.0))
-            .blur(4.0)
+            .size(Size::new(380.0, 200.0))
+            .blur(6.0)
             .contrast(18.0)
             .fill(SURFACE)
             .shadow(SHADOW);
         for (index, handle) in self.photos.iter().skip(1).take(2).enumerate() {
+            let (x, bounds) = if index == 0 {
+                (96.0, ItemBox::new(-96.0, -58.0, 296.0, 116.0))
+            } else {
+                (200.0, ItemBox::new(-200.0, -58.0, 296.0, 116.0))
+            };
             liquid = liquid.push(
                 LiquidItem::image(handle.clone())
-                    .size(150.0, 150.0)
-                    .position(30.0 + index as f32 * 170.0, 45.0)
-                    .radius(26.0)
-                    .melt(options)
+                    .size(84.0, 84.0)
+                    .position(x, 58.0)
+                    .radius(16.0)
+                    .melt(IMAGE_MELT_DEFAULTS)
                     .draggable(true)
-                    .drag_bounds(ItemBox::new(-85.0, -50.0, 170.0, 100.0)),
+                    .drag_bounds(bounds),
             );
         }
         section(
@@ -520,6 +665,13 @@ impl GooeyExample {
             liquid.into_element(),
         )
     }
+}
+
+fn centered<'a>(body: Element<'a, Message>) -> Element<'a, Message> {
+    container(body)
+        .width(Length::Fill)
+        .align_x(Alignment::Center)
+        .into()
 }
 
 fn section<'a>(
@@ -595,15 +747,14 @@ fn typed_input(_theme: &Theme, _status: text_input::Status) -> text_input::Style
     }
 }
 
-fn card_style(_theme: &Theme) -> container::Style {
+fn chip_style(_theme: &Theme) -> container::Style {
     container::Style {
-        background: None,
+        background: Some(Color::from_rgba8(235, 235, 236, 77.0 / 255.0).into()),
         border: Border {
-            color: Color::from_rgba8(15, 23, 42, 22.0 / 255.0),
+            color: Color::from_rgba8(0, 0, 0, 13.0 / 255.0),
             width: 1.0,
-            radius: 14.0.into(),
+            radius: 40.0.into(),
         },
-        text_color: Some(INK),
         ..container::Style::default()
     }
 }
