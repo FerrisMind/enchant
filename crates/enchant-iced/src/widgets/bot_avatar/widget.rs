@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+use std::sync::mpsc::{Receiver, channel};
 use std::time::Instant;
 
 use iced::advanced::image::{self, FilterMethod, Image, Renderer as _};
@@ -923,6 +924,32 @@ impl<Message> BotAvatar<Message> {
         h.finish()
     }
 
+    fn spawn_frame(&self, inner: &mut Inner, pose: Pose, density: f32, key: u64) {
+        let cfg = self.render_config(&pose);
+        let size = self.size;
+        let (tx, rx) = channel();
+        rayon::spawn(move || {
+            let frame = draw_frame(size, density, &pose, &cfg);
+            let (w, h, rgba) = to_straight_rgba(&frame);
+            let _ = tx.send((w, h, rgba, key));
+        });
+        inner.pending = Some(Pending { rx });
+    }
+
+    fn poll_frame(&self, inner: &mut Inner) -> bool {
+        let done = match &inner.pending {
+            Some(pending) => pending.rx.try_recv().ok(),
+            None => None,
+        };
+        if let Some((w, h, rgba, key)) = done {
+            inner.pending = None;
+            inner.image = Some(image::Handle::from_rgba(w, h, rgba));
+            inner.key = key;
+            return true;
+        }
+        false
+    }
+
     fn sync_sim(&self, inner: &mut Inner) {
         let seed = self.seed_value();
         if inner.seed != seed {
@@ -938,6 +965,13 @@ impl<Message> BotAvatar<Message> {
     }
 }
 
+/// One frame being rasterized on a worker thread. The widget keeps drawing
+/// the previous frame until this one lands, so the UI thread never waits for
+/// the material bakes or the slice stack.
+struct Pending {
+    rx: Receiver<(u32, u32, Vec<u8>, u64)>,
+}
+
 struct Inner {
     sim: BotAvatarSim,
     seed: f32,
@@ -946,6 +980,7 @@ struct Inner {
     image: Option<image::Handle>,
     key: u64,
     scale: f32,
+    pending: Option<Pending>,
 }
 
 impl Inner {
@@ -958,6 +993,7 @@ impl Inner {
             image: None,
             key: u64::MAX,
             scale: 1.0,
+            pending: None,
         }
     }
 }
@@ -994,8 +1030,15 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
 
     fn state(&self) -> widget::tree::State {
         let seed = self.seed_value();
+        let mut inner = Inner::new(seed, self.state);
+        // Start the first frame immediately so every avatar's material bake
+        // runs alongside the others; `draw` waits for this one frame only.
+        let pose = self.current_pose(&inner);
+        let density = self.pixel_density.unwrap_or(inner.scale);
+        let key = self.frame_key(&pose, density);
+        self.spawn_frame(&mut inner, pose, density, key);
         widget::tree::State::new(AvatarState {
-            inner: RefCell::new(Inner::new(seed, self.state)),
+            inner: RefCell::new(inner),
         })
     }
 
@@ -1059,6 +1102,7 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
         let Event::Window(window::Event::RedrawRequested(now)) = event else {
             return;
         };
+        let completed = self.poll_frame(&mut inner);
         if self.is_animated() {
             let dt = inner.last.map_or(0.0, |last| {
                 now.saturating_duration_since(last).as_secs_f64()
@@ -1088,9 +1132,23 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
                 inner.sim.set_pointer(0.0, 0.0, 0.0);
             }
             inner.sim.update((dt * f64::from(self.speed)) as f32);
+
+            // Render the next frame off the UI thread. While it runs the
+            // widget keeps drawing the last finished one.
+            if inner.image.is_some() && inner.pending.is_none() {
+                let pose = self.current_pose(&inner);
+                let density = self.pixel_density.unwrap_or(inner.scale);
+                let key = self.frame_key(&pose, density);
+                if inner.key != key {
+                    self.spawn_frame(&mut inner, pose, density, key);
+                }
+            }
             shell.request_redraw();
         } else {
             inner.last = None;
+            if completed || inner.pending.is_some() {
+                shell.request_redraw();
+            }
         }
     }
 
@@ -1114,12 +1172,27 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
         let pose = self.current_pose(&inner);
         let density = self.pixel_density.unwrap_or(inner.scale);
         let key = self.frame_key(&pose, density);
-        if inner.key != key || inner.image.is_none() {
+        // Nothing to blit yet: wait for the frame started in `state`, whose
+        // bake runs alongside the other avatars' rather than after them.
+        if inner.image.is_none()
+            && let Some(pending) = inner.pending.take()
+            && let Ok((w, h, rgba, done_key)) = pending.rx.recv()
+        {
+            inner.image = Some(image::Handle::from_rgba(w, h, rgba));
+            inner.key = done_key;
+        }
+        // The first frame has nothing to show yet, and a still avatar's
+        // props change without a clock to wait on: paint those here. Live
+        // avatars are refreshed by `spawn_frame` on a worker instead.
+        let still = !self.is_animated();
+        let stale = inner.image.is_none() || (still && inner.key != key);
+        if stale {
             let cfg = self.render_config(&pose);
             let frame = draw_frame(self.size, density, &pose, &cfg);
             let (w, h, rgba) = to_straight_rgba(&frame);
             inner.image = Some(image::Handle::from_rgba(w, h, rgba));
             inner.key = key;
+            inner.pending = None;
         }
         let Some(handle) = inner.image.clone() else {
             return;
