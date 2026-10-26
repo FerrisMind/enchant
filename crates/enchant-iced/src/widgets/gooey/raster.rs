@@ -21,17 +21,15 @@
 
 use std::sync::{Arc, Mutex, OnceLock};
 
-use iced::{Color, Point, Rectangle, Size};
 use iced::advanced::image::Handle;
+use iced::{Color, Point, Rectangle, Size};
 
 use crate::widgets::voice_glow::blur::blur;
 use crate::widgets::voice_glow::noise::Turbulence;
 
-use super::geometry::{
-    self, CornerRadii, RectPx,
-};
-use super::options::{DissolveOptions, ImageMeltOptions, ShadowLayer};
+use super::geometry::{self, CornerRadii, RectPx};
 use super::options::ItemBox;
+use super::options::{DissolveOptions, ImageMeltOptions, ShadowLayer};
 
 /// Alpha-binarize matrix used before spread morphology (upstream `BINARIZE`).
 const BINARIZE_SLOPE: f32 = 60.0;
@@ -52,10 +50,6 @@ impl Layer {
             height,
             data: vec![[0.0; 4]; width * height],
         }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.width == 0 || self.height == 0
     }
 
     fn over_pixel(&mut self, x: usize, y: usize, src: [f32; 4]) {
@@ -284,7 +278,12 @@ pub(crate) struct MeltPaint {
 /// One item as the rasterizer sees it (all logical coordinates).
 #[derive(Debug, Clone)]
 pub(crate) struct RasterItem {
+    /// Spring-lagged liquid body (after blob inset / bridge growth).
     pub bounds: ItemBox,
+    /// The item's own content box, before the liquid body is inflated or
+    /// shrunk. Images and melt seams use this so the picture never stretches
+    /// with the goo.
+    pub content: ItemBox,
     pub radii: CornerRadii,
     pub image: Option<Arc<DecodedImage>>,
     pub content_blur: f32,
@@ -367,7 +366,9 @@ impl DecodedImage {
     }
 }
 
-static DECODE_CACHE: OnceLock<Mutex<Vec<(Handle, Option<Arc<DecodedImage>>)>>> = OnceLock::new();
+static DECODE_CACHE: OnceLock<Mutex<Vec<DecodeEntry>>> = OnceLock::new();
+
+type DecodeEntry = (Handle, Option<Arc<DecodedImage>>);
 
 /// Decodes (and caches) an iced image handle.
 pub(crate) fn decode(handle: &Handle) -> Option<Arc<DecodedImage>> {
@@ -473,12 +474,8 @@ pub(crate) fn render(
         let radii = item.radii.scaled(density);
         if let Some((bend_y, bend_x)) = item.bend {
             if bend_y.abs() > 0.35 || bend_x.abs() > 0.35 {
-                let points = geometry::bend_polygon(
-                    rect,
-                    radii,
-                    bend_y * density,
-                    bend_x * density,
-                );
+                let points =
+                    geometry::bend_polygon(rect, radii, bend_y * density, bend_x * density);
                 geometry::fill_polygon(&mut shape, width, height, &points);
             } else {
                 geometry::fill_rrect(&mut shape, width, height, rect, radii);
@@ -598,13 +595,15 @@ pub(crate) fn render(
         behind.fill_mask(&band, shadow.color);
     }
 
-    // 8. Image content and the melt overlays.
-    for item in items {
+    // 8. Image content and the dissolve overlays. Image-melt items paint
+    //    nothing individually: the pair compositor owns their pixels.
+    for item in items.iter().filter(|item| item.melt.is_none()) {
         let Some(image) = &item.image else {
             continue;
         };
         paint_image_item(item, image, density, &mut content, &mut above);
     }
+    paint_image_melt(items, density, width, height, &mut content);
 
     #[cfg(debug_assertions)]
     if std::env::var_os("GOOEY_AUDIT").is_some() {
@@ -630,12 +629,13 @@ fn paint_image_item(
     content: &mut Layer,
     above: &mut Layer,
 ) {
+    let card = item.content;
     let rect = RectPx::from_rect(
         Rectangle {
-            x: item.bounds.origin.x,
-            y: item.bounds.origin.y,
-            width: item.bounds.size.width,
-            height: item.bounds.size.height,
+            x: card.origin.x,
+            y: card.origin.y,
+            width: card.size.width,
+            height: card.size.height,
         },
         density,
     );
@@ -660,10 +660,10 @@ fn paint_image_item(
                 continue;
             }
             let local = Point::new(
-                px / density - item.bounds.origin.x,
-                py / density - item.bounds.origin.y,
+                px / density - card.origin.x,
+                py / density - card.origin.y,
             );
-            let c = image.sample_cover(local, item.bounds.size);
+            let c = image.sample_cover(local, card.size);
             let a = c[3] * alpha;
             layer.data[y * w + x] = [c[0] * a, c[1] * a, c[2] * a, a];
         }
@@ -676,37 +676,12 @@ fn paint_image_item(
     }
 
     // Edge hole / crisp erase masks on the original image.
-    if let Some(paint) = item.dissolve.as_ref() {
-        if let Some(hole) = &paint.hole {
-            for y in 0..h {
-                let local_y = (y as f32 + y0 as f32 + 0.5) / density - item.bounds.origin.y;
-                for x in 0..w {
-                    let local_x = (x as f32 + x0 as f32 + 0.5) / density - item.bounds.origin.x;
-                    let keep = hole_alpha(hole, Point::new(local_x, local_y));
-                    if keep < 1.0 {
-                        let p = &mut layer.data[y * w + x];
-                        p[0] *= keep;
-                        p[1] *= keep;
-                        p[2] *= keep;
-                        p[3] *= keep;
-                    }
-                }
-            }
-        }
-    }
-    if let Some(melt) = item.melt.as_ref().filter(|m| m.strength > 0.001) {
-        let local_seam = Point::new(
-            melt.seam.x - item.bounds.origin.x,
-            melt.seam.y - item.bounds.origin.y,
-        );
-        let er = melt.d * 0.9;
-        let feather = (melt.d * 0.35).max(2.0);
+    if let Some(hole) = item.dissolve.as_ref().and_then(|paint| paint.hole.as_ref()) {
         for y in 0..h {
-            let local_y = (y as f32 + y0 as f32 + 0.5) / density - item.bounds.origin.y;
+            let local_y = (y as f32 + y0 as f32 + 0.5) / density - card.origin.y;
             for x in 0..w {
-                let local_x = (x as f32 + x0 as f32 + 0.5) / density - item.bounds.origin.x;
-                let d = distance(Point::new(local_x, local_y), local_seam);
-                let keep = smoothstep((d - er + feather) / feather);
+                let local_x = (x as f32 + x0 as f32 + 0.5) / density - card.origin.x;
+                let keep = hole_alpha(hole, Point::new(local_x, local_y));
                 if keep < 1.0 {
                     let p = &mut layer.data[y * w + x];
                     p[0] *= keep;
@@ -717,14 +692,10 @@ fn paint_image_item(
             }
         }
     }
-
     content.composite_over(&layer, (x0, y0));
 
     if let Some(paint) = item.dissolve.as_ref().filter(|d| d.strength > 0.001) {
         paint_dissolve(item, image, paint, density, above);
-    }
-    if let Some(paint) = item.melt.as_ref().filter(|m| m.strength > 0.001) {
-        paint_melt(item, image, paint, density, above);
     }
 }
 
@@ -751,7 +722,8 @@ fn audit_layer(name: &str, layer: &Layer) {
     }
 }
 
-fn image_blur_pad(item: &RasterItem) -> f32 {    let mut pad = item.content_blur * 3.0;
+fn image_blur_pad(item: &RasterItem) -> f32 {
+    let mut pad = item.content_blur * 3.0;
     if let Some(paint) = &item.dissolve {
         pad = pad
             .max((paint.options.blur * 3.0) + paint.options.warp * 1.5)
@@ -797,8 +769,7 @@ fn paint_dissolve(
     let by = (paint.seam.y + guy * paint.d * 0.05) * density;
     let taper = opts.taper.clamp(0.0, 1.0);
     let settle = 1.0 - 0.45 * smoothstep((paint.embed * 2.2).min(1.0));
-    let k_flow = ((g_amt + paint.gap.max(0.0)) / (8.0_f32.max(2.0 * paint.d)))
-        .min(2.2)
+    let k_flow = ((g_amt + paint.gap.max(0.0)) / (8.0_f32.max(2.0 * paint.d))).min(2.2)
         * (0.5 + taper)
         * settle;
     let anchor_x = paint.seam.x - gux * paint.d;
@@ -822,12 +793,10 @@ fn paint_dissolve(
                 blur: opts.blur * blur_k * e,
                 warp: opts.warp * warp_k * e,
                 mix: opts.mix * e,
-                gravity: g_amt,
                 flow: k_flow * (0.4 + 0.6 * t),
                 angle: g_deg,
                 anchor: Point::new(anchor_x, anchor_y),
                 axis_x: paint.axis_x,
-                taper,
                 phase,
                 octaves: opts.detail,
                 elong,
@@ -837,9 +806,24 @@ fn paint_dissolve(
         if blur_k > 0.0 {
             let sigma = opts.blur * blur_k * e * density;
             let mut tmp = Vec::new();
-            blur(&mut layer.data, layer.width, layer.height, sigma, sigma, &mut tmp);
+            blur(
+                &mut layer.data,
+                layer.width,
+                layer.height,
+                sigma,
+                sigma,
+                &mut tmp,
+            );
         }
-        erode(&mut layer, opts.mix * e, density, opts.detail, paint.phase, t, offset);
+        erode(
+            &mut layer,
+            opts.mix * e,
+            density,
+            opts.detail,
+            paint.phase,
+            t,
+            offset,
+        );
         above.composite_over(&layer, offset);
     }
 
@@ -856,12 +840,10 @@ fn paint_dissolve(
                 blur: 0.0,
                 warp: 0.0,
                 mix: 0.0,
-                gravity: 0.0,
                 flow: 0.0,
                 angle: g_deg,
                 anchor: paint.seam,
                 axis_x: paint.axis_x,
-                taper,
                 phase: paint.phase,
                 octaves: opts.detail,
                 elong,
@@ -870,64 +852,390 @@ fn paint_dissolve(
         );
         let sigma = seam_blur * e * density;
         let mut tmp = Vec::new();
-        blur(&mut layer.data, layer.width, layer.height, sigma, sigma, &mut tmp);
+        blur(
+            &mut layer.data,
+            layer.width,
+            layer.height,
+            sigma,
+            sigma,
+            &mut tmp,
+        );
         above.composite_over(&layer, offset);
     }
 }
 
-fn paint_melt(
-    item: &RasterItem,
-    image: &Arc<DecodedImage>,
-    paint: &MeltPaint,
+/// Paints the first two image-melt items as one pair, mirroring upstream
+/// `imageMelt.tsx`: a molten goo silhouette whose colours come from a wider
+/// blur clipped to the goo alpha, a marbled pass over the touch zone, and the
+/// two crisp faces erased back from the seam.
+fn paint_image_melt(
+    items: &[RasterItem],
     density: f32,
-    above: &mut Layer,
+    width: usize,
+    height: usize,
+    content: &mut Layer,
 ) {
-    let s = paint.strength.clamp(0.0, 1.0);
-    let e = s * s * (3.0 - 2.0 * s);
-    if e <= 0.001 {
+    let mut melt_items = items
+        .iter()
+        .filter(|item| item.melt.is_some() && item.image.is_some());
+    let (Some(a), Some(b)) = (melt_items.next(), melt_items.next()) else {
+        return;
+    };
+    let (Some(image_a), Some(image_b)) = (a.image.as_ref(), b.image.as_ref()) else {
+        return;
+    };
+    let (Some(melt_a), Some(melt_b)) = (a.melt.as_ref(), b.melt.as_ref()) else {
+        return;
+    };
+    let opts = melt_a.options;
+    let prox = melt_a.strength.min(melt_b.strength).clamp(0.0, 1.0);
+
+    let mut molten = Layer::new(width, height);
+    draw_melt_card(&mut molten, a, image_a, density);
+    draw_melt_card(&mut molten, b, image_b, density);
+    if prox <= 0.001 {
+        content.composite_over(&molten, (0, 0));
         return;
     }
-    let opts = &paint.options;
-    let dx = paint.neighbor_center.x - paint.seam.x;
-    let dy = paint.neighbor_center.y - paint.seam.y;
-    let len = (dx * dx + dy * dy).sqrt();
-    let (gux, guy) = if len > 1e-4 {
-        (dx / len, dy / len)
-    } else {
-        (1.0, 0.0)
+
+    let ca = a.content.center();
+    let cb = b.content.center();
+    let (aw, ah) = (a.content.size.width, a.content.size.height);
+    let (bw, bh) = (b.content.size.width, b.content.size.height);
+    let reach = opts.reach.max(0.0);
+    let r_a = (aw.hypot(ah) / 2.0) * reach * prox;
+    let r_b = (bw.hypot(bh) / 2.0) * reach * prox;
+    let seam = Point::new((ca.x + cb.x) / 2.0, (ca.y + cb.y) / 2.0);
+    let dxc = cb.x - ca.x;
+    let dyc = cb.y - ca.y;
+    let dc = dxc.hypot(dyc).max(1e-3);
+    let (tx, ty) = (-dyc / dc, dxc / dc);
+    let ovx = ((aw + bw) / 2.0 - dxc.abs()).max(0.0);
+    let ovy = ((ah + bh) / 2.0 - dyc.abs()).max(0.0);
+    let tan_half = 0.5 * (ovx * tx.abs() + ovy * ty.abs()) * prox;
+    let seam_angle = ty.atan2(tx);
+    let mix_amt = (opts.mix * prox).clamp(0.0, 1.0);
+    let blur_eff = (2.0 + (opts.blur - 2.0) * prox).max(0.0);
+    let warp_eff = opts.warp * prox;
+    let color_blur = (blur_eff * 2.5).max(0.0);
+    let edge_soft = (0.4 + (2.0 + opts.blur * 0.8) * prox).max(0.0);
+    let intercept = ((0.5 - opts.contrast * (5.0 / 12.0)) * 100.0).round() / 100.0;
+    let goo_alpha = |layer: &Layer| -> Vec<f32> {
+        layer
+            .data
+            .iter()
+            .map(|p| (opts.contrast * p[3] + intercept).clamp(0.0, 1.0))
+            .collect()
     };
-    let angle = guy.atan2(gux);
-    let flow = if paint.overlap { 0.35 } else { 0.8 };
-    let (mut layer, offset) = warp_image(
-        item,
-        image,
-        density,
-        WarpSpec {
-            center: paint.seam,
-            mask_radius: paint.d,
-            blur: 0.0,
-            warp: (opts.waviness + opts.warp) * e,
-            mix: opts.mix * e,
-            gravity: opts.gravity * 8.0 * e,
-            flow,
-            angle,
-            anchor: Point::new(
-                paint.seam.x - gux * paint.d,
-                paint.seam.y - guy * paint.d,
-            ),
-            axis_x: gux.abs() >= guy.abs(),
-            taper: 0.7,
-            phase: paint.phase,
-            octaves: 2,
-            elong: 1.0,
-            opacity: e,
-        },
-    );
-    let sigma = (opts.blur + opts.mix_blur * opts.mix) * e * density;
+
+    // Molten: blur mixes the colours, a wider blur supplies the colour field,
+    // and the goo alpha clips it back into a liquid shape.
+    let mut goo = molten.clone();
     let mut tmp = Vec::new();
-    blur(&mut layer.data, layer.width, layer.height, sigma, sigma, &mut tmp);
-    erode(&mut layer, opts.mix * e, density, 2, paint.phase, 0.5, offset);
-    above.composite_over(&layer, offset);
+    blur(
+        &mut goo.data,
+        width,
+        height,
+        blur_eff * density,
+        blur_eff * density,
+        &mut tmp,
+    );
+    let mut mix = molten.clone();
+    blur(
+        &mut mix.data,
+        width,
+        height,
+        color_blur * density,
+        color_blur * density,
+        &mut tmp,
+    );
+    let goo_shape = goo_alpha(&goo);
+    for (p, a_goo) in mix.data.iter_mut().zip(goo_shape.iter()) {
+        p[0] *= a_goo;
+        p[1] *= a_goo;
+        p[2] *= a_goo;
+        p[3] *= a_goo;
+    }
+    let mut melt_layer = if warp_eff > 0.01 {
+        displace_rgba(
+            &mix,
+            density,
+            warp_eff,
+            ((2.0 + opts.waviness * 1.2) / 1000.0, (2.0 + opts.waviness * 1.2) / 1000.0),
+            MeltNoise::warp(),
+        )
+    } else {
+        mix
+    };
+    solidify_rgba(&mut melt_layer.data, 3);
+    blur(
+        &mut melt_layer.data,
+        width,
+        height,
+        0.6 * density,
+        0.6 * density,
+        &mut tmp,
+    );
+    content.composite_over(&melt_layer, (0, 0));
+
+    // Marble: nested large-scale displacements fold both palettes into
+    // streaks inside the touch zone, clipped to the goo alpha.
+    if mix_amt > 0.01 {
+        let mut marble = molten.clone();
+        blur(
+            &mut marble.data,
+            width,
+            height,
+            opts.mix_blur * density,
+            opts.mix_blur * density,
+            &mut tmp,
+        );
+        marble = displace_rgba(
+            &marble,
+            density,
+            mix_amt * 90.0,
+            (0.011, 0.011),
+            MeltNoise::marble_a(),
+        );
+        marble = displace_rgba(
+            &marble,
+            density,
+            mix_amt * 50.0,
+            (0.019, 0.019),
+            MeltNoise::marble_b(),
+        );
+        solidify_rgba(&mut marble.data, 2);
+        blur(
+            &mut marble.data,
+            width,
+            height,
+            0.6 * density,
+            0.6 * density,
+            &mut tmp,
+        );
+        let zone = ellipse_mask(
+            width,
+            height,
+            density,
+            seam,
+            (r_a + r_b) / 2.0 + tan_half,
+            ((r_a + r_b) / 2.0) * opts.gravity.max(0.0),
+            seam_angle,
+            opts.fade.max(0.0),
+        );
+        for (p, (zone, a_goo)) in marble
+            .data
+            .iter_mut()
+            .zip(zone.iter().zip(goo_shape.iter()))
+        {
+            let keep = zone * a_goo;
+            p[0] *= keep;
+            p[1] *= keep;
+            p[2] *= keep;
+            p[3] *= keep;
+        }
+        content.composite_over(&marble, (0, 0));
+    }
+
+    // Crisp faces: each card minus a blurred seam-spanning erase ellipse.
+    for (item, image, other_r) in [(a, image_a, r_b), (b, image_b, r_a)] {
+        let mut face = Layer::new(width, height);
+        draw_melt_card(&mut face, item, image, density);
+        let mask = crisp_mask(
+            width,
+            height,
+            density,
+            item,
+            seam,
+            other_r + tan_half,
+            other_r,
+            seam_angle,
+            edge_soft,
+            opts.fade.max(0.0),
+        );
+        for (p, m) in face.data.iter_mut().zip(mask.iter()) {
+            p[0] *= m;
+            p[1] *= m;
+            p[2] *= m;
+            p[3] *= m;
+        }
+        content.composite_over(&face, (0, 0));
+    }
+}
+
+fn draw_melt_card(layer: &mut Layer, item: &RasterItem, image: &DecodedImage, density: f32) {
+    let card = item.content;
+    let rect = RectPx::from_rect(
+        Rectangle {
+            x: card.origin.x,
+            y: card.origin.y,
+            width: card.size.width,
+            height: card.size.height,
+        },
+        density,
+    );
+    let radii = item.radii.scaled(density);
+    let x0 = rect.x.floor().max(0.0) as usize;
+    let y0 = rect.y.floor().max(0.0) as usize;
+    let x1 = (rect.right().ceil().max(0.0) as usize).min(layer.width);
+    let y1 = (rect.bottom().ceil().max(0.0) as usize).min(layer.height);
+    for y in y0..y1 {
+        let py = y as f32 + 0.5;
+        for x in x0..x1 {
+            let px = x as f32 + 0.5;
+            let alpha = geometry::coverage(px, py, rect, radii);
+            if alpha <= 0.0 {
+                continue;
+            }
+            let local = Point::new(px / density - card.origin.x, py / density - card.origin.y);
+            let c = image.sample_cover(local, card.size);
+            let a = c[3] * alpha;
+            layer.over_pixel(x, y, [c[0] * a, c[1] * a, c[2] * a, a]);
+        }
+    }
+}
+
+fn solidify_rgba(data: &mut [[f32; 4]], passes: usize) {
+    for _ in 0..passes {
+        for p in data.iter_mut() {
+            let inv = 1.0 - p[3];
+            p[0] += p[0] * inv;
+            p[1] += p[1] * inv;
+            p[2] += p[2] * inv;
+            p[3] += p[3] * inv;
+        }
+    }
+}
+
+fn displace_rgba(
+    layer: &Layer,
+    density: f32,
+    scale: f32,
+    freq: (f32, f32),
+    noise: &Turbulence,
+) -> Layer {
+    let mut out = Layer::new(layer.width, layer.height);
+    if scale.abs() < 0.01 {
+        out.data.copy_from_slice(&layer.data);
+        return out;
+    }
+    let amount = scale * density;
+    for y in 0..layer.height {
+        for x in 0..layer.width {
+            let lx = (x as f32 + 0.5) / density;
+            let ly = (y as f32 + 0.5) / density;
+            let n1 = melt_noise(noise, lx, ly, freq, 2);
+            let n2 = melt_noise(noise, lx + 137.0, ly - 71.0, freq, 2);
+            let sx = (x as f32 + (n1 - 0.5) * amount).round() as i32;
+            let sy = (y as f32 + (n2 - 0.5) * amount).round() as i32;
+            if sx < 0 || sy < 0 || sx as usize >= layer.width || sy as usize >= layer.height {
+                continue;
+            }
+            out.data[y * layer.width + x] = layer.data[sy as usize * layer.width + sx as usize];
+        }
+    }
+    out
+}
+
+fn melt_noise(noise: &Turbulence, x: f32, y: f32, freq: (f32, f32), octaves: u32) -> f32 {
+    noise.fractal_red(
+        f64::from(x),
+        f64::from(y),
+        (f64::from(freq.0), f64::from(freq.1)),
+        octaves.clamp(1, 4),
+    )
+}
+
+/// A blurred, rotated ellipse coverage plane (the seam erase / marble zone).
+fn ellipse_mask(
+    width: usize,
+    height: usize,
+    density: f32,
+    center: Point,
+    radius_x: f32,
+    radius_y: f32,
+    angle: f32,
+    blur: f32,
+) -> Vec<f32> {
+    let mut mask = vec![0.0_f32; width * height];
+    let rx = radius_x.max(0.01);
+    let ry = radius_y.max(0.01);
+    let (sin, cos) = angle.sin_cos();
+    for y in 0..height {
+        let py = (y as f32 + 0.5) / density - center.y;
+        for x in 0..width {
+            let px = (x as f32 + 0.5) / density - center.x;
+            let u = px * cos + py * sin;
+            let v = -px * sin + py * cos;
+            if (u / rx).powi(2) + (v / ry).powi(2) <= 1.0 {
+                mask[y * width + x] = 1.0;
+            }
+        }
+    }
+    blur_plane(&mut mask, width, height, blur * density, blur * density);
+    mask
+}
+
+/// The crisp-face mask: the card's rounded rect (softened) minus the seam
+/// erase ellipse.
+#[allow(clippy::too_many_arguments)]
+fn crisp_mask(
+    width: usize,
+    height: usize,
+    density: f32,
+    item: &RasterItem,
+    seam: Point,
+    radius_x: f32,
+    radius_y: f32,
+    angle: f32,
+    edge_soft: f32,
+    fade: f32,
+) -> Vec<f32> {
+    let card = item.content;
+    let rect = RectPx::from_rect(
+        Rectangle {
+            x: card.origin.x,
+            y: card.origin.y,
+            width: card.size.width,
+            height: card.size.height,
+        },
+        density,
+    );
+    let radii = item.radii.scaled(density);
+    let mut mask = vec![0.0_f32; width * height];
+    for y in 0..height {
+        let py = y as f32 + 0.5;
+        for x in 0..width {
+            let px = x as f32 + 0.5;
+            mask[y * width + x] = geometry::coverage(px, py, rect, radii);
+        }
+    }
+    blur_plane(&mut mask, width, height, edge_soft * density, edge_soft * density);
+    let erase = ellipse_mask(width, height, density, seam, radius_x, radius_y, angle, fade);
+    for (m, e) in mask.iter_mut().zip(erase.iter()) {
+        *m *= 1.0 - e;
+    }
+    mask
+}
+
+/// The seeded turbulence fields used by the image-melt filter graph.
+struct MeltNoise;
+
+impl MeltNoise {
+    fn warp() -> &'static Turbulence {
+        static FIELD: OnceLock<Turbulence> = OnceLock::new();
+        FIELD.get_or_init(|| Turbulence::new(4))
+    }
+
+    fn marble_a() -> &'static Turbulence {
+        static FIELD: OnceLock<Turbulence> = OnceLock::new();
+        FIELD.get_or_init(|| Turbulence::new(5))
+    }
+
+    fn marble_b() -> &'static Turbulence {
+        static FIELD: OnceLock<Turbulence> = OnceLock::new();
+        FIELD.get_or_init(|| Turbulence::new(11))
+    }
 }
 
 struct WarpSpec {
@@ -936,12 +1244,10 @@ struct WarpSpec {
     blur: f32,
     warp: f32,
     mix: f32,
-    gravity: f32,
     flow: f32,
     angle: f32,
     anchor: Point,
     axis_x: bool,
-    taper: f32,
     phase: f32,
     octaves: u32,
     elong: f32,
@@ -957,10 +1263,10 @@ fn warp_image(
 ) -> (Layer, (i32, i32)) {
     let rect = RectPx::from_rect(
         Rectangle {
-            x: item.bounds.origin.x,
-            y: item.bounds.origin.y,
-            width: item.bounds.size.width,
-            height: item.bounds.size.height,
+            x: item.content.origin.x,
+            y: item.content.origin.y,
+            width: item.content.size.width,
+            height: item.content.size.height,
         },
         density,
     );
@@ -1036,11 +1342,8 @@ fn warp_image(
                 src_x += (n1 - 0.5) * 2.0 * spec.warp;
                 src_y += (n2 - 0.5) * 2.0 * spec.warp;
             }
-            let local_src = Point::new(
-                src_x - item.bounds.origin.x,
-                src_y - item.bounds.origin.y,
-            );
-            let c = image.sample_cover(local_src, item.bounds.size);
+            let local_src = Point::new(src_x - item.content.origin.x, src_y - item.content.origin.y);
+            let c = image.sample_cover(local_src, item.content.size);
             let a = c[3] * inside * mask * spec.opacity;
             if a <= 0.0 {
                 continue;
@@ -1111,7 +1414,11 @@ fn hole_alpha(hole: &HoleMask, local: Point) -> f32 {
             if r <= core {
                 alpha
             } else if r <= mid {
-                lerp(alpha, (1.0 + 2.0 * alpha) / 3.0, (r - core) / (mid - core).max(1e-4))
+                lerp(
+                    alpha,
+                    (1.0 + 2.0 * alpha) / 3.0,
+                    (r - core) / (mid - core).max(1e-4),
+                )
             } else if r < outer {
                 lerp(
                     (1.0 + 2.0 * alpha) / 3.0,
@@ -1237,7 +1544,7 @@ fn morph_line(src: &[f32], dst: &mut [f32], radius: usize, dilate: bool) {
     }
     let mut deque: VecDeque<usize> = VecDeque::new();
     let mut next = 0_usize;
-    for i in 0..n {
+    for (i, out) in dst.iter_mut().enumerate() {
         let hi = (i + radius).min(n - 1);
         while next <= hi {
             while let Some(&j) = deque.back() {
@@ -1262,9 +1569,7 @@ fn morph_line(src: &[f32], dst: &mut [f32], radius: usize, dilate: bool) {
                 break;
             }
         }
-        dst[i] = deque
-            .front()
-            .map_or(0.0, |&j| src[j]);
+        *out = deque.front().map_or(0.0, |&j| src[j]);
     }
 }
 

@@ -26,10 +26,10 @@ use iced::{
     window,
 };
 
+use super::Liquid;
 use super::engine::{self, ItemSpec, ItemState};
 use super::options::ItemBox;
 use super::raster::{self, GroupStyle, RasterItem};
-use super::Liquid;
 
 struct CachedRaster {
     signature: u64,
@@ -81,8 +81,11 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
     }
 
     fn diff(&self, tree: &mut Tree) {
-        let children: Vec<&Element<'_, Message>> =
-            self.items().iter().filter_map(|item| item.element()).collect();
+        let children: Vec<&Element<'_, Message>> = self
+            .items()
+            .iter()
+            .filter_map(|item| item.element())
+            .collect();
         tree.diff_children(&children);
     }
 
@@ -187,9 +190,17 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
                     return;
                 };
                 let mut delta = start + (position - press);
-                if let Some(limit) = self.items().get(index).and_then(|item| item.options.drag_bounds) {
-                    delta.x = delta.x.clamp(limit.origin.x, limit.origin.x + limit.size.width);
-                    delta.y = delta.y.clamp(limit.origin.y, limit.origin.y + limit.size.height);
+                if let Some(limit) = self
+                    .items()
+                    .get(index)
+                    .and_then(|item| item.options.drag_bounds)
+                {
+                    delta.x = delta
+                        .x
+                        .clamp(limit.origin.x, limit.origin.x + limit.size.width);
+                    delta.y = delta
+                        .y
+                        .clamp(limit.origin.y, limit.origin.y + limit.size.height);
                 }
                 let item = &self.items()[index];
                 // With a live callback the application owns the position: the
@@ -198,8 +209,12 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
                 let live = if item.on_drag.is_some() {
                     let mut target = base + delta;
                     if let Some(limit) = item.options.drag_bounds {
-                        target.x = target.x.clamp(limit.origin.x, limit.origin.x + limit.size.width);
-                        target.y = target.y.clamp(limit.origin.y, limit.origin.y + limit.size.height);
+                        target.x = target
+                            .x
+                            .clamp(limit.origin.x, limit.origin.x + limit.size.width);
+                        target.y = target
+                            .y
+                            .clamp(limit.origin.y, limit.origin.y + limit.size.height);
                     }
                     Some(target)
                 } else {
@@ -240,10 +255,10 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
                 shell.request_redraw();
                 shell.capture_event();
             }
-            Event::Window(window::Event::RedrawRequested(_)) => {
-                if state.active.get() || state.drag.get().is_some() {
-                    shell.request_redraw();
-                }
+            Event::Window(window::Event::RedrawRequested(_))
+                if state.active.get() || state.drag.get().is_some() =>
+            {
+                shell.request_redraw();
             }
             _ => {}
         }
@@ -264,29 +279,10 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
             return;
         }
         let state = tree.state.downcast_ref::<LiquidState>();
-        #[cfg(debug_assertions)]
-        if std::env::var_os("GOOEY_TRACE").is_some() {
-            static FRAME: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-            if FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 16 {
-                eprintln!("[gooey] bounds={bounds:?}");
-                for (index, item) in self.items().iter().enumerate() {
-                    let rendered = state
-                        .states
-                        .borrow()
-                        .get(index)
-                        .and_then(|state| state.rendered);
-                    eprintln!(
-                        "[gooey]   item {index}: pos={:?} offset={:?} rendered={rendered:?}",
-                        item.options().position, item.options().offset
-                    );
-                }
-            }
-        }
         let now = Instant::now();
-        let elapsed = state
-            .last
-            .get()
-            .map_or(0.0, |last| now.saturating_duration_since(last).as_secs_f64());
+        let elapsed = state.last.get().map_or(0.0, |last| {
+            now.saturating_duration_since(last).as_secs_f64()
+        });
         state.last.set(Some(now));
         let time = now.saturating_duration_since(state.origin).as_secs_f64();
 
@@ -298,10 +294,8 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
             let Some(item) = self.items().get(index) else {
                 break;
             };
-            let radii = item.options().resolve_radius(base.size);
             specs.push(ItemSpec {
                 base: *base,
-                radii,
                 options: item.options().clone(),
             });
         }
@@ -360,7 +354,10 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
                 {
                     raster.dump(
                         std::path::Path::new("target/gooey-dump"),
-                        &format!("frame{frame}-{}-{}", bounds.width as u32, bounds.height as u32),
+                        &format!(
+                            "frame{frame}-{}-{}",
+                            bounds.width as u32, bounds.height as u32
+                        ),
                     );
                 }
             }
@@ -432,7 +429,6 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
         draw_layer(renderer, &cache.content, bounds);
         draw_children(renderer, false);
         draw_layer(renderer, &cache.above, bounds);
-        drop(cache);
     }
 
     fn mouse_interaction(
@@ -520,9 +516,12 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
             let Some(element) = item.element_mut() else {
                 continue;
             };
-            element
-                .as_widget_mut()
-                .operate(&mut tree.children[child_index], child_layout, renderer, operation);
+            element.as_widget_mut().operate(
+                &mut tree.children[child_index],
+                child_layout,
+                renderer,
+                operation,
+            );
         }
     }
 
@@ -572,15 +571,12 @@ fn draw_layer(renderer: &mut Renderer, handle: &image::Handle, bounds: Rectangle
     );
 }
 
-fn adjust_cursor(
-    cursor: mouse::Cursor,
-    center: Point,
-    scale: f32,
-    drag: Vector,
-) -> mouse::Cursor {
+fn adjust_cursor(cursor: mouse::Cursor, center: Point, scale: f32, drag: Vector) -> mouse::Cursor {
     let scale = scale.max(0.05);
     match cursor {
-        mouse::Cursor::Available(p) => mouse::Cursor::Available(child_point(p, center, scale, drag)),
+        mouse::Cursor::Available(p) => {
+            mouse::Cursor::Available(child_point(p, center, scale, drag))
+        }
         mouse::Cursor::Levitating(p) => {
             mouse::Cursor::Levitating(child_point(p, center, scale, drag))
         }
@@ -590,10 +586,7 @@ fn adjust_cursor(
 
 fn child_point(point: Point, center: Point, scale: f32, drag: Vector) -> Point {
     let local = point - drag - Vector::new(center.x, center.y);
-    Point::new(
-        center.x + local.x / scale,
-        center.y + local.y / scale,
-    )
+    Point::new(center.x + local.x / scale, center.y + local.y / scale)
 }
 
 fn contains(rect: ItemBox, point: Point) -> bool {

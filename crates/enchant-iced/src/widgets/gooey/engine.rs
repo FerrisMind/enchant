@@ -6,13 +6,11 @@
 //! and paint parameters the rasterizer consumes. The widget owns one
 //! [`ItemState`] per item; headless tests can step the same states by hand.
 
-
 use iced::{Point, Size, Vector};
 
 use super::geometry::CornerRadii;
 use super::options::{
-    DissolveOptions, ImageMeltOptions, ItemBox, ItemOptions, LiquidLayout, Morph, Move,
-    MoveOptions, zeta,
+    DissolveOptions, ImageMeltOptions, ItemBox, ItemOptions, LiquidLayout, MoveOptions, zeta,
 };
 use super::raster::{DissolvePaint, HoleMask, MeltPaint, RasterItem, TailCircles};
 use super::spring::{self, Easing, SpringConfig, Transition};
@@ -21,7 +19,6 @@ use super::spring::{self, Easing, SpringConfig, Transition};
 #[derive(Debug, Clone)]
 pub(crate) struct ItemSpec {
     pub base: ItemBox,
-    pub radii: CornerRadii,
     pub options: ItemOptions,
 }
 
@@ -29,9 +26,7 @@ impl ItemSpec {
     /// The target box after offset, drag and scale.
     pub(crate) fn target(&self, drag: Vector) -> ItemBox {
         let offset = self.options.offset + drag;
-        self.base
-            .translated(offset)
-            .scaled(self.options.scale)
+        self.base.translated(offset).scaled(self.options.scale)
     }
 }
 
@@ -73,16 +68,6 @@ impl Sim {
 
     fn moving(&self) -> bool {
         self.vcx.abs() + self.vcy.abs() + self.vw.abs() + self.vh.abs() + self.vr.abs() > 0.5
-    }
-
-    fn settled(&self, target: ItemBox, target_radius: f32, speed: f32) -> bool {
-        (self.cx - target.center().x).abs() < 0.05
-            && (self.cy - target.center().y).abs() < 0.05
-            && (self.w - target.size.width).abs() < 0.05
-            && (self.h - target.size.height).abs() < 0.05
-            && (self.r - target_radius).abs() < 0.05
-            && speed < 1.0
-            && self.vw.abs() + self.vh.abs() + self.vr.abs() < 1.0
     }
 }
 
@@ -299,7 +284,11 @@ pub(crate) fn step(
     goo_blur: f32,
     reduced_motion: bool,
 ) -> Vec<RasterItem> {
-    let dt = if dt.is_finite() { dt.clamp(0.0, 0.25) } else { 0.0 };
+    let dt = if dt.is_finite() {
+        dt.clamp(0.0, 0.25)
+    } else {
+        0.0
+    };
     let dt_f32 = dt as f32;
     let targets: Vec<ItemBox> = specs
         .iter()
@@ -383,6 +372,7 @@ pub(crate) fn step(
 
         out.push(RasterItem {
             bounds: body,
+            content: target,
             radii: CornerRadii::uniform(render_radius),
             image: None,
             content_blur,
@@ -402,7 +392,7 @@ pub(crate) fn step(
 
     // Proximity pass: dissolve and melt need every item's measured rect.
     for (index, state) in states.iter_mut().enumerate() {
-        let rect = out[index].bounds;
+        let rect = out[index].content;
         let spec = &specs[index];
         let item = &mut out[index];
         if let Some(options) = spec.options.dissolve {
@@ -417,8 +407,7 @@ pub(crate) fn step(
             );
         }
         if let Some(options) = spec.options.melt {
-            item.melt =
-                melt_paint(index, rect, &targets, &mut state.melt, options, dt);
+            item.melt = melt_paint(index, rect, &targets, &mut state.melt, options, dt);
         }
     }
 
@@ -505,8 +494,22 @@ fn step_mirror(
     let cur = mirror.current.unwrap_or(target);
     let k = cfg.stiffness / cfg.mass.max(1e-3);
     let c = cfg.damping / cfg.mass.max(1e-3);
-    let (x, vx) = spring::advance(cur.origin.x, mirror.vel[0], target.origin.x, k, c, dt as f32);
-    let (y, vy) = spring::advance(cur.origin.y, mirror.vel[1], target.origin.y, k, c, dt as f32);
+    let (x, vx) = spring::advance(
+        cur.origin.x,
+        mirror.vel[0],
+        target.origin.x,
+        k,
+        c,
+        dt as f32,
+    );
+    let (y, vy) = spring::advance(
+        cur.origin.y,
+        mirror.vel[1],
+        target.origin.y,
+        k,
+        c,
+        dt as f32,
+    );
     let (w, vw) = spring::advance(
         cur.size.width,
         mirror.vel[2],
@@ -546,7 +549,7 @@ fn step_evolve(
     dt: f64,
     _goo_blur: f32,
 ) -> (ItemBox, f32, f32, f32) {
-    let morph = spec.options.morph.unwrap_or_else(Morph::new);
+    let morph = spec.options.morph.unwrap_or_default();
     let eo = morph.resolve();
     let tcx = target.center().x;
     let tcy = target.center().y;
@@ -686,12 +689,11 @@ fn step_evolve(
     }
 
     // Content blur envelope.
-    let motion_raw = ((sim.vcx.powi(2) + sim.vcy.powi(2)).sqrt()
-        + sim.vw.abs()
-        + sim.vh.abs())
-    / 420.0;
-    state.morph.motion_env =
-        motion_raw.min(1.0).max(state.morph.motion_env - (dt as f32) * 1.9);
+    let motion_raw =
+        ((sim.vcx.powi(2) + sim.vcy.powi(2)).sqrt() + sim.vw.abs() + sim.vh.abs()) / 420.0;
+    state.morph.motion_env = motion_raw
+        .min(1.0)
+        .max(state.morph.motion_env - (dt as f32) * 1.9);
     let motion = state.morph.motion_env;
     let content_blur = motion * motion * eo.content_blur.max(0.0);
 
@@ -714,39 +716,19 @@ fn step_move(
     let opts = if let Some(bend) = spec.options.bend {
         bend.resolve()
     } else {
-        spec.options
-            .move_effect
-            .map_or_else(Move::new, |m| m)
-            .resolve()
+        spec.options.move_effect.unwrap_or_default().resolve()
     };
     let tcx = target.center().x;
     let tcy = target.center().y;
-    let mut sim = state
-        .morph
-        .sim
-        .unwrap_or_else(|| Sim::new(target, radius));
+    let mut sim = state.morph.sim.unwrap_or_else(|| Sim::new(target, radius));
     if !state.initialized {
         state.morph.sim = Some(sim);
         state.initialized = true;
         state.tail = TailState::new();
         return (target, radius, 0.0, 0.0);
     }
-    let (cx, vcx) = spring::advance(
-        sim.cx,
-        sim.vcx,
-        tcx,
-        opts.stiffness,
-        opts.damping,
-        dt,
-    );
-    let (cy, vcy) = spring::advance(
-        sim.cy,
-        sim.vcy,
-        tcy,
-        opts.stiffness,
-        opts.damping,
-        dt,
-    );
+    let (cx, vcx) = spring::advance(sim.cx, sim.vcx, tcx, opts.stiffness, opts.damping, dt);
+    let (cy, vcy) = spring::advance(sim.cy, sim.vcy, tcy, opts.stiffness, opts.damping, dt);
     sim = Sim {
         cx,
         cy,
@@ -831,11 +813,17 @@ fn tail_circles(state: &ItemState) -> Option<TailCircles> {
     Some(TailCircles {
         tail: (Point::new(tail.x, tail.y), tail.r),
         mid_a: (
-            Point::new(sim.cx + lag_x * 0.45 + px * w1, sim.cy + lag_y * 0.45 + py * w1),
+            Point::new(
+                sim.cx + lag_x * 0.45 + px * w1,
+                sim.cy + lag_y * 0.45 + py * w1,
+            ),
             tail.r * 0.62,
         ),
         mid_b: (
-            Point::new(sim.cx + lag_x * 0.75 + px * w2, sim.cy + lag_y * 0.75 + py * w2),
+            Point::new(
+                sim.cx + lag_x * 0.75 + px * w2,
+                sim.cy + lag_y * 0.75 + py * w2,
+            ),
             tail.r * 0.4,
         ),
     })
@@ -851,9 +839,7 @@ fn dissolve_paint(
     dt: f64,
     goo_blur: f32,
 ) -> Option<DissolvePaint> {
-    let range = options
-        .range
-        .unwrap_or_else(|| (goo_blur * 2.5).max(10.0));
+    let range = options.range.unwrap_or_else(|| (goo_blur * 2.5).max(10.0));
     let mut best_gap = f32::INFINITY;
     let mut best_other: Option<ItemBox> = None;
     for (other_index, other) in targets.iter().enumerate() {
@@ -868,20 +854,18 @@ fn dissolve_paint(
     }
     let mut embed = 0.0;
     let mut contact_span = 0.0;
-    if let Some(other) = best_other {
-        if best_gap <= 0.0 {
-            let ox = (rect.right()).min(other.right()) - rect.origin.x.max(other.origin.x);
-            let oy = (rect.bottom()).min(other.bottom()) - rect.origin.y.max(other.origin.y);
-            let span = rect
-                .size
-                .width
-                .min(rect.size.height)
-                .min(other.size.width)
-                .min(other.size.height)
-                .max(1.0);
-            embed = ox.min(oy).max(0.0) / span;
-            contact_span = ox.max(oy).max(0.0);
-        }
+    if let Some(other) = best_other.filter(|_| best_gap <= 0.0) {
+        let ox = (rect.right()).min(other.right()) - rect.origin.x.max(other.origin.x);
+        let oy = (rect.bottom()).min(other.bottom()) - rect.origin.y.max(other.origin.y);
+        let span = rect
+            .size
+            .width
+            .min(rect.size.height)
+            .min(other.size.width)
+            .min(other.size.height)
+            .max(1.0);
+        embed = ox.min(oy).max(0.0) / span;
+        contact_span = ox.max(oy).max(0.0);
     }
     let mut target = 0.0;
     if best_other.is_some() && best_gap < range && options.active {
@@ -898,8 +882,10 @@ fn dissolve_paint(
         state.fade += (target - state.fade) * (dt as f32 * 6.0).min(1.0);
         state.release = None;
     } else {
-        let rel_ms = (options.release_ms.max(options.fade_ms.unwrap_or(options.release_ms)))
-            .max(40.0);
+        let rel_ms = (options
+            .release_ms
+            .max(options.fade_ms.unwrap_or(options.release_ms)))
+        .max(40.0);
         let (from, elapsed) = state.release.get_or_insert((state.fade, 0.0));
         *elapsed += dt as f32 * 1000.0;
         let k = (*elapsed / rel_ms).min(1.0);
@@ -912,6 +898,13 @@ fn dissolve_paint(
         state.fade = 0.0;
     }
     let s = state.fade;
+    #[cfg(debug_assertions)]
+    if std::env::var_os("GOOEY_DISSOLVE_TRACE").is_some() {
+        eprintln!(
+            "[dissolve] idx={index} size={:?} gap={best_gap:.1} embed={embed:.2} target={target:.2} fade={s:.2}",
+            rect.size
+        );
+    }
     if s <= 0.001 {
         state.opacity = 0.0;
         return None;
@@ -925,14 +918,10 @@ fn dissolve_paint(
     };
     let seam = seam_point(rect, other);
     let zone = options.zone.unwrap_or(goo_blur * 2.2 + 4.0);
-    let d = (rect.size.width.min(rect.size.height) * 0.9)
-        .min(zone * (0.7 + 0.6 * s));
+    let d = (rect.size.width.min(rect.size.height) * 0.9).min(zone * (0.7 + 0.6 * s));
     // Opacity fade clock.
     if let Some((_, elapsed)) = state.release {
-        let fade_ms = options
-            .fade_ms
-            .unwrap_or(options.release_ms)
-            .max(40.0);
+        let fade_ms = options.fade_ms.unwrap_or(options.release_ms).max(40.0);
         let k = (elapsed / fade_ms).min(1.0);
         let rel_fade = (1.0 - k) * (1.0 - k);
         state.opacity = if rel_fade < state.opacity {
@@ -964,22 +953,14 @@ fn dissolve_paint(
     let gx = neighbor_center.x - seam.x;
     let gy = neighbor_center.y - seam.y;
     let gl = (gx * gx + gy * gy).sqrt();
-    let (gux, guy) = if gl > 1e-4 { (gx / gl, gy / gl) } else { (1.0, 0.0) };
+    let (gux, guy) = if gl > 1e-4 {
+        (gx / gl, gy / gl)
+    } else {
+        (1.0, 0.0)
+    };
     let axis_x = match state.axis_x {
-        Some(true) => {
-            if guy.abs() > gux.abs() * 1.25 {
-                false
-            } else {
-                true
-            }
-        }
-        Some(false) => {
-            if gux.abs() > guy.abs() * 1.25 {
-                true
-            } else {
-                false
-            }
-        }
+        Some(true) => guy.abs() <= gux.abs() * 1.25,
+        Some(false) => gux.abs() > guy.abs() * 1.25,
         None => gux.abs() >= guy.abs(),
     };
     state.axis_x = Some(axis_x);
@@ -1140,8 +1121,12 @@ fn seam_point(a: ItemBox, b: ItemBox) -> Point {
 }
 
 fn box_gap(a: ItemBox, b: ItemBox) -> f32 {
-    let dx = (a.origin.x - b.right()).max(b.origin.x - a.right()).max(0.0);
-    let dy = (a.origin.y - b.bottom()).max(b.origin.y - a.bottom()).max(0.0);
+    let dx = (a.origin.x - b.right())
+        .max(b.origin.x - a.right())
+        .max(0.0);
+    let dy = (a.origin.y - b.bottom())
+        .max(b.origin.y - a.bottom())
+        .max(0.0);
     (dx * dx + dy * dy).sqrt()
 }
 
@@ -1249,10 +1234,7 @@ impl TransitionExt for Transition {
 /// Converts the public bend/move knobs into the raw options (for tests).
 #[allow(dead_code)]
 pub(crate) fn resolved_move(spec: &ItemSpec) -> MoveOptions {
-    spec.options
-        .move_effect
-        .map_or_else(Move::new, |m| m)
-        .resolve()
+    spec.options.move_effect.unwrap_or_default().resolve()
 }
 
 #[cfg(test)]
@@ -1264,7 +1246,6 @@ mod tests {
         options.observe = true;
         ItemSpec {
             base: ItemBox::new(x, 0.0, w, 40.0),
-            radii: CornerRadii::uniform(20.0),
             options,
         }
     }
@@ -1294,13 +1275,52 @@ mod tests {
     }
 
     #[test]
+    fn dissolve_paints_on_overlap() {
+        let mut options = ItemOptions::default();
+        options.dissolve = Some(DissolveOptions {
+            range: Some(44.0),
+            ..DissolveOptions::default()
+        });
+        let a = ItemSpec {
+            base: ItemBox::new(0.0, 0.0, 96.0, 96.0),
+            options: options.clone(),
+        };
+        let b = ItemSpec {
+            base: ItemBox::new(74.0, 0.0, 96.0, 96.0),
+            options,
+        };
+        let mut states = vec![ItemState::default(), ItemState::default()];
+        let mut last = Vec::new();
+        for i in 0..60 {
+            last = step(
+                &mut states,
+                &[a.clone(), b.clone()],
+                0.016 * i as f64,
+                0.016,
+                6.0,
+                false,
+            );
+        }
+        let paint = last[0].dissolve.as_ref().expect("dissolve armed");
+        assert!(paint.opacity > 0.2, "opacity {}", paint.opacity);
+        assert!(paint.d > 0.0, "melt depth {}", paint.d);
+    }
+
+    #[test]
     fn mirror_springs_toward_a_new_target() {
         let mut a = spec(0.0, 40.0);
         let mut states = vec![ItemState::default()];
         let _ = step(&mut states, &[a.clone()], 0.0, 0.016, 6.0, false);
         a.base = ItemBox::new(100.0, 0.0, 40.0, 40.0);
         for i in 0..240 {
-            step(&mut states, &[a.clone()], 0.016 * (i + 1) as f64, 0.016, 6.0, false);
+            step(
+                &mut states,
+                &[a.clone()],
+                0.016 * (i + 1) as f64,
+                0.016,
+                6.0,
+                false,
+            );
         }
         let rendered = states[0].rendered.unwrap();
         assert!((rendered.origin.x - 100.0).abs() < 0.5, "{rendered:?}");
@@ -1312,19 +1332,11 @@ mod tests {
         options.dissolve = Some(DissolveOptions::new());
         let a = ItemSpec {
             base: ItemBox::new(0.0, 0.0, 40.0, 40.0),
-            radii: CornerRadii::uniform(20.0),
             options,
         };
         let b = spec(200.0, 40.0);
         let mut states = vec![ItemState::default(), ItemState::default()];
-        let items = step(
-            &mut states,
-            &[a, b],
-            0.0,
-            0.016,
-            6.0,
-            false,
-        );
+        let items = step(&mut states, &[a, b], 0.0, 0.016, 6.0, false);
         assert!(items[0].dissolve.is_none());
     }
 }

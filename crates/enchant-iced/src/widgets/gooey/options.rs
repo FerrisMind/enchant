@@ -677,9 +677,7 @@ impl Shadow {
     /// An empty stack.
     #[must_use]
     pub const fn none() -> Self {
-        Self {
-            layers: Vec::new(),
-        }
+        Self { layers: Vec::new() }
     }
 
     /// Parses the CSS `box-shadow` syntax.
@@ -915,12 +913,6 @@ impl ItemOptions {
             || self.dissolve.is_some()
             || self.move_effect.is_some()
             || self.bend.is_some()
-    }
-
-    /// The effective radius, resolving `None` to half the short side.
-    pub(crate) fn resolve_radius(&self, size: Size) -> CornerRadii {
-        self.radius
-            .unwrap_or_else(|| CornerRadii::uniform(size.height.min(size.width) / 2.0))
     }
 }
 

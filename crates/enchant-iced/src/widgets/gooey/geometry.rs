@@ -157,6 +157,7 @@ pub(crate) struct RectPx {
 }
 
 impl RectPx {
+    #[cfg(test)]
     pub(crate) fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self { x, y, w, h }
     }
@@ -168,19 +169,6 @@ impl RectPx {
             w: rect.width * scale,
             h: rect.height * scale,
         }
-    }
-
-    pub(crate) fn scaled(self, scale: f32) -> Self {
-        Self {
-            x: self.x * scale,
-            y: self.y * scale,
-            w: self.w * scale,
-            h: self.h * scale,
-        }
-    }
-
-    pub(crate) fn center(self) -> Point {
-        Point::new(self.x + self.w / 2.0, self.y + self.h / 2.0)
     }
 
     pub(crate) fn right(self) -> f32 {
@@ -292,12 +280,7 @@ pub(crate) fn fill_circle(
 }
 
 /// Union-fills a closed polygon with 2×2 supersampling.
-pub(crate) fn fill_polygon(
-    plane: &mut [f32],
-    width: usize,
-    height: usize,
-    points: &[Point],
-) {
+pub(crate) fn fill_polygon(plane: &mut [f32], width: usize, height: usize, points: &[Point]) {
     if points.len() < 3 {
         return;
     }
@@ -347,9 +330,7 @@ fn point_in_polygon(x: f32, y: f32, points: &[Point]) -> bool {
     for i in 0..points.len() {
         let pi = points[i];
         let pj = points[j];
-        if ((pi.y > y) != (pj.y > y))
-            && (x < (pj.x - pi.x) * (y - pi.y) / (pj.y - pi.y) + pi.x)
-        {
+        if ((pi.y > y) != (pj.y > y)) && (x < (pj.x - pi.x) * (y - pi.y) / (pj.y - pi.y) + pi.x) {
             inside = !inside;
         }
         j = i;
@@ -461,12 +442,6 @@ pub(crate) fn bend_polygon(
         .collect()
 }
 
-/// The area-equivalent radius a blob should use for an item, with the
-/// reference's `pillRadius` clamp.
-pub(crate) fn pill_radius(radius: f32, w: f32, h: f32) -> f32 {
-    non_negative(radius).min(w.min(h) / 2.0)
-}
-
 /// Scales a logical-pixel rectangle into a raster of `size` pixels.
 pub(crate) fn resize(size: Size, density: f32) -> (usize, usize) {
     (
@@ -501,8 +476,8 @@ mod tests {
         let r = CornerRadii::uniform(4.0);
         assert_eq!(coverage(20.0, 20.0, rect, r), 1.0);
         assert_eq!(coverage(5.0, 5.0, rect, r), 0.0);
-        assert!((coverage(10.5, 20.0, rect, r) - 0.5).abs() < 1e-3);
-        assert!(coverage(12.0, 12.0, rect, r) < 1.0);
+        assert!((coverage(10.0, 20.0, rect, r) - 0.5).abs() < 1e-3);
+        assert_eq!(coverage(10.5, 10.5, rect, r), 0.0);
     }
 
     #[test]

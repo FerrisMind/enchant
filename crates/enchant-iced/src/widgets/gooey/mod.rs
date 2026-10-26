@@ -135,9 +135,11 @@ impl<'a, Message> LiquidItem<'a, Message> {
     /// `40 x 40` logical pixels.
     #[must_use]
     pub fn image(handle: impl Into<Handle>) -> Self {
-        let mut options = ItemOptions::default();
-        options.image = Some(handle.into());
-        options.size = Some(Size::new(40.0, 40.0));
+        let options = ItemOptions {
+            image: Some(handle.into()),
+            size: Some(Size::new(40.0, 40.0)),
+            ..ItemOptions::default()
+        };
         Self {
             element: None,
             options,
@@ -178,10 +180,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     /// content).
     #[must_use]
     pub fn size(mut self, width: f32, height: f32) -> Self {
-        self.options.size = Some(Size::new(
-            non_negative(width),
-            non_negative(height),
-        ));
+        self.options.size = Some(Size::new(non_negative(width), non_negative(height)));
         self
     }
 
@@ -284,7 +283,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     /// Enables the jelly shape physics with the tuned defaults.
     #[must_use]
     pub fn morph_shape(mut self, shape: bool) -> Self {
-        let mut morph = self.options.morph.unwrap_or_else(Morph::new);
+        let mut morph = self.options.morph.unwrap_or_default();
         morph.shape = shape;
         self.options.morph = Some(morph);
         self
@@ -293,7 +292,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     /// Shrinks the blob by `px` per side so opaque content covers it.
     #[must_use]
     pub fn blob_inset(mut self, inset: f32) -> Self {
-        let mut morph = self.options.morph.unwrap_or_else(Morph::new);
+        let mut morph = self.options.morph.unwrap_or_default();
         morph.blob_inset = non_negative(inset);
         self.options.morph = Some(morph);
         self
@@ -302,7 +301,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     /// Lets the blob swell back out near a neighbour.
     #[must_use]
     pub fn bridge_grow(mut self, grow: f32) -> Self {
-        let mut morph = self.options.morph.unwrap_or_else(Morph::new);
+        let mut morph = self.options.morph.unwrap_or_default();
         morph.bridge_grow = non_negative(grow);
         self.options.morph = Some(morph);
         self
@@ -370,10 +369,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     /// [`offset`](Self::offset) or your own model). Without it the widget keeps
     /// the pointer delta itself and the item stays where it was dropped.
     #[must_use]
-    pub fn on_drag(
-        mut self,
-        f: impl Fn(usize, Vector) -> Message + 'a,
-    ) -> Self {
+    pub fn on_drag(mut self, f: impl Fn(usize, Vector) -> Message + 'a) -> Self {
         self.on_drag = Some(Box::new(f));
         self
     }
@@ -382,10 +378,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     /// offset. The final offset is absolute when [`on_drag`](Self::on_drag) is
     /// set, and the retained pointer delta otherwise.
     #[must_use]
-    pub fn on_drag_end(
-        mut self,
-        f: impl Fn(usize, Vector) -> Message + 'a,
-    ) -> Self {
+    pub fn on_drag_end(mut self, f: impl Fn(usize, Vector) -> Message + 'a) -> Self {
         self.on_drag_end = Some(Box::new(f));
         self
     }
@@ -418,9 +411,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     }
 
     pub(crate) fn layout_size(&self) -> Size {
-        self.options
-            .size
-            .unwrap_or_else(|| Size::new(40.0, 40.0))
+        self.options.size.unwrap_or_else(|| Size::new(40.0, 40.0))
     }
 }
 
@@ -507,10 +498,7 @@ impl<'a, Message: 'a> Liquid<'a, Message> {
 
     /// Adds several items.
     #[must_use]
-    pub fn extend(
-        mut self,
-        items: impl IntoIterator<Item = LiquidItem<'a, Message>>,
-    ) -> Self {
+    pub fn extend(mut self, items: impl IntoIterator<Item = LiquidItem<'a, Message>>) -> Self {
         for item in items {
             self = self.push(item);
         }
@@ -686,31 +674,27 @@ impl<'a, Message: 'a> Liquid<'a, Message> {
         tree: &mut tree::Tree,
         renderer: &iced::Renderer,
         limits: &iced::advanced::layout::Limits,
-    ) -> (
-        Vec<iced::advanced::layout::Node>,
-        Size,
-        Vec<ItemBox>,
-    ) {
+    ) -> (Vec<iced::advanced::layout::Node>, Size, Vec<ItemBox>) {
         let child_limit = iced::advanced::layout::Limits::new(Size::ZERO, limits.max());
         let mut element_nodes = Vec::with_capacity(self.items.len());
         let mut sizes = Vec::with_capacity(self.items.len());
         for index in 0..self.items.len() {
-            if let Some(child_index) = self.element_index(index) {
-                if let Some(element) = self.items[index].element_mut() {
-                    let node = element.as_widget_mut().layout(
-                        &mut tree.children[child_index],
-                        renderer,
-                        &child_limit,
-                    );
-                    sizes.push(node.size());
-                    element_nodes.push((index, node));
-                    continue;
-                }
+            if let Some((child_index, element)) = self
+                .element_index(index)
+                .zip(self.items[index].element_mut())
+            {
+                let node = element.as_widget_mut().layout(
+                    &mut tree.children[child_index],
+                    renderer,
+                    &child_limit,
+                );
+                sizes.push(node.size());
+                element_nodes.push((index, node));
+                continue;
             }
             sizes.push(self.items[index].layout_size());
         }
-        let positions: Vec<Option<Point>> =
-            self.items.iter().map(|i| i.options.position).collect();
+        let positions: Vec<Option<Point>> = self.items.iter().map(|i| i.options.position).collect();
         let offsets: Vec<Vector> = self.items.iter().map(|i| i.options.offset).collect();
         let no_offsets = vec![Vector::ZERO; self.items.len()];
         let ones = vec![1.0_f32; self.items.len()];
@@ -761,16 +745,8 @@ impl<'a, Message: 'a> Liquid<'a, Message> {
                     + self.padding * 2.0,
             ),
             LiquidLayout::Free => Size::new(
-                targets
-                    .iter()
-                    .map(|t| t.right())
-                    .fold(0.0, f32::max)
-                    + self.padding,
-                targets
-                    .iter()
-                    .map(|t| t.bottom())
-                    .fold(0.0, f32::max)
-                    + self.padding,
+                targets.iter().map(|t| t.right()).fold(0.0, f32::max) + self.padding,
+                targets.iter().map(|t| t.bottom()).fold(0.0, f32::max) + self.padding,
             ),
         };
         let size = Size::new(
@@ -808,18 +784,18 @@ mod tests {
     #[test]
     fn defaults_match_upstream() {
         let liquid: Liquid<'_, ()> = Liquid::new([]);
-        assert_eq!(liquid.blur(), 6.0);
-        assert_eq!(liquid.contrast(), 18.0);
-        assert_eq!(liquid.waviness_freq(), 0.018);
-        assert!(liquid.shadows().is_empty());
+        assert_eq!(liquid.blur, 6.0);
+        assert_eq!(liquid.contrast, 18.0);
+        assert_eq!(liquid.waviness_freq, 0.018);
+        assert!(liquid.shadows.layers().is_empty());
     }
 
     #[test]
     fn shadow_string_parses_into_layers() {
         let liquid: Liquid<'_, ()> =
             Liquid::new([]).shadow("0 0 0 1px rgba(0,0,0,.06) inset, 0 4px 8px #0003");
-        assert_eq!(liquid.shadows().layers().len(), 2);
-        assert!(liquid.shadows().layers()[0].inset);
+        assert_eq!(liquid.shadows.layers().len(), 2);
+        assert!(liquid.shadows.layers()[0].inset);
     }
 
     #[test]
@@ -829,10 +805,10 @@ mod tests {
             .contrast(f32::NAN)
             .density(99.0)
             .waviness(-1.0);
-        assert_eq!(liquid.blur(), 0.0);
-        assert_eq!(liquid.contrast(), 18.0);
-        assert_eq!(liquid.density(), 3.0);
-        assert_eq!(liquid.waviness(), 0.0);
+        assert_eq!(liquid.blur, 0.0);
+        assert_eq!(liquid.contrast, 18.0);
+        assert_eq!(liquid.density, 3.0);
+        assert_eq!(liquid.waviness, 0.0);
     }
 
     #[test]
