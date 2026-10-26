@@ -854,6 +854,12 @@ pub struct ItemOptions {
     pub(crate) radius: Option<CornerRadii>,
     pub(crate) scale: f32,
     pub(crate) transition: Transition,
+    /// Whether [`ItemOptions::transition`] was set explicitly.
+    ///
+    /// Move effects spring after a target that already carries CSS-style
+    /// easing only when the caller asked for one; the default would otherwise
+    /// smooth every drag twice.
+    pub(crate) transition_set: bool,
     pub(crate) delay: Option<Duration>,
     pub(crate) observe: bool,
     pub(crate) position: Option<Point>,
@@ -878,6 +884,7 @@ impl Default for ItemOptions {
             radius: None,
             scale: 1.0,
             transition: Transition::Smooth,
+            transition_set: false,
             delay: None,
             observe: false,
             position: None,

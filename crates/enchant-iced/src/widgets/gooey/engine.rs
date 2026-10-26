@@ -12,7 +12,7 @@ use super::geometry::CornerRadii;
 use super::options::{
     DissolveOptions, ImageMeltOptions, ItemBox, ItemOptions, LiquidLayout, MoveOptions, zeta,
 };
-use super::raster::{DissolvePaint, HoleMask, MeltPaint, RasterItem, TailCircles};
+use super::raster::{DissolvePaint, HoleMask, MeltPaint, RasterItem, Stretch, TailCircles};
 use super::spring::{self, Easing, SpringConfig, Transition};
 
 /// One item's layout target and configuration for a frame.
@@ -187,17 +187,11 @@ impl DissolveState {
 #[derive(Debug, Clone)]
 struct MeltState {
     strength: f32,
-    phase: f32,
-    prev: Option<Point>,
 }
 
 impl MeltState {
     fn new() -> Self {
-        Self {
-            strength: 0.0,
-            phase: 0.0,
-            prev: None,
-        }
+        Self { strength: 0.0 }
     }
 }
 
@@ -213,6 +207,7 @@ pub(crate) struct ItemState {
     tail: TailState,
     bend_cur: f32,
     bend_cur_x: f32,
+    stretch: Option<Stretch>,
     dissolve: DissolveState,
     melt: MeltState,
     inset_smooth: Option<f32>,
@@ -234,6 +229,7 @@ impl Default for ItemState {
             tail: TailState::new(),
             bend_cur: 0.0,
             bend_cur_x: 0.0,
+            stretch: None,
             dissolve: DissolveState::new(),
             melt: MeltState::new(),
             inset_smooth: None,
@@ -328,12 +324,15 @@ pub(crate) fn step(
             state.tail = TailState::new();
             state.bend_cur = 0.0;
             state.bend_cur_x = 0.0;
+            state.stretch = None;
             (target, radius, 0.0, 0.0)
         } else if evolve {
             step_evolve(state, spec, target, radius, now, dt, goo_blur)
         } else if moving || bending {
-            step_move(state, spec, target, radius, dt_f32)
+            state.stretch = None;
+            step_move(state, spec, target, radius, now, dt_f32)
         } else {
+            state.stretch = None;
             step_mirror(state, spec, target, radius, now, dt)
         };
 
@@ -381,6 +380,7 @@ pub(crate) fn step(
             } else {
                 None
             },
+            stretch: state.stretch,
             tail: tail_circles(state),
             dissolve: None,
             melt: None,
@@ -422,13 +422,34 @@ fn step_mirror(
     now: f64,
     dt: f64,
 ) -> (ItemBox, f32, f32, f32) {
-    let mirror = &mut state.mirror;
     if !state.initialized {
-        mirror.current = Some(target);
-        mirror.target = Some(target);
+        state.mirror.current = Some(target);
+        state.mirror.target = Some(target);
         state.initialized = true;
         return (target, radius, 0.0, 0.0);
     }
+    let current = advance_transition(state, spec, target, now, dt);
+    (
+        current,
+        scaled_radius(radius, current, target),
+        0.0,
+        0.0,
+    )
+}
+
+/// Advances the item's *content* box along its configured transition.
+///
+/// Returns the eased box between the last retarget position and `target`.
+/// Move effects use the same helper so `.transition(..)` can drive the target
+/// the liquid chases, exactly like a CSS transition on the reference element.
+fn advance_transition(
+    state: &mut ItemState,
+    spec: &ItemSpec,
+    target: ItemBox,
+    now: f64,
+    dt: f64,
+) -> ItemBox {
+    let mirror = &mut state.mirror;
     let changed = mirror.target.is_none_or(|t| !boxes_close(t, target));
     if changed {
         mirror.target = Some(target);
@@ -443,18 +464,7 @@ fn step_mirror(
                     easing,
                 });
             }
-            Transition::Preset(preset) => {
-                mirror.delay_left = delay;
-                let cfg = preset.config();
-                mirror.vel = [0.0; 4];
-                let _ = cfg;
-            }
-            Transition::Spring(cfg) => {
-                mirror.delay_left = delay;
-                mirror.vel = [0.0; 4];
-                let _ = cfg;
-            }
-            Transition::Smooth => {
+            Transition::Preset(_) | Transition::Spring(_) | Transition::Smooth => {
                 mirror.delay_left = delay;
                 mirror.vel = [0.0; 4];
             }
@@ -464,8 +474,7 @@ fn step_mirror(
     if let Some(tween) = mirror.timed {
         let elapsed = now - tween.start - tween.delay;
         if elapsed <= 0.0 {
-            let current = mirror.current.unwrap_or(target);
-            return (current, scaled_radius(radius, current, target), 0.0, 0.0);
+            return mirror.current.unwrap_or(target);
         }
         let t = if tween.duration <= 0.0 {
             1.0
@@ -478,12 +487,11 @@ fn step_mirror(
         if t >= 1.0 {
             mirror.timed = None;
         }
-        return (current, scaled_radius(radius, current, target), 0.0, 0.0);
+        return current;
     }
     if mirror.delay_left > 0.0 {
         mirror.delay_left = (mirror.delay_left - dt).max(0.0);
-        let current = mirror.current.unwrap_or(target);
-        return (current, scaled_radius(radius, current, target), 0.0, 0.0);
+        return mirror.current.unwrap_or(target);
     }
     let cfg = match spec.options.transition {
         Transition::Preset(preset) => preset.config(),
@@ -529,7 +537,7 @@ fn step_mirror(
     mirror.vel = [vx, vy, vw, vh];
     let current = ItemBox::new(x, y, w.max(0.0), h.max(0.0));
     mirror.current = Some(current);
-    (current, scaled_radius(radius, current, target), 0.0, 0.0)
+    current
 }
 
 fn scaled_radius(radius: f32, current: ItemBox, target: ItemBox) -> f32 {
@@ -711,6 +719,7 @@ fn step_move(
     spec: &ItemSpec,
     target: ItemBox,
     radius: f32,
+    now: f64,
     dt: f32,
 ) -> (ItemBox, f32, f32, f32) {
     let opts = if let Some(bend) = spec.options.bend {
@@ -718,8 +727,6 @@ fn step_move(
     } else {
         spec.options.move_effect.unwrap_or_default().resolve()
     };
-    let tcx = target.center().x;
-    let tcy = target.center().y;
     let mut sim = state.morph.sim.unwrap_or_else(|| Sim::new(target, radius));
     if !state.initialized {
         state.morph.sim = Some(sim);
@@ -727,6 +734,15 @@ fn step_move(
         state.tail = TailState::new();
         return (target, radius, 0.0, 0.0);
     }
+    // The content moves first; the liquid springs after it. Without an
+    // explicit transition the content snaps, which is the drag case.
+    let content = if spec.options.transition_set {
+        advance_transition(state, spec, target, now, dt as f64)
+    } else {
+        target
+    };
+    let tcx = content.center().x;
+    let tcy = content.center().y;
     let (cx, vcx) = spring::advance(sim.cx, sim.vcx, tcx, opts.stiffness, opts.damping, dt);
     let (cy, vcy) = spring::advance(sim.cy, sim.vcy, tcy, opts.stiffness, opts.damping, dt);
     sim = Sim {
@@ -787,6 +803,19 @@ fn step_move(
     let btx = (sim.vcx * 0.09).clamp(-cap_x, cap_x) * opts.bend_x;
     state.bend_cur += (bty - state.bend_cur) * (dt * 9.0).min(1.0);
     state.bend_cur_x += (btx - state.bend_cur_x) * (dt * 9.0).min(1.0);
+    // Mild axial stretch: the drop widens along its travel and thins across
+    // it. The slope is absolute, like upstream, and the `stretch` knob is the
+    // ceiling — a fast flick reaches it, a slow drag barely shows.
+    let st = opts.stretch.min(speed * 0.0006);
+    state.stretch = if speed > 2.0 && st > 0.001 {
+        Some(Stretch {
+            angle: vcy.atan2(vcx),
+            along: 1.0 + st,
+            across: 1.0 / (1.0 + st * 0.65),
+        })
+    } else {
+        None
+    };
 
     (sim.boxed(0.0), radius, speed, 0.0)
 }
@@ -1070,35 +1099,25 @@ fn melt_paint(
             best_other = Some(*other);
         }
     }
-    let other = best_other?;
+    best_other?;
     let range = (options.blur * 2.6).max(8.0);
     let near = (1.0 - best_gap / range).clamp(0.0, 1.0);
     let target = near * near * (3.0 - 2.0 * near);
-    state.strength += (target - state.strength) * (dt as f32 * 12.0).min(1.0);
+    // Upstream eases with an exponential chase (rate 14), which is
+    // frame-rate independent, unlike a `dt * k` step.
+    let k = if dt > 0.0 {
+        1.0 - (-14.0 * dt as f32).exp()
+    } else {
+        0.0
+    };
+    state.strength += (target - state.strength) * k;
     if state.strength <= 0.001 {
+        state.strength = 0.0;
         return None;
     }
-    let seam = seam_point(rect, other);
-    let pos = rect.center();
-    let move_speed = state.prev.map_or(0.0, |prev| {
-        if dt > 0.0 {
-            ((pos.x - prev.x).powi(2) + (pos.y - prev.y).powi(2)).sqrt() / dt as f32
-        } else {
-            0.0
-        }
-    });
-    state.prev = Some(pos);
-    state.phase += (dt.min(1.0 / 24.0) as f32) * 0.12 * (move_speed / 40.0).min(1.0);
-    let diag = (rect.size.width.powi(2) + rect.size.height.powi(2)).sqrt() / 2.0;
-    let d = diag * options.reach.clamp(0.0, 2.0) * state.strength;
     Some(MeltPaint {
         options,
         strength: state.strength,
-        seam,
-        neighbor_center: other.center(),
-        d,
-        phase: state.phase,
-        overlap: best_gap <= 0.0,
     })
 }
 
@@ -1242,11 +1261,12 @@ mod tests {
     use super::*;
 
     fn spec(x: f32, w: f32) -> ItemSpec {
-        let mut options = ItemOptions::default();
-        options.observe = true;
         ItemSpec {
             base: ItemBox::new(x, 0.0, w, 40.0),
-            options,
+            options: ItemOptions {
+                observe: true,
+                ..ItemOptions::default()
+            },
         }
     }
 
@@ -1276,11 +1296,13 @@ mod tests {
 
     #[test]
     fn dissolve_paints_on_overlap() {
-        let mut options = ItemOptions::default();
-        options.dissolve = Some(DissolveOptions {
-            range: Some(44.0),
-            ..DissolveOptions::default()
-        });
+        let options = ItemOptions {
+            dissolve: Some(DissolveOptions {
+                range: Some(44.0),
+                ..DissolveOptions::default()
+            }),
+            ..ItemOptions::default()
+        };
         let a = ItemSpec {
             base: ItemBox::new(0.0, 0.0, 96.0, 96.0),
             options: options.clone(),
@@ -1328,8 +1350,10 @@ mod tests {
 
     #[test]
     fn dissolve_requires_proximity() {
-        let mut options = ItemOptions::default();
-        options.dissolve = Some(DissolveOptions::new());
+        let options = ItemOptions {
+            dissolve: Some(DissolveOptions::new()),
+            ..ItemOptions::default()
+        };
         let a = ItemSpec {
             base: ItemBox::new(0.0, 0.0, 40.0, 40.0),
             options,

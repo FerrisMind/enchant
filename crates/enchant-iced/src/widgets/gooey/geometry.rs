@@ -442,9 +442,33 @@ pub(crate) fn bend_polygon(
         .collect()
 }
 
+/// Applies an anisotropic stretch along the motion axis, in place.
+///
+/// Equivalent to transforming every point by `R(-a) · S(along, across) · R(a)`
+/// around `center`: the body grows where it leads and squeezes where it
+/// trails, which is what upstream's wrapper transform does with CSS.
+pub(crate) fn stretch_points(
+    points: &mut [Point],
+    center: Point,
+    angle: f32,
+    along: f32,
+    across: f32,
+) {
+    let (sin, cos) = angle.sin_cos();
+    for point in points {
+        let dx = point.x - center.x;
+        let dy = point.y - center.y;
+        let axial = dx * cos + dy * sin;
+        let lateral = -dx * sin + dy * cos;
+        let axial = axial * along;
+        let lateral = lateral * across;
+        point.x = center.x + axial * cos - lateral * sin;
+        point.y = center.y + axial * sin + lateral * cos;
+    }
+}
+
 /// Scales a logical-pixel rectangle into a raster of `size` pixels.
-pub(crate) fn resize(size: Size, density: f32) -> (usize, usize) {
-    (
+pub(crate) fn resize(size: Size, density: f32) -> (usize, usize) {    (
         (size.width * density).round().max(1.0) as usize,
         (size.height * density).round().max(1.0) as usize,
     )

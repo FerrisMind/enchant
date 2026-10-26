@@ -234,6 +234,7 @@ impl<'a, Message> LiquidItem<'a, Message> {
     #[must_use]
     pub fn transition(mut self, transition: impl Into<Transition>) -> Self {
         self.options.transition = transition.into();
+        self.options.transition_set = true;
         self
     }
 

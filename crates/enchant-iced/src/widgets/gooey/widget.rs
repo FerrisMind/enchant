@@ -31,11 +31,21 @@ use super::engine::{self, ItemSpec, ItemState};
 use super::options::ItemBox;
 use super::raster::{self, GroupStyle, RasterItem};
 
+struct CachedImage {
+    handle: image::Handle,
+    /// iced uploads image data asynchronously unless an explicit allocation is
+    /// held, and an animated raster is a brand-new handle every frame. Without
+    /// this the liquid is never drawn while it is moving: the upload lands one
+    /// frame late and the handle has already been replaced. Holding the
+    /// allocation makes the texture resident on the frame that records it.
+    _allocation: image::Allocation,
+}
+
 struct CachedRaster {
     signature: u64,
-    behind: image::Handle,
-    content: image::Handle,
-    above: image::Handle,
+    behind: Option<CachedImage>,
+    content: Option<CachedImage>,
+    above: Option<CachedImage>,
     bounds: Rectangle,
 }
 
@@ -43,6 +53,10 @@ struct CachedRaster {
 pub(super) struct LiquidState {
     states: RefCell<Vec<ItemState>>,
     cache: RefCell<Option<CachedRaster>>,
+    /// Recently replaced rasters. Their allocations keep textures alive for a
+    /// couple of frames so a GPU frame still reading an atlas entry is never
+    /// raced by an upload that reuses it.
+    history: RefCell<Vec<CachedRaster>>,
     origin: Instant,
     last: Cell<Option<Instant>>,
     active: Cell<bool>,
@@ -55,6 +69,7 @@ impl LiquidState {
         Self {
             states: RefCell::new(Vec::new()),
             cache: RefCell::new(None),
+            history: RefCell::new(Vec::new()),
             origin: Instant::now(),
             last: Cell::new(None),
             active: Cell::new(true),
@@ -158,6 +173,18 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
                     return;
                 };
                 let local = position - Vector::new(bounds.x, bounds.y);
+                #[cfg(debug_assertions)]
+                if std::env::var_os("GOOEY_DRAG_TRACE").is_some() {
+                    eprintln!(
+                        "[drag] bounds={bounds:?} local={local:?} candidates={:?}",
+                        state
+                            .states
+                            .borrow()
+                            .iter()
+                            .map(|s| s.rendered)
+                            .collect::<Vec<_>>()
+                    );
+                }
                 let hit = {
                     let states = state.states.borrow();
                     (0..self.items().len()).rev().find_map(|index| {
@@ -349,7 +376,9 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
                 static FRAME: AtomicUsize = AtomicUsize::new(0);
                 let frame = FRAME.fetch_add(1, Ordering::Relaxed);
                 if frame < 400
-                    && scene.iter().any(|item| item.image.is_some())
+                    && scene
+                        .iter()
+                        .any(|item| item.image.is_some() || item.bend.is_some())
                     && bounds.width > 200.0
                 {
                     raster.dump(
@@ -361,18 +390,25 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
                     );
                 }
             }
-            let behind =
-                image::Handle::from_rgba(raster.width, raster.height, raster.behind.clone());
-            let content =
-                image::Handle::from_rgba(raster.width, raster.height, raster.content.clone());
-            let above = image::Handle::from_rgba(raster.width, raster.height, raster.above.clone());
-            *state.cache.borrow_mut() = Some(CachedRaster {
+            let width = raster.width;
+            let height = raster.height;
+            let behind = upload(renderer, width, height, &raster.behind);
+            let content = upload(renderer, width, height, &raster.content);
+            let above = upload(renderer, width, height, &raster.above);
+            let mut cache = state.cache.borrow_mut();
+            if let Some(previous) = cache.replace(CachedRaster {
                 signature,
                 behind,
                 content,
                 above,
                 bounds,
-            });
+            }) {
+                let mut history = state.history.borrow_mut();
+                history.push(previous);
+                if history.len() > 2 {
+                    history.remove(0);
+                }
+            }
         }
 
         let cache = state.cache.borrow();
@@ -561,14 +597,39 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
     }
 }
 
-fn draw_layer(renderer: &mut Renderer, handle: &image::Handle, bounds: Rectangle) {
+fn draw_layer(renderer: &mut Renderer, layer: &Option<CachedImage>, bounds: Rectangle) {
+    let Some(layer) = layer else {
+        return;
+    };
     renderer.draw_image(
-        image::Image::new(handle.clone())
+        image::Image::new(layer.handle.clone())
             .filter_method(image::FilterMethod::Linear)
             .snap(false),
         bounds,
         bounds,
     );
+}
+
+/// Uploads one raster layer and keeps its allocation alive.
+///
+/// Empty layers are skipped: most demos have nothing in `content` or `above`,
+/// and refusing to upload them saves two blocking texture uploads per frame
+/// while the liquid is animating.
+fn upload(
+    renderer: &Renderer,
+    width: u32,
+    height: u32,
+    pixels: &[u8],
+) -> Option<CachedImage> {
+    if !pixels.chunks_exact(4).any(|pixel| pixel[3] != 0) {
+        return None;
+    }
+    let handle = image::Handle::from_rgba(width, height, pixels.to_vec());
+    let allocation = renderer.load_image(&handle).ok()?;
+    Some(CachedImage {
+        handle,
+        _allocation: allocation,
+    })
 }
 
 fn adjust_cursor(cursor: mouse::Cursor, center: Point, scale: f32, drag: Vector) -> mouse::Cursor {
@@ -629,6 +690,10 @@ fn signature(revision: u64, scene: &[RasterItem], style: &GroupStyle, bounds: Re
         item.bounds.origin.y.to_bits().hash(&mut hasher);
         item.bounds.size.width.to_bits().hash(&mut hasher);
         item.bounds.size.height.to_bits().hash(&mut hasher);
+        item.content.origin.x.to_bits().hash(&mut hasher);
+        item.content.origin.y.to_bits().hash(&mut hasher);
+        item.content.size.width.to_bits().hash(&mut hasher);
+        item.content.size.height.to_bits().hash(&mut hasher);
         item.radii.top_left.to_bits().hash(&mut hasher);
         item.radii.top_right.to_bits().hash(&mut hasher);
         item.radii.bottom_right.to_bits().hash(&mut hasher);
@@ -642,6 +707,11 @@ fn signature(revision: u64, scene: &[RasterItem], style: &GroupStyle, bounds: Re
         if let Some((y, x)) = item.bend {
             y.to_bits().hash(&mut hasher);
             x.to_bits().hash(&mut hasher);
+        }
+        if let Some(stretch) = item.stretch {
+            stretch.angle.to_bits().hash(&mut hasher);
+            stretch.along.to_bits().hash(&mut hasher);
+            stretch.across.to_bits().hash(&mut hasher);
         }
         if let Some(tail) = item.tail {
             tail.tail.0.x.to_bits().hash(&mut hasher);
@@ -662,9 +732,6 @@ fn signature(revision: u64, scene: &[RasterItem], style: &GroupStyle, bounds: Re
         }
         if let Some(melt) = &item.melt {
             melt.strength.to_bits().hash(&mut hasher);
-            melt.seam.x.to_bits().hash(&mut hasher);
-            melt.seam.y.to_bits().hash(&mut hasher);
-            melt.phase.to_bits().hash(&mut hasher);
         }
     }
     hasher.finish()

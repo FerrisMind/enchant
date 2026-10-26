@@ -180,7 +180,8 @@ pub fn parse_color(token: &str) -> Option<Color> {
 
 /// Splits `input` on top-level separators, ignoring separators inside
 /// parentheses. Empty parts are dropped and every part is trimmed.
-fn split_top_level(input: &str, is_separator: impl Fn(char) -> bool) -> Vec<&str> {    let mut parts = Vec::new();
+fn split_top_level(input: &str, is_separator: impl Fn(char) -> bool) -> Vec<&str> {
+    let mut parts = Vec::new();
     let mut depth: i32 = 0;
     let mut start = 0;
 

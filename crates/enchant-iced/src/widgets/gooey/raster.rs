@@ -263,16 +263,6 @@ pub(crate) struct MeltPaint {
     pub options: ImageMeltOptions,
     /// Proximity-eased reveal strength.
     pub strength: f32,
-    /// Contact point in group logical coordinates.
-    pub seam: Point,
-    /// Neighbour centre in group logical coordinates.
-    pub neighbor_center: Point,
-    /// Melt zone diameter.
-    pub d: f32,
-    /// Churn phase.
-    pub phase: f32,
-    /// Whether the item overlaps its neighbour.
-    pub overlap: bool,
 }
 
 /// One item as the rasterizer sees it (all logical coordinates).
@@ -289,11 +279,28 @@ pub(crate) struct RasterItem {
     pub content_blur: f32,
     /// Smoothed bend: `(vertical bow, cap deformation)`.
     pub bend: Option<(f32, f32)>,
+    /// Velocity stretch of the liquid body along the motion axis.
+    pub stretch: Option<Stretch>,
     pub tail: Option<TailCircles>,
     pub dissolve: Option<DissolvePaint>,
     pub melt: Option<MeltPaint>,
     /// Whether the body joins the merged liquid silhouette.
     pub silhouette: bool,
+}
+
+/// Anisotropic scale of the liquid body along its direction of travel.
+///
+/// Mirrors upstream's `rotate(a) scale(1 + st, 1 / (1 + st * 0.65)) rotate(-a)`:
+/// the leading half grows, the trailing half squeezes, and the body turns into
+/// a soft drop instead of an ellipse.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Stretch {
+    /// Direction of travel, in radians.
+    pub angle: f32,
+    /// Scale along the motion axis (`>= 1`).
+    pub along: f32,
+    /// Scale across the motion axis (`<= 1`).
+    pub across: f32,
 }
 
 /// A decoded image in straight RGBA, f32 per channel.
@@ -402,16 +409,6 @@ pub(crate) fn decode(handle: &Handle) -> Option<Arc<DecodedImage>> {
     decoded
 }
 
-/// Drops cached decodes (tests use this to keep memory bounded).
-#[cfg(test)]
-pub(crate) fn clear_decode_cache() {
-    if let Some(cache) = DECODE_CACHE.get() {
-        if let Ok(mut cache) = cache.lock() {
-            cache.clear();
-        }
-    }
-}
-
 struct Noise;
 
 impl Noise {
@@ -472,13 +469,32 @@ pub(crate) fn render(
             density,
         );
         let radii = item.radii.scaled(density);
-        if let Some((bend_y, bend_x)) = item.bend {
-            if bend_y.abs() > 0.35 || bend_x.abs() > 0.35 {
-                let points =
-                    geometry::bend_polygon(rect, radii, bend_y * density, bend_x * density);
-                geometry::fill_polygon(&mut shape, width, height, &points);
-            } else {
-                geometry::fill_rrect(&mut shape, width, height, rect, radii);
+        let (bend_y, bend_x) = item.bend.unwrap_or((0.0, 0.0));
+        let bowed = bend_y.abs() > 0.35 || bend_x.abs() > 0.35;
+        if bowed || item.stretch.is_some() {
+            let mut points =
+                geometry::bend_polygon(rect, radii, bend_y * density, bend_x * density);
+            if let Some(stretch) = item.stretch {
+                let center = Point::new(
+                    item.bounds.origin.x * density + rect.w / 2.0,
+                    item.bounds.origin.y * density + rect.h / 2.0,
+                );
+                geometry::stretch_points(
+                    &mut points,
+                    center,
+                    stretch.angle,
+                    stretch.along,
+                    stretch.across,
+                );
+            }
+            geometry::fill_polygon(&mut shape, width, height, &points);
+            #[cfg(debug_assertions)]
+            if std::env::var_os("GOOEY_BEND_TRACE").is_some() {
+                let covered = shape.iter().filter(|a| **a > 0.0).count();
+                eprintln!(
+                    "[bend] rect={rect:?} radii={radii:?} bend=({bend_y},{bend_x}) points={} covered={covered}",
+                    points.len()
+                );
             }
         } else {
             geometry::fill_rrect(&mut shape, width, height, rect, radii);
@@ -659,10 +675,7 @@ fn paint_image_item(
             if alpha <= 0.0 {
                 continue;
             }
-            let local = Point::new(
-                px / density - card.origin.x,
-                py / density - card.origin.y,
-            );
+            let local = Point::new(px / density - card.origin.x, py / density - card.origin.y);
             let c = image.sample_cover(local, card.size);
             let a = c[3] * alpha;
             layer.data[y * w + x] = [c[0] * a, c[1] * a, c[2] * a, a];
@@ -961,7 +974,10 @@ fn paint_image_melt(
             &mix,
             density,
             warp_eff,
-            ((2.0 + opts.waviness * 1.2) / 1000.0, (2.0 + opts.waviness * 1.2) / 1000.0),
+            (
+                (2.0 + opts.waviness * 1.2) / 1000.0,
+                (2.0 + opts.waviness * 1.2) / 1000.0,
+            ),
             MeltNoise::warp(),
         )
     } else {
@@ -1017,11 +1033,13 @@ fn paint_image_melt(
             width,
             height,
             density,
-            seam,
-            (r_a + r_b) / 2.0 + tan_half,
-            ((r_a + r_b) / 2.0) * opts.gravity.max(0.0),
-            seam_angle,
-            opts.fade.max(0.0),
+            Ellipse {
+                center: seam,
+                radius_x: (r_a + r_b) / 2.0 + tan_half,
+                radius_y: ((r_a + r_b) / 2.0) * opts.gravity.max(0.0),
+                angle: seam_angle,
+                blur: opts.fade.max(0.0),
+            },
         );
         for (p, (zone, a_goo)) in marble
             .data
@@ -1146,25 +1164,26 @@ fn melt_noise(noise: &Turbulence, x: f32, y: f32, freq: (f32, f32), octaves: u32
     )
 }
 
-/// A blurred, rotated ellipse coverage plane (the seam erase / marble zone).
-fn ellipse_mask(
-    width: usize,
-    height: usize,
-    density: f32,
+/// A rotated ellipse in the seam's coordinate space.
+struct Ellipse {
     center: Point,
     radius_x: f32,
     radius_y: f32,
     angle: f32,
+    /// Softening of the edge, in logical pixels.
     blur: f32,
-) -> Vec<f32> {
+}
+
+/// A blurred, rotated ellipse coverage plane (the seam erase / marble zone).
+fn ellipse_mask(width: usize, height: usize, density: f32, ellipse: Ellipse) -> Vec<f32> {
     let mut mask = vec![0.0_f32; width * height];
-    let rx = radius_x.max(0.01);
-    let ry = radius_y.max(0.01);
-    let (sin, cos) = angle.sin_cos();
+    let rx = ellipse.radius_x.max(0.01);
+    let ry = ellipse.radius_y.max(0.01);
+    let (sin, cos) = ellipse.angle.sin_cos();
     for y in 0..height {
-        let py = (y as f32 + 0.5) / density - center.y;
+        let py = (y as f32 + 0.5) / density - ellipse.center.y;
         for x in 0..width {
-            let px = (x as f32 + 0.5) / density - center.x;
+            let px = (x as f32 + 0.5) / density - ellipse.center.x;
             let u = px * cos + py * sin;
             let v = -px * sin + py * cos;
             if (u / rx).powi(2) + (v / ry).powi(2) <= 1.0 {
@@ -1210,8 +1229,25 @@ fn crisp_mask(
             mask[y * width + x] = geometry::coverage(px, py, rect, radii);
         }
     }
-    blur_plane(&mut mask, width, height, edge_soft * density, edge_soft * density);
-    let erase = ellipse_mask(width, height, density, seam, radius_x, radius_y, angle, fade);
+    blur_plane(
+        &mut mask,
+        width,
+        height,
+        edge_soft * density,
+        edge_soft * density,
+    );
+    let erase = ellipse_mask(
+        width,
+        height,
+        density,
+        Ellipse {
+            center: seam,
+            radius_x,
+            radius_y,
+            angle,
+            blur: fade,
+        },
+    );
     for (m, e) in mask.iter_mut().zip(erase.iter()) {
         *m *= 1.0 - e;
     }
@@ -1342,7 +1378,8 @@ fn warp_image(
                 src_x += (n1 - 0.5) * 2.0 * spec.warp;
                 src_y += (n2 - 0.5) * 2.0 * spec.warp;
             }
-            let local_src = Point::new(src_x - item.content.origin.x, src_y - item.content.origin.y);
+            let local_src =
+                Point::new(src_x - item.content.origin.x, src_y - item.content.origin.y);
             let c = image.sample_cover(local_src, item.content.size);
             let a = c[3] * inside * mask * spec.opacity;
             if a <= 0.0 {
