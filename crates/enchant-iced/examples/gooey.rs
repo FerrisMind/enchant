@@ -12,7 +12,7 @@
 //!   staggered delayed transitions.
 //! - **Split pair**: one blank circle divides into two and merges back.
 //! - **Email field**: the field and submit button share one gooey pill and
-//!   grow apart when the field is used.
+//!   grow apart when the field takes focus.
 //! - **Slider**: a draggable thumb rides the track with the `move` effect.
 //! - **Drag card**: dragging bows the liquid and stretches it toward the
 //!   pointer.
@@ -27,12 +27,13 @@
 
 mod _shared;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use enchant_iced::{
     Bend, CornerRadii, DissolveOptions, EVOLVE_DEFAULTS, Easing, EvolveOptions,
     IMAGE_MELT_DEFAULTS, ItemBox, Liquid, LiquidItem, Morph, Move, Transition,
 };
+use iced::advanced::widget::{Id, operation::focusable};
 use iced::widget::{Space, button, column, container, image, row, scrollable, text, text_input};
 use iced::{
     Alignment, Border, Color, Element, Font, Length, Size, Subscription, Task, Theme, Vector,
@@ -47,6 +48,10 @@ const SURFACE: Color = Color::from_rgb(1.0, 1.0, 1.0);
 
 const SHADOW: &str = "0 1px 2px rgba(0, 0, 0, 0.05), 0 10px 30px rgba(0, 0, 0, 0.10)";
 const SLIDER_TRAVEL: f32 = 188.0;
+
+/// The email field opens on focus, so the demo polls the real iced focus
+/// state instead of guessing from input events.
+const EMAIL_INPUT: Id = Id::new("gooey-email-input");
 
 /// Upstream plus-menu / split-pair motion curves.
 const BOUNCY_OPEN: Easing = Easing::CubicBezier {
@@ -80,6 +85,7 @@ enum Message {
     Nudge,
     ToggleMenu,
     EmailChanged(String),
+    EmailFocus(bool),
     Submit,
     Tick,
     Slider(Vector),
@@ -96,7 +102,8 @@ struct GooeyExample {
     split_open: bool,
     email_open: bool,
     email: String,
-    submitted: bool,
+    /// When the open/closed change happened, for the arrow's short fade.
+    email_anim: Option<Instant>,
     phase: f32,
     slider: f32,
     avatars: Vec<image::Handle>,
@@ -115,7 +122,7 @@ impl GooeyExample {
                 split_open: false,
                 email_open: false,
                 email: String::new(),
-                submitted: false,
+                email_anim: None,
                 phase: 0.0,
                 slider: 84.0,
                 avatars: (0..6).map(make_avatar).collect(),
@@ -131,16 +138,27 @@ impl GooeyExample {
             Message::Tab(index) => self.tab = index,
             Message::Nudge => self.nudged = !self.nudged,
             Message::ToggleMenu => self.menu_open = !self.menu_open,
-            Message::EmailChanged(value) => {
-                self.email = value;
-                self.email_open = true;
+            Message::EmailChanged(value) => self.email = value,
+            Message::EmailFocus(focused) => {
+                if self.email_open != focused {
+                    self.email_open = focused;
+                    self.email_anim = Some(Instant::now());
+                }
             }
-            Message::Submit => self.submitted = !self.email.is_empty(),
+            Message::Submit => {
+                // The reference button hands focus back to the page, which is
+                // what closes the pair.
+                self.email_open = false;
+                self.email_anim = Some(Instant::now());
+                return iced::advanced::widget::operate(focusable::unfocus());
+            }
             Message::Tick => {
                 self.phase += 0.028;
                 if self.phase > std::f32::consts::TAU {
                     self.phase -= std::f32::consts::TAU;
                 }
+                return iced::advanced::widget::operate(focusable::is_focused(EMAIL_INPUT))
+                    .map(Message::EmailFocus);
             }
             Message::Slider(offset) => {
                 self.slider = offset.x.clamp(0.0, SLIDER_TRAVEL);
@@ -378,11 +396,11 @@ impl GooeyExample {
             liquid = liquid.push(
                 LiquidItem::new(
                     button(icon(body))
-                    .padding(0)
-                    .width(Length::Fixed(40.0))
-                    .height(Length::Fixed(40.0))
-                    .style(transparent_button)
-                    .on_press_maybe(open.then_some(Message::ToggleMenu)),
+                        .padding(0)
+                        .width(Length::Fixed(40.0))
+                        .height(Length::Fixed(40.0))
+                        .style(transparent_button)
+                        .on_press_maybe(open.then_some(Message::ToggleMenu)),
                 )
                 .position(x, y)
                 .transition(transition)
@@ -396,15 +414,19 @@ impl GooeyExample {
         liquid = liquid.push(
             LiquidItem::new(
                 button(icon(lucide(
-                    if open { LucideIcon::X } else { LucideIcon::Plus },
+                    if open {
+                        LucideIcon::X
+                    } else {
+                        LucideIcon::Plus
+                    },
                     18.0,
                     INK,
                 )))
-                    .padding(0)
-                    .width(Length::Fixed(40.0))
-                    .height(Length::Fixed(40.0))
-                    .style(transparent_button)
-                    .on_press(Message::ToggleMenu),
+                .padding(0)
+                .width(Length::Fixed(40.0))
+                .height(Length::Fixed(40.0))
+                .style(transparent_button)
+                .on_press(Message::ToggleMenu),
             )
             .position(main.0, main.1)
             .morph(Morph::new().shape(true).bounce(0.7)),
@@ -459,6 +481,20 @@ impl GooeyExample {
 
     fn email_demo(&self) -> Element<'_, Message> {
         let open = self.email_open;
+        // Same hold-back as the reference: the arrow materialises once the
+        // button has pulled clear, and fades on the way back in.
+        let arrow_alpha = match self.email_anim {
+            Some(start) => {
+                let elapsed = start.elapsed().as_secs_f32();
+                if open {
+                    ((elapsed - 0.072) / 0.15).clamp(0.0, 1.0)
+                } else {
+                    (1.0 - elapsed / 0.15).clamp(0.0, 1.0)
+                }
+            }
+            None if open => 1.0,
+            None => 0.0,
+        };
         let transition = Transition::Timed {
             duration: Duration::from_millis(600),
             easing: Easing::CubicBezier {
@@ -469,7 +505,8 @@ impl GooeyExample {
             },
         };
         let field = container(
-            text_input("you@example.com", &self.email)
+            text_input("Enter your email", &self.email)
+                .id(EMAIL_INPUT)
                 .size(14)
                 .padding(iced::Padding {
                     top: 0.0,
@@ -490,19 +527,14 @@ impl GooeyExample {
             .transition(transition)
             .radius(CornerRadii::uniform(24.0));
         let submit = LiquidItem::new(
-            button(icon(if !open {
-                Space::new().into()
-            } else {
-                lucide(
-                    if self.submitted {
-                        LucideIcon::Check
-                    } else {
-                        LucideIcon::ArrowRight
-                    },
-                    17.0,
-                    INK,
-                )
-            }))
+            button(icon(lucide(
+                LucideIcon::ArrowRight,
+                18.0,
+                Color {
+                    a: arrow_alpha,
+                    ..INK
+                },
+            )))
             .padding(0)
             .width(Length::Fixed(44.0))
             .height(Length::Fixed(44.0))
@@ -522,7 +554,7 @@ impl GooeyExample {
             .extend([field, submit]);
         section(
             "Email input",
-            "Using the field widens it; the submit button stays attached.",
+            "Focusing the field pushes the submit circle clear; the goo necks, stretches and lets go.",
             liquid.into_element(),
         )
     }
