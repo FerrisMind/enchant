@@ -137,9 +137,18 @@ impl Scene {
     /// Whether `layer` paints anything.
     pub fn has_layer(&self, layer: Layer) -> bool {
         match layer {
-            Layer::Surface | Layer::Ring => true,
+            // Transparent / bare hosts (MetalText) skip the surface plate +
+            // inset shadow so only the masked metal shows.
+            Layer::Surface => self.surface.is_some(),
+            Layer::Ring => true,
             Layer::Glow => self.glow.is_some(),
-            Layer::Rim => true,
+            // Ring buttons always get the after-hairline. Sheet fills
+            // (text/badge) only paint the analytic rim when explicitly on —
+            // MetalText uses a separate glyph-rim overlay instead.
+            Layer::Rim => match self.mask {
+                MetalFxMask::Ring => true,
+                MetalFxMask::Fill | MetalFxMask::Custom(_) => self.rim.is_some(),
+            },
         }
     }
 

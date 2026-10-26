@@ -169,15 +169,15 @@ pub use line_shadow_text::{LineShadowTextProps, line_shadow_color_for_mode, line
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
 pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee, marquee_indexed};
 pub use metal_fx::{
-    AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, MetalBadge, MetalBadgeCore,
-    MetalBadgeDefaults, MetalBendApplyTo, MetalBendConfig, MetalCursorLight,
+    AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, METAL_TEXT_PAD_CSS, MetalBadge,
+    MetalBadgeCore, MetalBadgeDefaults, MetalBendApplyTo, MetalBendConfig, MetalCursorLight,
     MetalCursorLightConfig, MetalCursorSpill, MetalCursorSprite, MetalFx, MetalFxLayer,
     MetalFxMask, MetalFxOptions, MetalFxPreset, MetalFxResolvedTheme, MetalFxSurface,
     MetalFxTheme, MetalFxVariant, MetalGlowConfig, MetalGlowMode, MetalReflection,
     MetalReflectionAnchor, MetalReflectionOccluderConfig, MetalReflectionStyle, MetalText,
     MetalTextDefaults, MetalTextFont, TextInnerShadow, bend_config, bend_config_revision,
-    cursor_light_config, cursor_light_config_revision, cursor_sprite, rasterize_text_mask,
-    reflection_occluder_config, reset_bend_config, reset_cursor_light_config,
+    cursor_light_config, cursor_light_config_revision, cursor_sprite, glyph_mask_image,
+    rasterize_text_mask, reflection_occluder_config, reset_bend_config, reset_cursor_light_config,
     reset_reflection_occluder_config, set_bend_config, set_cursor_light_config, set_cursor_sprite,
     set_reflection_occluder_config, text_inner_shadow_mask,
 };

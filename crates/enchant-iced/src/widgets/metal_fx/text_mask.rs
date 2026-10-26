@@ -3,6 +3,7 @@
 //! Uses the crate's bundled Geist variable font so headless tests and demos
 //! share the same letterforms without depending on the host OS.
 
+use std::borrow::Cow;
 use std::sync::OnceLock;
 
 use swash::scale::{Render, ScaleContext, Source};
@@ -14,6 +15,7 @@ use super::bake::gauss_blur;
 use super::mask::AlphaMask;
 
 static GEIST: OnceLock<Vec<u8>> = OnceLock::new();
+static GEIST_LOADED: OnceLock<()> = OnceLock::new();
 
 fn geist_bytes() -> &'static [u8] {
     GEIST
@@ -21,6 +23,18 @@ fn geist_bytes() -> &'static [u8] {
             include_bytes!("../../../assets/Geist/Geist-VariableFont_wght.ttf").to_vec()
         })
         .as_slice()
+}
+
+/// Registers the bundled Geist variable font with iced's cosmic-text system so
+/// live labels share metrics with [`rasterize_text_mask`].
+pub fn ensure_geist_font_loaded() {
+    use iced::advanced::graphics::text as gfx_text;
+    GEIST_LOADED.get_or_init(|| {
+        let mut font_system = gfx_text::font_system()
+            .write()
+            .expect("write iced font system");
+        font_system.load_font(Cow::Borrowed(geist_bytes()));
+    });
 }
 
 /// Figma text inner-shadow defaults (`MetalText.tsx`).
@@ -101,6 +115,9 @@ impl Default for MetalTextFont {
 /// Rasterises `text` into a white-on-transparent alpha mask covering the
 /// tight glyph box padded by `pad` CSS px on every side.
 ///
+/// Sized from the **rendered** glyph placements (not typographic ascent /
+/// descent alone) so rounded bottoms and AA fringe are never clipped.
+///
 /// # Examples
 ///
 /// ```rust
@@ -135,14 +152,17 @@ pub fn rasterize_text_mask(text: &str, font: &MetalTextFont, density: f32, pad: 
             pen_x += g.advance;
         }
     });
-    let metrics = font_ref.metrics(&[]);
-    let scale = size / f32::from(metrics.units_per_em);
-    let ascent = metrics.ascent * scale;
-    let descent = (-metrics.descent) * scale;
-    let pad_px = (pad * density).ceil().max(1.0);
-    let width = (pen_x + 2.0 * pad_px).ceil().max(1.0) as u32;
-    let height = (ascent + descent + 2.0 * pad_px).ceil().max(1.0) as u32;
-    let mut alpha = vec![0u8; (width * height) as usize];
+
+    // Render every glyph once in pen space (baseline Y = 0, Y-up for `top`)
+    // so we can size the mask to the true ink box instead of typographic
+    // ascent/descent — Geist's bowls often spill a few px past descent.
+    struct Placed {
+        left: i32,
+        top: i32,
+        w: u32,
+        h: u32,
+        data: Vec<u8>,
+    }
     let mut scale_ctx = ScaleContext::new();
     let mut scaler = scale_ctx
         .builder(font_ref)
@@ -150,10 +170,13 @@ pub fn rasterize_text_mask(text: &str, font: &MetalTextFont, density: f32, pad: 
         .variations([("wght", weight)])
         .hint(true)
         .build();
+    let mut placed: Vec<Placed> = Vec::with_capacity(glyphs.len());
+    let mut min_x = i32::MAX;
+    let mut min_y = i32::MAX;
+    let mut max_x = i32::MIN;
+    let mut max_y = i32::MIN;
     for &(id, x) in &glyphs {
-        let px = x + pad_px;
-        let py = pad_px + ascent;
-        let offset = Vector::new(px.fract(), py.fract());
+        let offset = Vector::new(x.fract(), 0.0);
         let Some(img) = Render::new(&[Source::Outline])
             .format(Format::Alpha)
             .offset(offset)
@@ -161,23 +184,56 @@ pub fn rasterize_text_mask(text: &str, font: &MetalTextFont, density: f32, pad: 
         else {
             continue;
         };
-        // Swash/zeno placements are origin=baseline with Y-up: `top` is the
-        // offset of the bitmap's top edge above the baseline, so flip into the
-        // Y-down mask buffer.
+        // Baseline at y=0, Y-up `top` → Y-down bitmap top edge.
+        let left = img.placement.left + x.floor() as i32;
+        let top = -img.placement.top;
+        let right = left + img.placement.width as i32;
+        let bottom = top + img.placement.height as i32;
+        min_x = min_x.min(left);
+        min_y = min_y.min(top);
+        max_x = max_x.max(right);
+        max_y = max_y.max(bottom);
+        placed.push(Placed {
+            left,
+            top,
+            w: img.placement.width,
+            h: img.placement.height,
+            data: img.data,
+        });
+    }
+
+    let pad_px = (pad * density).ceil().max(1.0) as i32;
+    let (width, height, origin_x, origin_y) = if placed.is_empty() {
+        let metrics = font_ref.metrics(&[]);
+        let scale = size / f32::from(metrics.units_per_em);
+        let ascent = (metrics.ascent * scale).ceil() as i32;
+        let descent = ((-metrics.descent) * scale).ceil() as i32;
+        let w = (pen_x.ceil() as i32 + 2 * pad_px).max(1) as u32;
+        let h = (ascent + descent + 2 * pad_px).max(1) as u32;
+        (w, h, pad_px, pad_px + ascent)
+    } else {
+        let w = (max_x - min_x + 2 * pad_px).max(1) as u32;
+        let h = (max_y - min_y + 2 * pad_px).max(1) as u32;
+        (w, h, pad_px - min_x, pad_px - min_y)
+    };
+
+    let mut alpha = vec![0u8; (width * height) as usize];
+    for g in &placed {
         blit_alpha(
             &mut alpha,
             width,
             height,
-            img.placement.left + px.floor() as i32,
-            py.floor() as i32 - img.placement.top,
-            img.placement.width,
-            img.placement.height,
-            &img.data,
+            g.left + origin_x,
+            g.top + origin_y,
+            g.w,
+            g.h,
+            &g.data,
         );
     }
     AlphaMask::from_alpha(width, height, density, alpha)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn blit_alpha(
     dst: &mut [u8],
     dst_w: u32,
@@ -203,6 +259,47 @@ fn blit_alpha(
             dst[i] = dst[i].max(s);
         }
     }
+}
+
+/// Default CSS pad around the tight glyph box (`MetalText` / neighbour labels).
+pub const METAL_TEXT_PAD_CSS: f32 = 3.0;
+
+/// Tints `mask` into a straight-RGBA iced image at the mask's CSS size.
+///
+/// Use this for live labels that must share the same pixel grid as a
+/// [`MetalFxMask::Custom`](super::mask::MetalFxMask::Custom) / reflection
+/// glyph mask — iced `text` metrics will not line up.
+#[must_use]
+pub fn glyph_mask_image<'a, Message: 'a>(
+    mask: &AlphaMask,
+    color: iced::Color,
+) -> iced::Element<'a, Message> {
+    use iced::widget::image;
+    use iced::{ContentFit, Length};
+
+    let (w, h) = mask.pixel_size();
+    let density = mask.density().max(1e-3);
+    let css_w = w as f32 / density;
+    let css_h = h as f32 / density;
+    let n = (w * h) as usize;
+    let mut rgba = vec![0u8; n * 4];
+    let r = (color.r.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let g = (color.g.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let b = (color.b.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let ca = color.a.clamp(0.0, 1.0);
+    for (i, &a) in mask.alpha().iter().enumerate() {
+        let j = i * 4;
+        rgba[j] = r;
+        rgba[j + 1] = g;
+        rgba[j + 2] = b;
+        rgba[j + 3] = ((f32::from(a) / 255.0) * ca * 255.0).round() as u8;
+    }
+    let handle = image::Handle::from_rgba(w, h, rgba);
+    image(handle)
+        .width(Length::Fixed(css_w))
+        .height(Length::Fixed(css_h))
+        .content_fit(ContentFit::Fill)
+        .into()
 }
 
 /// Builds the white top-edge rim overlay from a glyph mask (`drawInnerShadow`).
@@ -243,6 +340,37 @@ mod tests {
     fn rasterize_pro_has_ink() {
         let mask = rasterize_text_mask("Pro", &MetalTextFont::default(), 2.0, 2.0);
         assert!(mask.interior_points(2.0).len() > 8);
+    }
+
+    #[test]
+    fn rasterize_pro_keeps_pad_below_ink() {
+        let pad = 2.0;
+        let density = 2.0;
+        let mask = rasterize_text_mask(
+            "Pro",
+            &MetalTextFont {
+                size: 24.0,
+                weight: 500.0,
+            },
+            density,
+            pad,
+        );
+        let (w, h) = mask.pixel_size();
+        let a = mask.alpha();
+        let mut max_y = 0u32;
+        for y in 0..h {
+            for x in 0..w {
+                if a[(y * w + x) as usize] > 8 {
+                    max_y = max_y.max(y);
+                }
+            }
+        }
+        let bottom_pad = h.saturating_sub(1).saturating_sub(max_y);
+        let need = (pad * density).floor() as u32;
+        assert!(
+            bottom_pad >= need,
+            "bottom pad {bottom_pad} < {need} (ink max_y={max_y}, h={h})"
+        );
     }
 
     #[test]

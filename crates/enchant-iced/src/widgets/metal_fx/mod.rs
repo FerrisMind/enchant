@@ -148,8 +148,8 @@ pub use preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetM
 pub use raster::{MetalFxBitmap, MetalFxHost, MetalFxLayerKind, MetalRenderOptions};
 pub use rim::MetalRimOptions;
 pub use text_mask::{
-    METAL_TEXT_DEFAULTS, MetalTextDefaults, MetalTextFont, TextInnerShadow, rasterize_text_mask,
-    text_inner_shadow_mask,
+    METAL_TEXT_DEFAULTS, METAL_TEXT_PAD_CSS, MetalTextDefaults, MetalTextFont, TextInnerShadow,
+    ensure_geist_font_loaded, glyph_mask_image, rasterize_text_mask, text_inner_shadow_mask,
 };
 pub use tween::{Ease, Tween};
 pub use widget::MetalFx;

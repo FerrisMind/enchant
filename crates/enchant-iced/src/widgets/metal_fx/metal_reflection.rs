@@ -10,6 +10,7 @@ use iced::advanced::widget::{self, Operation, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
 use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme, mouse, window};
 
+use super::mask::AlphaMask;
 use super::reflection::{MetalReflectionPaint, MetalReflectionStyle, paint_reflection};
 use super::reflection_anchor::reflection_anchor;
 
@@ -27,6 +28,7 @@ pub struct MetalReflection<'a, Message> {
     strength: f32,
     style: MetalReflectionStyle,
     density: f32,
+    glyph_mask: Option<AlphaMask>,
     child: Element<'a, Message>,
 }
 
@@ -38,6 +40,7 @@ impl<'a, Message> MetalReflection<'a, Message> {
             strength: 1.0,
             style: MetalReflectionStyle::Surface,
             density: 1.0,
+            glyph_mask: None,
             child: child.into(),
         }
     }
@@ -61,6 +64,12 @@ impl<'a, Message> MetalReflection<'a, Message> {
         if density.is_finite() {
             self.density = density.clamp(1.0, 3.0);
         }
+        self
+    }
+
+    /// Clips a [`MetalReflectionStyle::Glyphs`] catch to letterforms.
+    pub fn glyph_mask(mut self, mask: AlphaMask) -> Self {
+        self.glyph_mask = Some(mask);
         self
     }
 }
@@ -201,7 +210,7 @@ impl<Message> Widget<Message, Theme, Renderer> for MetalReflection<'_, Message> 
             style: self.style,
             density: self.density,
             pointer,
-            glyph_mask: None,
+            glyph_mask: self.glyph_mask.as_ref(),
         }) else {
             inner.handle = None;
             return;

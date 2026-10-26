@@ -310,7 +310,9 @@ pub struct MetalReflectionPaint<'a> {
     pub style: MetalReflectionStyle,
     pub density: f32,
     pub pointer: Option<[f32; 2]>,
-    pub glyph_mask: Option<&'a [u8]>,
+    /// Optional glyph coverage; when set, reflection ink is clipped to it
+    /// (CSS-px sampling via [`AlphaMask::sample`](super::mask::AlphaMask::sample)).
+    pub glyph_mask: Option<&'a super::mask::AlphaMask>,
 }
 
 /// Renders one reflection frame into straight RGBA8 (target-local).
@@ -414,8 +416,7 @@ pub fn paint_reflection(input: MetalReflectionPaint<'_>) -> Option<(u32, u32, Ve
             }
 
             if let Some(mask) = glyph_mask {
-                let mi = ((py * w + px) as usize).min(mask.len().saturating_sub(1));
-                a *= f32::from(mask[mi]) / 255.0;
+                a *= mask.sample(lx, ly);
             }
 
             let keep = occluder_keep(

@@ -5,23 +5,20 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use iced::advanced::image::{self, Renderer as _};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::overlay;
 use iced::advanced::renderer::{self, Renderer as _};
 use iced::advanced::widget::{self, Operation, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
-use iced::border::Radius;
-use iced::{
-    Background, Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Theme, Vector,
-    mouse, window,
-};
+use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme, Vector, mouse, window};
 use iced_wgpu::primitive::Renderer as _;
 
 use super::bend::{MetalBendField, MetalBendState};
 use super::bend_config::{MetalBendConfig, bend_config};
 use super::cursor_light::{
-    MetalCursorLight, MetalCursorSpill, cursor_light_config, fade_alpha, nearest_outline_point,
-    proximity_weight, spill_frame,
+    MetalCursorLight, MetalCursorSpill, bake_spill_rgba, cursor_light_config, fade_alpha,
+    nearest_outline_point, proximity_weight, spill_frame,
 };
 use super::geometry::MetalFxVariant;
 use super::glow::{GlowFrame, GlowSampler, GlowState, GlowTick, MaterialSampler};
@@ -521,42 +518,29 @@ fn place(renderer: &mut Renderer, scene: &Arc<Scene>, bounds: Rectangle, layer: 
 }
 
 /// Soft radial glint under the pointer (`spill` effect).
+///
+/// Matches the web's `radial-gradient(closest-side, … 0% / 0.35@45% / 0@100%)`
+/// — a single soft disc, not hard concentric quads.
 fn draw_spill(renderer: &mut Renderer, bounds: Rectangle, spill: MetalCursorSpill) {
-    // Three concentric discs approximate the CSS radial-gradient.
-    let rings = [
-        (1.0_f32, spill.opacity),
-        (0.55, spill.opacity * 0.35),
-        (0.2, spill.opacity * 0.08),
-    ];
-    for (scale, alpha) in rings {
-        if alpha < 0.01 {
-            continue;
-        }
-        let r = spill.radius * scale;
-        let rect = Rectangle {
-            x: bounds.x + spill.position[0] - r,
-            y: bounds.y + spill.position[1] - r,
-            width: r * 2.0,
-            height: r * 2.0,
-        };
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: rect,
-                border: Border {
-                    radius: Radius::from(r),
-                    ..Border::default()
-                },
-                shadow: iced::Shadow::default(),
-                snap: false,
-            },
-            Background::Color(Color::from_rgba(
-                spill.tint[0],
-                spill.tint[1],
-                spill.tint[2],
-                alpha,
-            )),
-        );
+    if spill.opacity < 0.01 || spill.radius < 0.5 {
+        return;
     }
+    // Bake at 2× so the soft falloff stays smooth when drawn into CSS px.
+    let px = (spill.radius * 2.0).ceil().max(2.0) as u32;
+    let (w, h, rgba) = bake_spill_rgba(px, spill.tint, spill.opacity);
+    let handle = image::Handle::from_rgba(w, h, rgba);
+    let r = spill.radius;
+    let rect = Rectangle {
+        x: bounds.x + spill.position[0] - r,
+        y: bounds.y + spill.position[1] - r,
+        width: r * 2.0,
+        height: r * 2.0,
+    };
+    renderer.draw_image(
+        image::Image::new(handle).filter_method(image::FilterMethod::Linear),
+        rect,
+        rect,
+    );
 }
 
 impl<Message> Widget<Message, Theme, Renderer> for MetalFx<'_, Message> {

@@ -1,14 +1,14 @@
 //! Bare metal-filled text — Libraries.dev `MetalText.tsx` / Swift `MetalText`.
 
-use iced::widget::{container, text};
+use iced::widget::{container, stack};
 use iced::{Background, Color, Element, Length};
 
-use super::mask::{MetalFxMask, MetalGlowMode};
+use super::mask::{AlphaMask, MetalFxMask, MetalGlowMode};
 use super::options::MetalFxSurface;
 use super::preset::MetalFxTheme;
 use super::text_mask::{
-    METAL_TEXT_DEFAULTS, MetalTextFont, TextInnerShadow, rasterize_text_mask,
-    text_inner_shadow_mask,
+    METAL_TEXT_DEFAULTS, METAL_TEXT_PAD_CSS, MetalTextFont, TextInnerShadow, glyph_mask_image,
+    rasterize_text_mask, text_inner_shadow_mask,
 };
 use super::widget::MetalFx;
 
@@ -147,25 +147,17 @@ impl MetalText {
         Message: Clone + 'a,
     {
         let density = 2.0;
-        let pad = 2.0;
-        let mask = rasterize_text_mask(&self.content, &self.font, density, pad);
+        let mask = rasterize_text_mask(&self.content, &self.font, density, METAL_TEXT_PAD_CSS);
         let (pw, ph) = mask.pixel_size();
         let css_w = pw as f32 / density;
         let css_h = ph as f32 / density;
 
-        // Keep the rim bake exercised for parity (GPU rim is analytic + mask).
-        if let Some(shadow) = self.inner_shadow {
-            let _ = text_inner_shadow_mask(&mask, shadow);
-        }
-
-        let label = text(self.content.clone())
-            .size(self.font.size)
-            .color(self.color);
-        let body = container(label)
+        // Base colour and metal share the same swash mask so glyphs never
+        // drift (iced `text` uses different metrics than the mask bake).
+        let base = glyph_mask_image(&mask, self.color);
+        let body = container(base)
             .width(Length::Fixed(css_w))
             .height(Length::Fixed(css_h))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
             .style(|_| container::Style {
                 background: Some(Background::Color(Color::TRANSPARENT)),
                 ..container::Style::default()
@@ -176,17 +168,31 @@ impl MetalText {
             .strength(self.strength * self.metal_opacity)
             .shader_scale(self.shader_scale)
             .border_radius(4.0)
+            .ring_px(0.0)
             .glow(self.glow)
             .glow_gain(self.glow_gain)
-            .inner_shadow(self.inner_shadow.is_some())
-            .mask(MetalFxMask::Custom(mask))
+            // Bare text: no pill ring rim / after-hairline — glyph rim is a
+            // separate overlay (matches BARE_CSS + drawInnerShadow).
+            .inner_shadow(false)
+            .mask(MetalFxMask::Custom(mask.clone()))
             .glow_mode(MetalGlowMode::Mask)
             .surface(MetalFxSurface::Transparent)
             .paused(self.paused);
         if let Some(id) = self.anchor_id {
             fx = fx.anchor_id(id);
         }
-        fx.into()
+
+        let metal: Element<'a, Message> = fx.into();
+        if let Some(shadow) = self.inner_shadow {
+            let rim = text_inner_shadow_mask(&mask, shadow);
+            let rim_img = glyph_mask_image(&rim, Color::WHITE);
+            stack![metal, rim_img]
+                .width(Length::Fixed(css_w))
+                .height(Length::Fixed(css_h))
+                .into()
+        } else {
+            metal
+        }
     }
 }
 
@@ -216,7 +222,9 @@ mod tests {
             .glow(false)
             .shader_scale(2.8)
             .surface(MetalFxSurface::Transparent)
-            .border_radius(4.0);
+            .border_radius(4.0)
+            .inner_shadow(false)
+            .ring_px(0.0);
         let host = MetalFxHost::new(pw as f32 / 2.0, ph as f32 / 2.0);
         let bitmap = options.render_at(
             Duration::from_millis(900),
@@ -228,5 +236,27 @@ mod tests {
         let corner = bitmap.pixel(0, 0);
         assert_eq!(corner[3], 0, "transparent outside glyphs");
         assert!(!mask.interior_points(2.0).is_empty());
+    }
+
+    #[test]
+    fn bare_text_skips_surface_and_box_rim_layers() {
+        use super::super::scene::{Layer, tests::scene};
+        let mut s = scene(MetalFxResolvedTheme::Dark, false);
+        s.surface = None;
+        s.rim = None;
+        s.mask = MetalFxMask::Custom(AlphaMask::solid(8, 4));
+        s.glow_mode = MetalGlowMode::Mask;
+        assert!(!s.has_layer(Layer::Surface));
+        assert!(!s.has_layer(Layer::Rim));
+        assert!(s.has_layer(Layer::Ring));
+    }
+
+    #[test]
+    fn base_tint_shares_mask_pixel_grid() {
+        let mask = rasterize_text_mask("Pro", &MetalTextFont::default(), 2.0, 2.0);
+        let (pw, ph) = mask.pixel_size();
+        assert!(pw > 8 && ph > 8);
+        // Interior ink must exist so the tinted base is visible under metal.
+        assert!(mask.interior_points(2.0).len() > 4);
     }
 }

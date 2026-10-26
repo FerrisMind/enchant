@@ -13,8 +13,9 @@
 //! ```
 
 use enchant_iced::widgets::metal_fx::{
-    MetalBadge, MetalFx, MetalFxPreset, MetalFxTheme, MetalFxVariant, MetalReflection,
-    MetalReflectionStyle, MetalText, MetalTextFont, set_cursor_light_config,
+    METAL_TEXT_PAD_CSS, MetalBadge, MetalFx, MetalFxPreset, MetalFxTheme, MetalFxVariant,
+    MetalReflection, MetalReflectionStyle, MetalText, MetalTextFont, glyph_mask_image,
+    rasterize_text_mask, set_cursor_light_config,
 };
 use iced::widget::{button, checkbox, column, container, row, slider, space, text};
 use iced::{
@@ -200,25 +201,36 @@ impl Gallery {
         .inner_shadow(true)
         .anchor_id("send");
 
+        let text_font = MetalTextFont {
+            size: 24.0,
+            weight: 500.0,
+        };
         let pro = MetalText::new("Pro")
-            .font(MetalTextFont {
-                size: 48.0,
-                weight: 500.0,
-            })
+            .font(text_font.clone())
             .theme(theme)
             .strength(s)
             .paused(paused)
             .anchor_id("pro");
 
-        // Neighbour catch on "Plan" from the Pro metal text.
+        // Neighbour catch on "Plan" — same swash mask for label + reflection
+        // (iced `text` would sit lower than the mask ink).
+        let plan_mask = rasterize_text_mask("Plan", &text_font, 2.0, METAL_TEXT_PAD_CSS);
+        let (plan_pw, plan_ph) = plan_mask.pixel_size();
+        let plan_w = plan_pw as f32 / 2.0;
+        let plan_h = plan_ph as f32 / 2.0;
+        let plan_label = glyph_mask_image(
+            &plan_mask,
+            Color::from_rgba(0.9, 0.9, 0.9, 0.55),
+        );
         let plan = MetalReflection::new(
             "pro",
-            text("Plan")
-                .size(48)
-                .color(Color::from_rgba(0.9, 0.9, 0.9, 0.55)),
+            container(plan_label)
+                .width(Length::Fixed(plan_w))
+                .height(Length::Fixed(plan_h)),
         )
         .strength(0.64)
-        .style(MetalReflectionStyle::Glyphs);
+        .style(MetalReflectionStyle::Glyphs)
+        .glyph_mask(plan_mask);
 
         let badge = MetalBadge::new("New").theme(theme).strength(s).paused(paused);
 

@@ -221,6 +221,46 @@ pub fn fade_alpha(dt_secs: f32, fade_ms: f32) -> f32 {
     1.0 - (-(dt_secs * 1000.0) / tau).exp()
 }
 
+/// Soft radial spill bitmap matching the web's
+/// `radial-gradient(closest-side, rgba 0% → 0.35@45% → 0@100%)`.
+///
+/// Returns straight RGBA8 (`width == height == 2 * radius_px`).
+#[must_use]
+pub fn bake_spill_rgba(radius_px: u32, tint: [f32; 3], opacity: f32) -> (u32, u32, Vec<u8>) {
+    let radius_px = radius_px.max(1);
+    let side = radius_px * 2;
+    let mut rgba = vec![0u8; (side * side * 4) as usize];
+    let r = radius_px as f32;
+    let cx = r - 0.5;
+    let cy = r - 0.5;
+    let op = opacity.clamp(0.0, 1.0);
+    let tr = tint[0].clamp(0.0, 1.0);
+    let tg = tint[1].clamp(0.0, 1.0);
+    let tb = tint[2].clamp(0.0, 1.0);
+    for y in 0..side {
+        for x in 0..side {
+            let d = ((x as f32 - cx).hypot(y as f32 - cy) / r).clamp(0.0, 1.0);
+            // Piecewise match of the CSS stops: 1 @ 0, 0.35 @ 0.45, 0 @ 1.
+            let a = if d <= 0.45 {
+                1.0 - (1.0 - 0.35) * (d / 0.45)
+            } else {
+                0.35 * (1.0 - (d - 0.45) / 0.55)
+            }
+            .clamp(0.0, 1.0)
+                * op;
+            if a < 0.002 {
+                continue;
+            }
+            let i = ((y * side + x) * 4) as usize;
+            rgba[i] = (tr * 255.0).round() as u8;
+            rgba[i + 1] = (tg * 255.0).round() as u8;
+            rgba[i + 2] = (tb * 255.0).round() as u8;
+            rgba[i + 3] = (a * 255.0).round() as u8;
+        }
+    }
+    (side, side, rgba)
+}
+
 /// Builds a spill frame from proximity, sample colour and luminance.
 #[must_use]
 pub fn spill_frame(
@@ -386,5 +426,22 @@ mod tests {
         assert!(cursor_sprite().is_some());
         set_cursor_sprite(None);
         assert!(cursor_sprite().is_none());
+    }
+
+    #[test]
+    fn spill_radial_is_soft_not_a_hard_disc() {
+        let (w, h, rgba) = bake_spill_rgba(32, [1.0, 1.0, 1.0], 1.0);
+        assert_eq!(w, 64);
+        assert_eq!(h, 64);
+        let center = ((32 * 64 + 32) * 4) as usize;
+        let edge = ((32 * 64 + 63) * 4) as usize;
+        let mid = ((32 * 64 + 32 + 14) * 4) as usize; // ~45% of radius
+        assert!(rgba[center + 3] > 240, "core opaque");
+        assert!(
+            rgba[mid + 3] > 60 && rgba[mid + 3] < 120,
+            "mid stop ~0.35: {}",
+            rgba[mid + 3]
+        );
+        assert!(rgba[edge + 3] < 8, "rim fades out: {}", rgba[edge + 3]);
     }
 }
