@@ -1829,8 +1829,9 @@ pub(crate) fn draw_glasses(
         return;
     }
     let f = frame_of(kind);
-    let (cy, sy) = yaw.sin_cos();
-    let (cp, sp) = pitch.sin_cos();
+    // `sin_cos` gives (sin, cos); the matrix below wants cos first.
+    let (sy, cy) = yaw.sin_cos();
+    let (sp, cp) = pitch.sin_cos();
     let (l, h) = light_of(lx, ly);
     let view = make_view(
         [cy, 0.0, sy, sp * sy, cp, -sp * cy, -cp * sy, sp, cp * cy],
