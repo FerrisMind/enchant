@@ -229,34 +229,8 @@ impl MetalBadge {
             .align_x(iced::alignment::Horizontal::Center)
             .align_y(iced::alignment::Vertical::Center);
 
-        // White core under the label (ellipse ≈ `core.size`% of the box) so
-        // metal stays at the rim and text sits on clean white.
-        let core_w = (w * self.core.size / 100.0).max(1.0);
-        let core_h = (h * self.core.size / 100.0).max(1.0);
-        let core_r = core_w.min(core_h) * 0.5;
-        let core_blob = container(column![])
-            .width(Length::Fixed(core_w))
-            .height(Length::Fixed(core_h))
-            .style(move |_| container::Style {
-                background: Some(Background::Color(Color::from_rgba(
-                    1.0,
-                    1.0,
-                    1.0,
-                    self.core.a,
-                ))),
-                border: Border {
-                    radius: core_r.into(),
-                    ..Border::default()
-                },
-                ..container::Style::default()
-            });
-        let core_overlay = container(core_blob)
-            .width(Length::Fixed(w))
-            .height(Length::Fixed(h))
-            .align_x(iced::alignment::Horizontal::Center)
-            .align_y(iced::alignment::Vertical::Center);
-
-        // Gradient wash + inset rims (layers 3 + 5) above the metal, below text.
+        // Inset rims / wash sit with the label above the metal (not a white blob).
+        let _ = self.core; // kept for API parity; core is the white surface under metal.
         let glow_overlay = container(column![])
             .width(Length::Fixed(w))
             .height(Length::Fixed(h))
@@ -280,11 +254,12 @@ impl MetalBadge {
                 ..container::Style::default()
             });
 
-        // Content above metal: core → rims → label (Figma bottom→top 3b/3/5/4).
-        let body = stack![core_overlay, glow_overlay, label_box]
+        // Only overlays + label above metal — no separate white core disc.
+        let body = stack![glow_overlay, label_box]
             .width(Length::Fixed(w))
             .height(Length::Fixed(h));
 
+        // Stack: white surface (core) → metal fill → child ("New" + rims).
         MetalFx::new(body)
             .theme(self.theme)
             .strength(self.strength * self.metal_opacity)
@@ -295,7 +270,6 @@ impl MetalBadge {
             .mask(MetalFxMask::Fill)
             .glow_mode(MetalGlowMode::Ring)
             .surface(MetalFxSurface::Solid(Color::WHITE))
-            // Metal under the label/core — default OverChild buried "New".
             .layer(MetalFxLayer::BehindChild)
             .paused(self.paused)
             .into()
