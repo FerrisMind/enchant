@@ -113,7 +113,11 @@ pub use aurora_text::{AuroraTextProps, aurora_text};
 pub use avatar_circles::{AvatarCircleEntry, AvatarCirclesProps, avatar_circles};
 pub use backlight::{BacklightProps, BacklightSvgGlow, backlight};
 pub use blur_fade::{BlurFadeDirection, BlurFadeProps, BlurFadeState, blur_fade};
-pub use border_beam::{BorderBeam, BorderBeamEase};
+pub use border_beam::{
+    BeamBitmap, BeamHost, BeamLayers, BeamRenderOptions, BorderBeam, BorderBeamCanvas,
+    BorderBeamCanvasState, BorderBeamFrame, BorderBeamOptions, BorderBeamPalette, BorderBeamRaster,
+    BorderBeamSize, BorderBeamSpec, BorderBeamTheme, ResolvedBeamTheme,
+};
 pub use code_comparison::{CodeComparisonProps, code_comparison};
 pub use comic_text::{ComicTextProps, ComicTextState, comic_text};
 pub use confetti::{Confetti, ConfettiButton, ConfettiOptions, ConfettiShape, ConfettiState};
