@@ -7,6 +7,7 @@ const INTERNAL_HELPER_EXAMPLES: &[&str] = &[
     "border_track",
     "motion_grid",
     "thinking_orb",
+    "voice_glow",
 ];
 
 const HELPER_EXPORTS: &[&str] = &[
