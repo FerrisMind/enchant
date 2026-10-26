@@ -264,6 +264,24 @@ impl<'a, Message: 'a> Widget<Message, Theme, Renderer> for Liquid<'a, Message> {
             return;
         }
         let state = tree.state.downcast_ref::<LiquidState>();
+        #[cfg(debug_assertions)]
+        if std::env::var_os("GOOEY_TRACE").is_some() {
+            static FRAME: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            if FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 16 {
+                eprintln!("[gooey] bounds={bounds:?}");
+                for (index, item) in self.items().iter().enumerate() {
+                    let rendered = state
+                        .states
+                        .borrow()
+                        .get(index)
+                        .and_then(|state| state.rendered);
+                    eprintln!(
+                        "[gooey]   item {index}: pos={:?} offset={:?} rendered={rendered:?}",
+                        item.options().position, item.options().offset
+                    );
+                }
+            }
+        }
         let now = Instant::now();
         let elapsed = state
             .last
