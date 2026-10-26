@@ -5,6 +5,7 @@ use std::path::PathBuf;
 const INTERNAL_HELPER_EXAMPLES: &[&str] = &[
     "animated_subscribe_button",
     "border_track",
+    "metal_fx",
     "motion_grid",
     "thinking_orb",
     "voice_glow",
@@ -28,9 +29,11 @@ const HELPER_EXPORTS: &[&str] = &[
     "line_shadow_color_for_mode",
     "marquee_indexed",
     "noise_texture_layer",
+    "rasterize_text_mask",
     "scroll_velocity_container",
     "scroll_velocity_row",
     "shiny_text_color_for_mode",
+    "text_inner_shadow_mask",
     "theme_transition_overlay",
 ];
 

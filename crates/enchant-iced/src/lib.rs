@@ -26,6 +26,13 @@ pub use sections::{
 pub use theme::MagicTheme;
 pub use widgets::gravity;
 pub use widgets::{
+    AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, MetalBadge, MetalBadgeCore,
+    MetalBadgeDefaults, MetalFx, MetalFxLayer, MetalFxMask, MetalFxOptions, MetalFxPreset,
+    MetalFxResolvedTheme, MetalFxSurface, MetalFxTheme, MetalFxVariant, MetalGlowConfig,
+    MetalGlowMode, MetalText, MetalTextDefaults, MetalTextFont, TextInnerShadow,
+    rasterize_text_mask, text_inner_shadow_mask,
+};
+pub use widgets::{
     AndroidProps, AnimatedBeamProps, AnimatedCircularProgressBarProps,
     AnimatedCircularProgressBarState, AnimatedGradientTextProps, AnimatedGridPatternProps,
     AnimatedListProps, AnimatedListState, AnimatedShinyTextProps, AnimatedSubscribeButtonProps,
@@ -96,10 +103,3 @@ pub use widgets::{
     VoiceGlowRaster, VoiceGlowTheme, VoiceGlowType,
 };
 pub use widgets::{GlyphMatrixProps, glyph_matrix};
-pub use widgets::{
-    AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, MetalBadge, MetalBadgeCore,
-    MetalBadgeDefaults, MetalFx, MetalFxLayer, MetalFxMask, MetalFxOptions, MetalFxPreset,
-    MetalFxResolvedTheme, MetalFxSurface, MetalFxTheme, MetalFxVariant, MetalGlowConfig,
-    MetalGlowMode, MetalText, MetalTextDefaults, MetalTextFont, TextInnerShadow, rasterize_text_mask,
-    text_inner_shadow_mask,
-};
