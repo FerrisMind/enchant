@@ -712,6 +712,7 @@ impl<'a, Message: 'a> Liquid<'a, Message> {
         let positions: Vec<Option<Point>> =
             self.items.iter().map(|i| i.options.position).collect();
         let offsets: Vec<Vector> = self.items.iter().map(|i| i.options.offset).collect();
+        let no_offsets = vec![Vector::ZERO; self.items.len()];
         let ones = vec![1.0_f32; self.items.len()];
         // Widget content sits at the component-driven target immediately;
         // only the liquid silhouette is spring-lagged.
@@ -727,6 +728,16 @@ impl<'a, Message: 'a> Liquid<'a, Message> {
             .into_iter()
             .map(|(index, node)| node.move_to(content_boxes[index].origin))
             .collect();
+        // The engine applies each item's offset and scale itself; hand it the
+        // unoffset layout box so those properties are not applied twice.
+        let base_boxes = engine::layout_targets(
+            self.layout,
+            self.padding,
+            &sizes,
+            &positions,
+            &no_offsets,
+            &ones,
+        );
         let scales: Vec<f32> = self.items.iter().map(|i| i.options.scale).collect();
         let targets = engine::layout_targets(
             self.layout,
@@ -766,7 +777,7 @@ impl<'a, Message: 'a> Liquid<'a, Message> {
             self.width.unwrap_or(total.width),
             self.height.unwrap_or(total.height),
         );
-        (nodes, size, content_boxes)
+        (nodes, size, base_boxes)
     }
 }
 
