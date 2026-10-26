@@ -32,7 +32,10 @@
 //!   `dissolve` (turbulence-warped imagery + edge holes where two liquids
 //!   meet). Items also support component-driven position/scale with spring or
 //!   timed transitions, per-item delay, radius override, blob inset,
-//!   bridge grow, observation mode, and built-in dragging. A
+//!   bridge grow, observation mode, and built-in dragging. An explicit
+//!   [`transition`](LiquidItem::transition) on a move item eases the content
+//!   target before the surface springs after it, matching the reference's CSS
+//!   transition + move-effect layering. A
 //!   [content](LiquidItem::content) item is laid out and drawn inside the
 //!   group without joining the silhouette (the reference's plain children),
 //!   and [behind](LiquidItem::behind) puts an item's element below the
@@ -231,6 +234,12 @@ impl<'a, Message> LiquidItem<'a, Message> {
     }
 
     /// How the liquid follows component-driven position/scale changes.
+    ///
+    /// On a `move`/`bend` item the explicit transition first eases the
+    /// content's target and the liquid springs after it — the same layering
+    /// the reference gets from a CSS transition on the element plus its move
+    /// effect. Without an explicit transition the target moves instantly and
+    /// only the liquid's own spring shows.
     #[must_use]
     pub fn transition(mut self, transition: impl Into<Transition>) -> Self {
         self.options.transition = transition.into();

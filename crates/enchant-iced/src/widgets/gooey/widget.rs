@@ -615,12 +615,7 @@ fn draw_layer(renderer: &mut Renderer, layer: &Option<CachedImage>, bounds: Rect
 /// Empty layers are skipped: most demos have nothing in `content` or `above`,
 /// and refusing to upload them saves two blocking texture uploads per frame
 /// while the liquid is animating.
-fn upload(
-    renderer: &Renderer,
-    width: u32,
-    height: u32,
-    pixels: &[u8],
-) -> Option<CachedImage> {
+fn upload(renderer: &Renderer, width: u32, height: u32, pixels: &[u8]) -> Option<CachedImage> {
     if !pixels.chunks_exact(4).any(|pixel| pixel[3] != 0) {
         return None;
     }
