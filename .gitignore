@@ -22,6 +22,11 @@ Thumbs.db
 Desktop.ini
 ehthumbs.db
 
+# Editor / merge leftovers
+*.bak
+*.orig
+*.rej
+*.tmp
 # Environment / secrets
 .env
 .env.*
