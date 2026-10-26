@@ -27,6 +27,7 @@ pub mod backlight;
 pub mod blur_fade;
 pub mod border_beam;
 pub mod border_track;
+pub mod bot_avatar;
 pub mod code_comparison;
 pub mod comic_text;
 pub mod confetti;
