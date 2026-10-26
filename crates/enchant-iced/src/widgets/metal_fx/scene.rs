@@ -18,6 +18,7 @@ use bytemuck::{Pod, Zeroable};
 
 use super::bake::GlowSprite;
 use super::glow::GlowFrame;
+use super::mask::{MetalFxMask, MetalGlowMode};
 use super::material::{MetalMaterial, SHEET_PIXEL_RATIO, SHEET_RESOLUTION, SheetMapping};
 use super::preset::{MetalFxResolvedTheme, MetalPresetMode};
 use super::rim::MetalRimOptions;
@@ -61,6 +62,10 @@ pub(crate) struct Scene {
     pub surface: Option<[f32; 4]>,
     pub target_srgb: bool,
     pub dither: bool,
+    /// Ring band vs sheet fill (`mask` on the web).
+    pub mask: MetalFxMask,
+    /// Glow placement when [`mask`](Self::mask) is a fill.
+    pub glow_mode: MetalGlowMode,
 }
 
 /// GPU uniform block (matches `Uniforms` in the WGSL; every field is a vec4).
@@ -209,7 +214,7 @@ impl Scene {
         ];
         u.hair = self.after_hairline();
         u.circ = self.circle_hairline();
-        u.glow_misc = [sat, bright, b(self.glow.is_some()), 0.0];
+        u.glow_misc = [sat, bright, b(self.glow.is_some()), b(self.mask.is_fill())];
         if let Some(g) = &self.glow {
             let f = &g.frame;
             u.halo = [f.position[0], f.position[1], f.tangent, f.halo_opacity];
@@ -343,10 +348,21 @@ impl Scene {
         c
     }
 
+    fn mask_cover(&self, p: [f32; 2]) -> f32 {
+        match &self.mask {
+            MetalFxMask::Ring | MetalFxMask::Fill => 1.0,
+            MetalFxMask::Custom(m) => m.sample(p[0], p[1]),
+        }
+    }
+
     fn shade_ring(&self, p: [f32; 2], frag_px: [f32; 2]) -> [f32; 4] {
         let sd_o = self.box_sd(p);
         let co = self.cover(sd_o);
-        let a = co * (1.0 - self.cover(self.inset_sd(p, self.ring)));
+        let a = if self.mask.is_fill() {
+            co * self.mask_cover(p)
+        } else {
+            co * (1.0 - self.cover(self.inset_sd(p, self.ring)))
+        };
         let mut out = [0.0; 4];
         if a > 0.0 {
             let s = self.mapping.uv(p);
@@ -356,7 +372,7 @@ impl Scene {
             out = [m[0] * k, m[1] * k, m[2] * k, m[3] * k];
         }
         let circ = self.circle_hairline();
-        if self.circle && circ[3] > 0.0 {
+        if !self.mask.is_fill() && self.circle && circ[3] > 0.0 {
             let outer = (self.cover(sd_o - 1.0) - co).max(0.0);
             out = over(premul([circ[0], circ[1], circ[2], circ[3] * outer]), out);
         }
@@ -376,7 +392,12 @@ impl Scene {
         let f = &g.frame;
         let co = self.cover(self.box_sd(p));
         let ci = self.cover(self.inset_sd(p, self.glow_ring_inset()));
-        let m = (1.0 - co) * 0.5 + co * (1.0 - ci);
+        let m = if self.mask.is_fill() && self.glow_mode == MetalGlowMode::Mask {
+            // Clip the halo to the custom mask (metal text).
+            self.mask_cover(p)
+        } else {
+            (1.0 - co) * 0.5 + co * (1.0 - ci)
+        };
         let ah = Self::sprite_alpha(&g.halo, p, f.position, f.tangent) * f.halo_opacity * m;
         let ae = Self::sprite_alpha(&g.extra, p, f.extra_position, f.tangent) * f.extra_opacity * m;
         let a = ae + ah * (1.0 - ae);
@@ -488,6 +509,8 @@ pub(crate) mod tests {
             surface: Some([0.153, 0.153, 0.153, 1.0]),
             target_srgb: false,
             dither: false,
+            mask: MetalFxMask::Ring,
+            glow_mode: MetalGlowMode::Mask,
         }
     }
 

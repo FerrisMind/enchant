@@ -36,6 +36,7 @@ struct Slot {
     bind_group: wgpu::BindGroup,
     halo_id: u64,
     extra_id: u64,
+    mask_id: u64,
 }
 
 /// The shared metal-fx GPU state.
@@ -46,7 +47,11 @@ pub struct MetalFxPipeline {
     sampler: wgpu::Sampler,
     dummy: wgpu::TextureView,
     _dummy_texture: wgpu::Texture,
+    /// 1×1 white — custom masks multiply against this when none is bound.
+    dummy_mask: wgpu::TextureView,
+    _dummy_mask_texture: wgpu::Texture,
     sprites: HashMap<u64, GpuSprite>,
+    masks: HashMap<u64, GpuSprite>,
     slots: Vec<Slot>,
     next_slot: usize,
     frame: u64,
@@ -131,6 +136,7 @@ impl MetalFxPipeline {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                sprite_entry(4),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -197,6 +203,26 @@ impl MetalFxPipeline {
             &[0],
         );
         let dummy = dummy_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let dummy_mask_texture = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("metal_fx.dummy_mask"),
+                size: wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            wgpu::util::TextureDataOrder::LayerMajor,
+            &[255],
+        );
+        let dummy_mask = dummy_mask_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         Self {
             normal,
@@ -205,7 +231,10 @@ impl MetalFxPipeline {
             sampler,
             dummy,
             _dummy_texture: dummy_texture,
+            dummy_mask,
+            _dummy_mask_texture: dummy_mask_texture,
             sprites: HashMap::new(),
+            masks: HashMap::new(),
             slots: Vec::new(),
             next_slot: 0,
             frame: 0,
@@ -267,19 +296,62 @@ impl MetalFxPipeline {
         );
     }
 
-    fn make_slot(&self, device: &wgpu::Device, halo_id: u64, extra_id: u64) -> Slot {
+    fn upload_mask(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        mask: &super::mask::AlphaMask,
+    ) {
+        let frame = self.frame;
+        if let Some(existing) = self.masks.get_mut(&mask.id()) {
+            existing.last_used = frame;
+            return;
+        }
+        let (w, h) = mask.pixel_size();
+        let texture = device.create_texture_with_data(
+            queue,
+            &wgpu::TextureDescriptor {
+                label: Some("metal_fx.alpha_mask"),
+                size: wgpu::Extent3d {
+                    width: w,
+                    height: h,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            wgpu::util::TextureDataOrder::LayerMajor,
+            mask.alpha(),
+        );
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.masks.insert(
+            mask.id(),
+            GpuSprite {
+                _texture: texture,
+                view,
+                last_used: frame,
+            },
+        );
+    }
+
+    fn make_slot(&self, device: &wgpu::Device, halo_id: u64, extra_id: u64, mask_id: u64) -> Slot {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("metal_fx.uniforms"),
             size: UNIFORM_SIZE,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let bind_group = self.bind_group(device, &buffer, halo_id, extra_id);
+        let bind_group = self.bind_group(device, &buffer, halo_id, extra_id, mask_id);
         Slot {
             buffer,
             bind_group,
             halo_id,
             extra_id,
+            mask_id,
         }
     }
 
@@ -289,8 +361,16 @@ impl MetalFxPipeline {
         buffer: &wgpu::Buffer,
         halo_id: u64,
         extra_id: u64,
+        mask_id: u64,
     ) -> wgpu::BindGroup {
         let view = |id: u64| self.sprites.get(&id).map_or(&self.dummy, |s| &s.view);
+        let mask_view = if mask_id == 0 {
+            &self.dummy_mask
+        } else {
+            self.masks
+                .get(&mask_id)
+                .map_or(&self.dummy_mask, |s| &s.view)
+        };
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("metal_fx.bind_group"),
             layout: &self.layout,
@@ -310,6 +390,10 @@ impl MetalFxPipeline {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(mask_view),
                 },
             ],
         })
@@ -332,18 +416,34 @@ impl MetalFxPipeline {
             }
             _ => (0, 0),
         };
+        let mask_id = if let Some(mask) = scene.mask.custom() {
+            self.upload_mask(device, queue, mask);
+            mask.id()
+        } else {
+            0
+        };
 
         let index = self.next_slot;
         self.next_slot += 1;
         if index == self.slots.len() {
-            let slot = self.make_slot(device, halo_id, extra_id);
+            let slot = self.make_slot(device, halo_id, extra_id, mask_id);
             self.slots.push(slot);
-        } else if self.slots[index].halo_id != halo_id || self.slots[index].extra_id != extra_id {
-            let bind_group = self.bind_group(device, &self.slots[index].buffer, halo_id, extra_id);
+        } else if self.slots[index].halo_id != halo_id
+            || self.slots[index].extra_id != extra_id
+            || self.slots[index].mask_id != mask_id
+        {
+            let bind_group = self.bind_group(
+                device,
+                &self.slots[index].buffer,
+                halo_id,
+                extra_id,
+                mask_id,
+            );
             let slot = &mut self.slots[index];
             slot.bind_group = bind_group;
             slot.halo_id = halo_id;
             slot.extra_id = extra_id;
+            slot.mask_id = mask_id;
         }
 
         let mut uniforms: Uniforms = scene.uniforms(layer);

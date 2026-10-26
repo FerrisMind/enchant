@@ -16,6 +16,7 @@ use iced_wgpu::primitive::Renderer as _;
 use super::geometry::MetalFxVariant;
 use super::glow::{GlowFrame, GlowState, GlowTick, MaterialSampler};
 use super::glow_config::{MetalGlowConfig, glow_config};
+use super::mask::{MetalFxMask, MetalGlowMode};
 use super::material::{MetalMaterial, SheetMapping};
 use super::options::{MetalFxLayer, MetalFxOptions, MetalFxSurface};
 use super::preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode};
@@ -162,6 +163,18 @@ impl<'a, Message> MetalFx<'a, Message> {
     /// Overrides the shader sampling scale.
     pub fn shader_scale(mut self, scale: f32) -> Self {
         self.options = self.options.shader_scale(scale);
+        self
+    }
+
+    /// Custom alpha mask / sheet fill.
+    pub fn mask(mut self, mask: MetalFxMask) -> Self {
+        self.options = self.options.mask(mask);
+        self
+    }
+
+    /// Glow placement when a fill mask is set.
+    pub fn glow_mode(mut self, mode: MetalGlowMode) -> Self {
+        self.options = self.options.glow_mode(mode);
         self
     }
 

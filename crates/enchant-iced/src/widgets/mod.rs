@@ -169,8 +169,11 @@ pub use line_shadow_text::{LineShadowTextProps, line_shadow_color_for_mode, line
 pub use magic_card::{MagicCardMode, MagicCardProps, magic_card};
 pub use marquee::{MarqueeItem, MarqueeOrientation, MarqueeProps, marquee, marquee_indexed};
 pub use metal_fx::{
-    MetalFx, MetalFxLayer, MetalFxOptions, MetalFxPreset, MetalFxResolvedTheme, MetalFxSurface,
-    MetalFxTheme, MetalFxVariant, MetalGlowConfig,
+    AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, MetalBadge, MetalBadgeCore,
+    MetalBadgeDefaults, MetalFx, MetalFxLayer, MetalFxMask, MetalFxOptions, MetalFxPreset,
+    MetalFxResolvedTheme, MetalFxSurface, MetalFxTheme, MetalFxVariant, MetalGlowConfig,
+    MetalGlowMode, MetalText, MetalTextDefaults, MetalTextFont, TextInnerShadow, rasterize_text_mask,
+    text_inner_shadow_mask,
 };
 pub use meteors::{MeteorsProps, meteors};
 pub use mockups::{AndroidProps, IphoneProps, SafariMode, SafariProps, android, iphone, safari};

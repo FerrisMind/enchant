@@ -5,6 +5,7 @@
 use iced::Color;
 
 use super::geometry::MetalFxVariant;
+use super::mask::{MetalFxMask, MetalGlowMode};
 use super::preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode};
 use super::rim::MetalRimOptions;
 
@@ -95,6 +96,8 @@ pub struct MetalFxOptions {
     pub(crate) surface: MetalFxSurface,
     pub(crate) layer: MetalFxLayer,
     pub(crate) mode: Option<MetalPresetMode>,
+    pub(crate) mask: MetalFxMask,
+    pub(crate) glow_mode: MetalGlowMode,
 }
 
 impl Default for MetalFxOptions {
@@ -115,6 +118,8 @@ impl Default for MetalFxOptions {
             surface: MetalFxSurface::Themed,
             layer: MetalFxLayer::OverChild,
             mode: None,
+            mask: MetalFxMask::Ring,
+            glow_mode: MetalGlowMode::Mask,
         }
     }
 }
@@ -255,6 +260,19 @@ impl MetalFxOptions {
     /// Hands control back to [`preset`](Self::preset) / [`theme`](Self::theme).
     pub fn reset_preset_mode(mut self) -> Self {
         self.mode = None;
+        self
+    }
+
+    /// Custom alpha mask / sheet fill (`mask` on the web). [`MetalFxMask::Fill`]
+    /// and [`MetalFxMask::Custom`] skip the ring punch.
+    pub fn mask(mut self, mask: MetalFxMask) -> Self {
+        self.mask = mask;
+        self
+    }
+
+    /// How the glow is placed when a fill mask is set (`glowMode`).
+    pub fn glow_mode(mut self, mode: MetalGlowMode) -> Self {
+        self.glow_mode = mode;
         self
     }
 

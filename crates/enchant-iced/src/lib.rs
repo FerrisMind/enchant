@@ -97,6 +97,9 @@ pub use widgets::{
 };
 pub use widgets::{GlyphMatrixProps, glyph_matrix};
 pub use widgets::{
-    MetalFx, MetalFxLayer, MetalFxOptions, MetalFxPreset, MetalFxResolvedTheme, MetalFxSurface,
-    MetalFxTheme, MetalFxVariant, MetalGlowConfig,
+    AlphaMask, METAL_BADGE_DEFAULTS, METAL_TEXT_DEFAULTS, MetalBadge, MetalBadgeCore,
+    MetalBadgeDefaults, MetalFx, MetalFxLayer, MetalFxMask, MetalFxOptions, MetalFxPreset,
+    MetalFxResolvedTheme, MetalFxSurface, MetalFxTheme, MetalFxVariant, MetalGlowConfig,
+    MetalGlowMode, MetalText, MetalTextDefaults, MetalTextFont, TextInnerShadow, rasterize_text_mask,
+    text_inner_shadow_mask,
 };

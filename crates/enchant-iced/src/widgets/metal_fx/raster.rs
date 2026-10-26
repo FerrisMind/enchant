@@ -312,6 +312,8 @@ impl MetalFxOptions {
             surface: self.resolved_surface(theme).map(|c| [c.r, c.g, c.b, c.a]),
             target_srgb,
             dither: false,
+            mask: self.mask.clone(),
+            glow_mode: self.glow_mode,
         }
     }
 

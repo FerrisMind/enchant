@@ -34,7 +34,7 @@ struct Uniforms {
     extra_tint: vec4<f32>,   // rgb, group alpha (0.7 dark / 0.2746 light)
     halo_sprite: vec4<f32>,  // w, h, ax, ay (css px)
     extra_sprite: vec4<f32>,
-    glow_misc: vec4<f32>,    // saturate, brightness, enabled, _
+    glow_misc: vec4<f32>,    // saturate, brightness, enabled, fill (0 ring / 1 fill)
     rim: vec4<f32>,          // offsetY, blur, alpha, enabled
     rim_color: vec4<f32>,
     surf: vec4<f32>,         // surface rgba (straight)
@@ -46,6 +46,7 @@ struct Uniforms {
 @group(0) @binding(1) var halo_tex: texture_2d<f32>;
 @group(0) @binding(2) var extra_tex: texture_2d<f32>;
 @group(0) @binding(3) var samp: sampler;
+@group(0) @binding(4) var mask_tex: texture_2d<f32>;
 
 const PI: f32 = 3.14159265358979323846;
 
@@ -409,17 +410,32 @@ fn finish(c: vec4<f32>) -> vec4<f32> {
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 
+fn mask_cover(p: vec2<f32>) -> f32 {
+    // Mask texture covers the CSS box; binding 4 is 1×1 white when unused.
+    let st = p / max(u.metrics.xy, vec2<f32>(1.0));
+    if (st.x < 0.0 || st.y < 0.0 || st.x > 1.0 || st.y > 1.0) {
+        return 0.0;
+    }
+    return textureSampleLevel(mask_tex, samp, st, 0.0).r;
+}
+
 fn layer_ring(p: vec2<f32>, frag_px: vec2<f32>) -> vec4<f32> {
     let sd_o = box_sd(p);
     let co = cover(sd_o);
-    let a = co * (1.0 - cover(inset_sd(p, u.shape.y)));
+    var a: f32;
+    if (u.glow_misc.w > 0.5) {
+        // Sheet fill: full rounded-rect (or custom mask) — no ring punch.
+        a = co * mask_cover(p);
+    } else {
+        a = co * (1.0 - cover(inset_sd(p, u.shape.y)));
+    }
     var out = vec4<f32>(0.0);
     if (a > 0.0) {
         let s = u.sheet.xy + p * u.sheet.zw;
         let m = material(s, frag_px);
         out = m * (u.sizing2.w * a);
     }
-    if (u.flags.x > 0.5 && u.circ.a > 0.0) {
+    if (u.glow_misc.w < 0.5 && u.flags.x > 0.5 && u.circ.a > 0.0) {
         let outer = max(0.0, cover(sd_o - 1.0) - co);
         out = over(straight_to_premul(vec4<f32>(u.circ.rgb, u.circ.a * outer)), out);
     }

@@ -78,6 +78,7 @@ mod color;
 mod geometry;
 mod glow;
 mod glow_config;
+mod mask;
 mod material;
 mod options;
 mod pipeline;
@@ -86,8 +87,11 @@ mod primitive;
 mod raster;
 mod rim;
 mod scene;
+mod text_mask;
 mod tween;
 mod widget;
+mod metal_badge;
+mod metal_text;
 
 pub use bake::{GlowSprite, SPRITE_DENSITY, bake_extra, bake_halo};
 pub use color::{hex_to_rgb, hex_to_rgba};
@@ -100,14 +104,21 @@ pub use glow_config::{
     MetalGlowConfig, glow_config, glow_config_revision, reset_glow_config, set_glow_config,
     update_glow_config,
 };
+pub use mask::{AlphaMask, MetalFxMask, MetalGlowMode};
 pub use material::{
     CANONICAL_HEIGHT, CANONICAL_WIDTH, MetalMaterial, SHEET_PIXEL_RATIO, SHEET_RESOLUTION,
     SheetMapping, SheetUvs, sheet_uvs,
 };
+pub use metal_badge::{METAL_BADGE_DEFAULTS, MetalBadge, MetalBadgeCore, MetalBadgeDefaults};
+pub use metal_text::MetalText;
 pub use options::{MetalFxLayer, MetalFxOptions, MetalFxSurface};
 pub use pipeline::{MetalFxPipeline, WGSL as METAL_FX_WGSL};
 pub use preset::{MetalFxPreset, MetalFxResolvedTheme, MetalFxTheme, MetalPresetMode, ShaderFit};
 pub use raster::{MetalFxBitmap, MetalFxHost, MetalFxLayerKind, MetalRenderOptions};
 pub use rim::MetalRimOptions;
+pub use text_mask::{
+    METAL_TEXT_DEFAULTS, MetalTextDefaults, MetalTextFont, TextInnerShadow, rasterize_text_mask,
+    text_inner_shadow_mask,
+};
 pub use tween::{Ease, Tween};
 pub use widget::MetalFx;
