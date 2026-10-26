@@ -1,6 +1,9 @@
 # Rust / Cargo
 target/
 **/target/
+# Alternate CARGO_TARGET_DIR (e.g. target-metalfx/)
+target-*/
+**/target-*/
 Cargo.lock
 **/*.rs.bk
 *.pdb
