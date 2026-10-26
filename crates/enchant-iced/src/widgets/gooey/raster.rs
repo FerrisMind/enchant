@@ -1191,7 +1191,13 @@ fn ellipse_mask(width: usize, height: usize, density: f32, ellipse: Ellipse) -> 
             }
         }
     }
-    blur_plane(&mut mask, width, height, blur * density, blur * density);
+    blur_plane(
+        &mut mask,
+        width,
+        height,
+        ellipse.blur * density,
+        ellipse.blur * density,
+    );
     mask
 }
 
@@ -1651,4 +1657,98 @@ fn sample_plane(plane: &[f32], width: usize, height: usize, x: f32, y: f32) -> f
     let a = plane[y0 * width + x0] + (plane[y0 * width + x1] - plane[y0 * width + x0]) * fx;
     let b = plane[y1 * width + x0] + (plane[y1 * width + x1] - plane[y1 * width + x0]) * fx;
     a + (b - a) * fy
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(stretch: Option<Stretch>) -> RasterItem {
+        RasterItem {
+            bounds: ItemBox::new(22.0, 22.0, 20.0, 20.0),
+            content: ItemBox::new(22.0, 22.0, 20.0, 20.0),
+            radii: CornerRadii::uniform(10.0),
+            image: None,
+            content_blur: 0.0,
+            bend: None,
+            stretch,
+            tail: None,
+            dissolve: None,
+            melt: None,
+            silhouette: true,
+        }
+    }
+
+    /// Horizontal extent of the painted silhouette, in raster pixels.
+    fn extent(raster: &LiquidRaster) -> (usize, usize) {
+        let mut min = usize::MAX;
+        let mut max = 0;
+        for (index, pixel) in raster.behind.chunks_exact(4).enumerate() {
+            if pixel[3] > 16 {
+                let x = index % raster.width as usize;
+                min = min.min(x);
+                max = max.max(x + 1);
+            }
+        }
+        (min, max)
+    }
+
+    #[test]
+    fn empty_group_paints_nothing() {
+        let raster = render(Size::new(64.0, 64.0), 1.0, &GroupStyle::default(), &[]);
+        assert!(raster.behind.iter().all(|byte| *byte == 0));
+    }
+
+    #[test]
+    fn stretch_widens_the_body_along_its_motion_axis() {
+        let style = GroupStyle {
+            // No blur: this test measures geometry, not the goo filter.
+            blur: 0.0,
+            ..GroupStyle::default()
+        };
+        let plain = render(Size::new(64.0, 64.0), 1.0, &style, &[item(None)]);
+        let (plain_min, plain_max) = extent(&plain);
+        let stretched = render(
+            Size::new(64.0, 64.0),
+            1.0,
+            &style,
+            &[item(Some(Stretch {
+                angle: 0.0,
+                along: 1.5,
+                across: 1.0,
+            }))],
+        );
+        let (stretch_min, stretch_max) = extent(&stretched);
+        let plain_width = plain_max - plain_min;
+        let stretch_width = stretch_max - stretch_min;
+        assert!(
+            stretch_width >= plain_width + 8,
+            "plain {plain_width} stretch {stretch_width}"
+        );
+        // The centre stays put, so both sides grow symmetrically.
+        assert!(stretch_min + 4 <= plain_min, "{stretch_min} vs {plain_min}");
+        assert!(stretch_max >= plain_max + 4, "{stretch_max} vs {plain_max}");
+    }
+
+    #[test]
+    fn bend_lowers_the_top_edge_midpoint() {
+        let style = GroupStyle {
+            blur: 0.0,
+            ..GroupStyle::default()
+        };
+        // A circle has no straight top edge to bow, so use a wide pill: the
+        // bow only exists where the edge has length.
+        let mut bowed = item(None);
+        bowed.bounds = ItemBox::new(12.0, 22.0, 40.0, 20.0);
+        bowed.content = bowed.bounds;
+        bowed.radii = CornerRadii::uniform(8.0);
+        bowed.bend = Some((6.0, 0.0));
+        let raster = render(Size::new(64.0, 64.0), 1.0, &style, &[bowed]);
+        let column = raster.width as usize / 2;
+        let first = (0..raster.height as usize)
+            .find(|y| raster.behind[(y * raster.width as usize + column) * 4 + 3] > 16)
+            .expect("silhouette painted");
+        // Quadratic with control 2b at the midpoint: sag = b = 6 px.
+        assert!((27..31).contains(&first), "top edge at {first}");
+    }
 }

@@ -429,12 +429,7 @@ fn step_mirror(
         return (target, radius, 0.0, 0.0);
     }
     let current = advance_transition(state, spec, target, now, dt);
-    (
-        current,
-        scaled_radius(radius, current, target),
-        0.0,
-        0.0,
-    )
+    (current, scaled_radius(radius, current, target), 0.0, 0.0)
 }
 
 /// Advances the item's *content* box along its configured transition.
@@ -730,6 +725,8 @@ fn step_move(
     let mut sim = state.morph.sim.unwrap_or_else(|| Sim::new(target, radius));
     if !state.initialized {
         state.morph.sim = Some(sim);
+        state.mirror.current = Some(target);
+        state.mirror.target = Some(target);
         state.initialized = true;
         state.tail = TailState::new();
         return (target, radius, 0.0, 0.0);
@@ -1362,5 +1359,87 @@ mod tests {
         let mut states = vec![ItemState::default(), ItemState::default()];
         let items = step(&mut states, &[a, b], 0.0, 0.016, 6.0, false);
         assert!(items[0].dissolve.is_none());
+    }
+
+    fn moving(x: f32) -> ItemSpec {
+        ItemSpec {
+            base: ItemBox::new(x, 0.0, 40.0, 40.0),
+            options: ItemOptions {
+                move_effect: Some(super::super::options::Move::new()),
+                ..ItemOptions::default()
+            },
+        }
+    }
+
+    #[test]
+    fn explicit_transition_slows_the_move_target() {
+        // A 1 s linear transition must keep the body far behind an instant
+        // retarget: after 0.2 s the eased content has covered 20%, while the
+        // untransitioned liquid has almost caught the full jump.
+        let build = |eased: bool| {
+            let mut spec = moving(0.0);
+            if eased {
+                spec.options.transition = Transition::Timed {
+                    duration: std::time::Duration::from_secs(1),
+                    easing: Easing::Linear,
+                };
+                spec.options.transition_set = true;
+            }
+            let mut states = vec![ItemState::default()];
+            let _ = step(&mut states, &[spec.clone()], 0.0, 0.016, 6.0, false);
+            spec.base = ItemBox::new(200.0, 0.0, 40.0, 40.0);
+            for frame in 1..=12 {
+                let _ = step(
+                    &mut states,
+                    &[spec.clone()],
+                    0.016 * frame as f64,
+                    0.016,
+                    6.0,
+                    false,
+                );
+            }
+            states[0].rendered.expect("body rendered").origin.x
+        };
+        let eased = build(true);
+        let direct = build(false);
+        assert!(eased < 80.0, "eased body must lag: {eased}");
+        assert!(direct > 190.0, "direct body snaps: {direct}");
+    }
+
+    #[test]
+    fn fast_horizontal_move_stretches_the_body_along_x() {
+        let mut spec = moving(0.0);
+        let mut states = vec![ItemState::default()];
+        let _ = step(&mut states, &[spec.clone()], 0.0, 0.016, 6.0, false);
+        spec.base = ItemBox::new(60.0, 0.0, 40.0, 40.0);
+        let mut stretch = None;
+        for frame in 1..6 {
+            let items = step(
+                &mut states,
+                &[spec.clone()],
+                0.016 * frame as f64,
+                0.016,
+                6.0,
+                false,
+            );
+            if let Some(value) = items[0].stretch {
+                stretch = Some(value);
+            }
+        }
+        let stretch = stretch.expect("a fast move must stretch the drop");
+        assert!(stretch.along > 1.0, "along = {}", stretch.along);
+        assert!(stretch.across < 1.0, "across = {}", stretch.across);
+        assert!(stretch.angle.abs() < 0.01, "angle = {}", stretch.angle);
+    }
+
+    #[test]
+    fn slow_drag_does_not_stretch() {
+        let mut spec = moving(0.0);
+        let mut states = vec![ItemState::default()];
+        let _ = step(&mut states, &[spec.clone()], 0.0, 0.016, 6.0, false);
+        spec.base = ItemBox::new(0.5, 0.0, 40.0, 40.0);
+        let items = step(&mut states, &[spec], 0.016, 0.016, 6.0, false);
+        let along = items[0].stretch.map_or(1.0, |stretch| stretch.along);
+        assert!(along < 1.005, "along = {along}");
     }
 }
