@@ -46,9 +46,7 @@ use iced::advanced::text::{self as adv_text};
 use iced::advanced::widget::{Tree, Widget, tree};
 use iced::advanced::{Renderer as _, text::Renderer as _};
 use iced::mouse;
-use iced::widget::{
-    button, column, container, pick_list, row, slider, space, text, text_input,
-};
+use iced::widget::{button, column, container, pick_list, row, slider, space, text, text_input};
 use iced::{
     Alignment, Background, Border, Color, Element, Event, Font, Length, Pixels, Point, Rectangle,
     Renderer, Size, Subscription, Theme, Transformation, border, window,
@@ -548,8 +546,8 @@ impl Demo {
                 Self::tick_pill(&mut self.gallery_chat);
                 // Stage pill advances while its own mic is live, or while the
                 // playground Play is on and the stage type is the pill.
-                let stage_pill_running = self.stage_host.listening
-                    || (self.playing && self.stage == StageType::Pill);
+                let stage_pill_running =
+                    self.stage_host.listening || (self.playing && self.stage == StageType::Pill);
                 if stage_pill_running {
                     let now = clock();
                     if now - self.stage_host.pill_tick >= 1.0 {
@@ -630,7 +628,10 @@ impl Demo {
         let host = self.host(id);
         let (content, backdrop): (Element<'a, Message>, Element<'a, Message>) = match stage {
             StageType::ChatInput => (self.chat_content(id, host, w, h), chat_backdrop(w, h, dark)),
-            StageType::Mobile => (self.phone_content(id, host, w, h), phone_backdrop(w, h, dark)),
+            StageType::Mobile => (
+                self.phone_content(id, host, w, h),
+                phone_backdrop(w, h, dark),
+            ),
             StageType::Pill => (
                 pill_content(id, host.pill_seconds, w, h, dark),
                 pill_backdrop(w, h, dark),
@@ -792,12 +793,11 @@ impl Demo {
             ))
             .padding(24)
             .style(card),
-            container(self.beam(
-                HostId::GalleryChat,
-                StageType::ChatInput,
-                chat_glow,
-                |_| Message::Tick
-            ))
+            container(
+                self.beam(HostId::GalleryChat, StageType::ChatInput, chat_glow, |_| {
+                    Message::Tick
+                })
+            )
             .padding(24)
             .center_y(Length::Fill)
             .style(card),
@@ -807,14 +807,9 @@ impl Demo {
 
         let stage_glow = self.stage_glow();
         let stage = container(
-            container(self.beam(
-                HostId::Stage,
-                self.stage,
-                stage_glow,
-                Message::StageLevel
-            ))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill),
+            container(self.beam(HostId::Stage, self.stage, stage_glow, Message::StageLevel))
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
         )
         .width(Length::FillPortion(3))
         .height(Length::Fixed(430.0))
@@ -974,9 +969,7 @@ fn lucide<'a>(icon: LucideIcon, color: Color, size: f32) -> Element<'a, Message>
         .font(Font::with_name("lucide"))
         .size(size)
         .line_height(iced::widget::text::LineHeight::Absolute(iced::Pixels(size)))
-        .style(move |_| iced::widget::text::Style {
-            color: Some(color),
-        })
+        .style(move |_| iced::widget::text::Style { color: Some(color) })
         .into()
 }
 
@@ -1192,13 +1185,7 @@ fn backdrop<'a>(
 }
 
 /// `.mock-pill`: mic icon, the running mm:ss counter and a real stop button.
-fn pill_content<'a>(
-    id: HostId,
-    seconds: u64,
-    w: f32,
-    h: f32,
-    dark: bool,
-) -> Element<'a, Message> {
+fn pill_content<'a>(id: HostId, seconds: u64, w: f32, h: f32, dark: bool) -> Element<'a, Message> {
     let ink = if dark {
         Color::from_rgb8(0x87, 0x87, 0x87)
     } else {
@@ -1265,9 +1252,7 @@ enum ScalePressKind<'a> {
         glyph: f32,
     },
     /// Labels / marks — layout stays at rest size; draw uses GPU scale about centre.
-    Widget {
-        content: Element<'a, Message>,
-    },
+    Widget { content: Element<'a, Message> },
 }
 
 struct ScalePressButton<'a> {
@@ -1536,11 +1521,7 @@ impl<'a> Widget<Message, Theme, Renderer> for ScalePressButton<'a> {
         }
 
         match &self.kind {
-            ScalePressKind::Icon {
-                icon,
-                color,
-                glyph,
-            } => {
+            ScalePressKind::Icon { icon, color, glyph } => {
                 draw_press_lucide(renderer, *icon, *color, *glyph * scale, bounds, *viewport);
             }
             ScalePressKind::Widget { content } => {
