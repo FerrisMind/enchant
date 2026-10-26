@@ -89,6 +89,7 @@ pub mod thinking_orb;
 pub mod tweet_card;
 pub mod typing_animation;
 pub mod video_text;
+pub mod voice_glow;
 pub mod warp_background;
 pub mod word_rotate;
 
@@ -227,5 +228,9 @@ pub use typing_animation::{
     TypingAnimationCursorStyle, TypingAnimationProps, TypingAnimationState, typing_animation,
 };
 pub use video_text::{VideoTextProps, VideoTextSource, VideoTextState, video_text};
+pub use voice_glow::{
+    GlowLayering, VoiceBeam, VoiceGlow, VoiceGlowEngine, VoiceGlowFrame, VoiceGlowMotion,
+    VoiceGlowRaster, VoiceGlowTheme, VoiceGlowType,
+};
 pub use warp_background::{WarpBackgroundProps, warp_background};
 pub use word_rotate::{WordRotateProps, WordRotateState, word_rotate};
