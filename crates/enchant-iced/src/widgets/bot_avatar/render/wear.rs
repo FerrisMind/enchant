@@ -12,6 +12,8 @@
 //! Everything is drawn in body space (the caller passes the body's transform
 //! for the slices); the glasses in face space.
 
+#![allow(clippy::too_many_arguments)] // signatures follow the reference accessory routines
+
 use std::collections::HashMap;
 use std::f32::consts::{PI, TAU};
 use std::rc::Rc;
@@ -24,9 +26,9 @@ use super::super::color::{Rgba, shade};
 use super::super::types::{BotAvatarGlasses, BotAvatarHat};
 use super::face::EyeSpot;
 use super::mesh::{
-    self, Layer, P2, PaintOpts, Proj, Rgb, Shade, V3, View, cross, cut_gem, dot, felt, gem, gold,
-    hull, make_mesh, make_tube, make_view, metal, mix, norm, paper, pearl, plastic, poly_path,
-    project_mesh, satin, scale, section, segs, silver, sphere_sprite, sub, velvet,
+    self, Layer, P2, PaintOpts, Proj, Rgb, Shade, V3, View, cross, cut_gem, felt, gold, hull,
+    make_mesh, make_tube, make_view, metal, norm, paper, plastic, poly_path, project_mesh, satin,
+    scale, section, segs, silver, sphere_sprite, sub, velvet,
 };
 
 /// Everything a bot can wear.
@@ -75,7 +77,6 @@ pub(crate) struct WearRig {
     pub cp: f32,
     pub sp: f32,
     pub facing: f32,
-    pub half_depth: f32,
     pub lx: f32,
     pub ly: f32,
 }
@@ -147,10 +148,10 @@ fn marks_for(path: &Path) -> Option<Arc<Marks>> {
     static CACHE: OnceLock<Mutex<HashMap<u64, Arc<Marks>>>> = OnceLock::new();
     let key = path_hash(path);
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Ok(c) = cache.lock() {
-        if let Some(m) = c.get(&key) {
-            return Some(Arc::clone(m));
-        }
+    if let Ok(c) = cache.lock()
+        && let Some(m) = c.get(&key)
+    {
+        return Some(Arc::clone(m));
     }
     let marks = Arc::new(build_marks(path)?);
     if let Ok(mut c) = cache.lock() {
@@ -229,13 +230,9 @@ fn build_marks(path: &Path) -> Option<Marks> {
     }
     let mut widths = vec![0.0f32; N];
     let mut edge: Vec<P2> = Vec::new();
-    for y in 0..N {
+    for (y, width) in widths.iter_mut().enumerate() {
         let (l, r) = row(y);
-        widths[y] = if l < 0 {
-            0.0
-        } else {
-            (r - l + 1) as f32 * u
-        };
+        *width = if l < 0 { 0.0 } else { (r - l + 1) as f32 * u };
         if l >= 0 {
             edge.push([to_x(l as usize) - 0.5 * u, to_x(y)]);
             edge.push([to_x(r as usize) + 0.5 * u, to_x(y)]);
@@ -256,19 +253,6 @@ fn build_marks(path: &Path) -> Option<Marks> {
 }
 
 /* ── projection ─────────────────────────────────────────────────────── */
-
-fn project(r: WearRig, p: V3) -> P2 {
-    let x = p[0] - 50.0;
-    let y = p[1] - 50.0;
-    [
-        r.cy * x + r.sy * p[2],
-        r.sy * r.sp * x + r.cp * y - r.cy * r.sp * p[2],
-    ]
-}
-
-fn depth_of(r: WearRig, p: V3) -> f32 {
-    -r.sy * r.cp * (p[0] - 50.0) + r.sp * (p[1] - 50.0) + r.cy * r.cp * p[2]
-}
 
 fn tilt(v: V3, roll: f32, lean: f32) -> V3 {
     let (sr, cr) = roll.sin_cos();
@@ -334,7 +318,15 @@ fn view_of(r: WearRig, px: f32) -> View {
     let (l, h) = light_of(r.lx, r.ly);
     make_view(
         [
-            r.cy, 0.0, r.sy, r.sy * r.sp, r.cp, -r.cy * r.sp, -r.sy * r.cp, r.sp, r.cy * r.cp,
+            r.cy,
+            0.0,
+            r.sy,
+            r.sy * r.sp,
+            r.cp,
+            -r.cy * r.sp,
+            -r.sy * r.cp,
+            r.sp,
+            r.cy * r.cp,
         ],
         [50.0, 50.0, 0.0],
         l,
@@ -455,21 +447,14 @@ where
     )
 }
 
-fn offset_path<P, O>(
-    path: P,
-    up: V3,
-    off: O,
-) -> impl Fn(f32) -> V3
+fn offset_path<P, O>(path: P, up: V3, off: O) -> impl Fn(f32) -> V3
 where
     P: Fn(f32) -> V3,
     O: Fn(f32) -> f32,
 {
     move |u: f32| {
         let e = 1e-3;
-        let t = norm(sub(
-            path((u + e).min(1.0)),
-            path((u - e).max(0.0)),
-        ));
+        let t = norm(sub(path((u + e).min(1.0)), path((u - e).max(0.0))));
         let b = cross(t, up);
         along(path(u), b, off(u))
     }
@@ -487,7 +472,15 @@ fn yarn_ball(
 ) {
     let rgb = rgb_of(base);
     let n = segs(view, TAU * rad, 12, 20, 11.0);
-    let ball = sphere_mesh(view, owner, &format!("ball{seed}"), c, rad * 0.86, n, (n >> 1).max(6));
+    let ball = sphere_mesh(
+        view,
+        owner,
+        &format!("ball{seed}"),
+        c,
+        rad * 0.86,
+        n,
+        (n >> 1).max(6),
+    );
     let vis = mesh::paint_layers(
         pixmap,
         &[Layer::new(vec![ball], felt(view, rgb, 0.92))],
@@ -594,7 +587,16 @@ fn draw_beret(
         rr *= 1.0 + 0.035 * (th * 7.0 + 0.4).sin() * band;
         place([rr * th.cos(), hh2, rr * 0.93 * th.sin()])
     };
-    let dome = surface(view, owner, "beret:dome", surf, nu, nv, |_, _| place([0.0, -lift - hh * 0.4, 0.0]), true);
+    let dome = surface(
+        view,
+        owner,
+        "beret:dome",
+        surf,
+        nu,
+        nv,
+        |_, _| place([0.0, -lift - hh * 0.4, 0.0]),
+        true,
+    );
     let under = surface(
         view,
         owner,
@@ -740,7 +742,16 @@ fn draw_beanie(
     let (bbx0, bby0, bbx1, bby1, ..) = bounds_of(&[&cuff]);
     let _ = (bbx0, bby0, bbx1, bby1);
     let (_, _, _, y1, cx, _, bw, _) = bounds_of(&[&cuff]);
-    mesh::contact(pixmap, body_clip, space, cx, y1 - 0.01 * w, bw * 0.5, 0.06 * w, 0.34);
+    mesh::contact(
+        pixmap,
+        body_clip,
+        space,
+        cx,
+        y1 - 0.01 * w,
+        bw * 0.5,
+        0.06 * w,
+        0.34,
+    );
     let vis_dome = mesh::paint_layers(
         pixmap,
         &[Layer::new(vec![dome], felt(view, rgb, 0.96))],
@@ -934,7 +945,13 @@ fn draw_party(
             view,
             owner,
             &format!("party:stripe{i}"),
-            |s, t| cone_at((i as f32 + 0.5 * t - twist * s * 0.97) / k as f32, s * 0.97, 1.004),
+            |s, t| {
+                cone_at(
+                    (i as f32 + 0.5 * t - twist * s * 0.97) / k as f32,
+                    s * 0.97,
+                    1.004,
+                )
+            },
             n_up + 3,
             1,
             in_cone,
@@ -996,7 +1013,13 @@ fn draw_crown(
         view,
         owner,
         "crown:band",
-        |u, v| on(u * TAU, r * (1.0 - 0.018 * (v * PI).sin()), -band_h * (1.0 - v)),
+        |u, v| {
+            on(
+                u * TAU,
+                r * (1.0 - 0.018 * (v * PI).sin()),
+                -band_h * (1.0 - v),
+            )
+        },
         nu,
         2,
         move |_, v| axis(-band_h * (1.0 - v)),
@@ -1037,7 +1060,8 @@ fn draw_crown(
         |u, v| {
             let th = u * TAU;
             let phi = v * PI * 0.5;
-            let puff = 0.08 * (2.0 * phi).sin() * (0.55 + 0.45 * (5.0 * (th - p0 - PI / 5.0)).cos());
+            let puff =
+                0.08 * (2.0 * phi).sin() * (0.55 + 0.45 * (5.0 * (th - p0 - PI / 5.0)).cos());
             on(
                 th,
                 r * (0.9 * phi.sin() + puff),
@@ -1130,7 +1154,16 @@ fn draw_crown(
         ));
     }
     let (_, _, _, by1, bcx, _, bw, _) = bounds_of(&[&band]);
-    mesh::contact(pixmap, body_clip, space, bcx, by1, bw * 0.5, 0.045 * w, 0.34);
+    mesh::contact(
+        pixmap,
+        body_clip,
+        space,
+        bcx,
+        by1,
+        bw * 0.5,
+        0.045 * w,
+        0.34,
+    );
     let mid = view.depth(axis(cap_base));
     let g = gold(view);
     let facet = metal(
@@ -1139,13 +1172,8 @@ fn draw_crown(
         [92.0, 54.0, 10.0],
         [255.0, 222.0, 150.0],
     );
-    let gold_both: Shade = Rc::new(move |n: V3| {
-        facet(if n[2] < 0.0 {
-            [-n[0], -n[1], -n[2]]
-        } else {
-            n
-        })
-    });
+    let gold_both: Shade =
+        Rc::new(move |n: V3| facet(if n[2] < 0.0 { [-n[0], -n[1], -n[2]] } else { n }));
     let pearl_r = 0.024 * w;
     let bud_r = 0.019 * w;
     for &p in &pearls {
@@ -1196,7 +1224,7 @@ fn draw_crown(
         [36.0, 90.0, 220.0],
         [30.0, 150.0, 92.0],
     ];
-    for i in 0..5 {
+    for (i, &stone) in stones.iter().enumerate() {
         for (th, stud) in [
             (p0 + (i as f32 / 5.0) * TAU, false),
             (p0 + (i as f32 / 5.0) * TAU + PI / 5.0, true),
@@ -1221,7 +1249,7 @@ fn draw_crown(
                 n,
                 t,
                 size,
-                stones[i],
+                stone,
             );
         }
     }
@@ -1653,9 +1681,7 @@ fn draw_bow_tie(
     let room = (m.bottom - 3.0 - cy_b).max(0.0);
     let k = w.min(100.0) * (room / 15.0).clamp(0.5, 1.0);
     let z_front = body_z(50.0, cy_b);
-    let q = |x: f32, y: f32, z: f32| -> V3 {
-        [50.0 + x * k, cy_b + y * k, z_front + z * k]
-    };
+    let q = |x: f32, y: f32, z: f32| -> V3 { [50.0 + x * k, cy_b + y * k, z_front + z * k] };
     let rgb = rgb_of(base);
     let corners: Vec<P2> = [
         q(-0.36, -0.18, 0.0),
@@ -1694,11 +1720,7 @@ fn draw_bow_tie(
             let y = -h * (PI * v).cos() + 0.012 * u * u;
             let bulge = 0.018 + 0.058 * (PI * (0.12 + 0.88 * u)).sin();
             let fold = 0.016 * (3.0 * PI * v).sin() * (1.0 - u).powf(1.3);
-            q(
-                dir * x,
-                y,
-                (bulge + fold) * (PI * v).sin() + 0.004,
-            )
+            q(dir * x, y, (bulge + fold) * (PI * v).sin() + 0.004)
         };
         layers.push(Layer::new(
             vec![surface(
@@ -1760,11 +1782,26 @@ fn draw_bow_tie(
     }
     for i in (0..layers.len()).step_by(2) {
         let part: Vec<&Layer> = layers[i..(i + 2).min(layers.len())].iter().collect();
-        let vis = mesh::paint_layers(pixmap, &layers[i..(i + 2).min(layers.len())], view.px, space, PaintOpts::default());
+        let vis = mesh::paint_layers(
+            pixmap,
+            &layers[i..(i + 2).min(layers.len())],
+            view.px,
+            space,
+            PaintOpts::default(),
+        );
         let _ = part;
         let outline = hull(&vis);
         mesh::grain_over(pixmap, &outline, 0.5, 0.1, space, None);
-        mesh::fuzz(pixmap, &outline, rgb, 41 + i as i32, 0.3, view.px, space, None);
+        mesh::fuzz(
+            pixmap,
+            &outline,
+            rgb,
+            41 + i as i32,
+            0.3,
+            view.px,
+            space,
+            None,
+        );
     }
 }
 
@@ -1929,13 +1966,7 @@ pub(crate) fn draw_glasses(
             m
         };
         let _ = h2;
-        pixmap.fill_path(
-            &lens,
-            &lp,
-            FillRule::Winding,
-            space.transform(),
-            None,
-        );
+        pixmap.fill_path(&lens, &lp, FillRule::Winding, space.transform(), None);
         let mut streak = |x0f: f32, width: f32, a: f32, mask: &Mask| {
             let mut p = PathBuilder::new();
             p.move_to(x0 + w * x0f, y1 + h2 * 0.1);
@@ -2012,11 +2043,7 @@ pub(crate) fn draw_glasses(
         false,
     );
     let mut parts = vec![
-        (
-            rim(left),
-            vis[0],
-            view.depth([left.ox, left.oy, z_plane]),
-        ),
+        (rim(left), vis[0], view.depth([left.ox, left.oy, z_plane])),
         (
             rim(right),
             vis[1],
@@ -2126,15 +2153,9 @@ pub(crate) fn draw_wear_front(
     }
     match wear.hat {
         BotAvatarHat::None => {}
-        BotAvatarHat::Beret => {
-            draw_beret(pixmap, view, &owner, &m, wear.color, space, body_clip)
-        }
-        BotAvatarHat::Beanie => {
-            draw_beanie(pixmap, view, &owner, &m, wear.color, space, body_clip)
-        }
-        BotAvatarHat::Party => {
-            draw_party(pixmap, view, &owner, &m, wear.color, space, body_clip)
-        }
+        BotAvatarHat::Beret => draw_beret(pixmap, view, &owner, &m, wear.color, space, body_clip),
+        BotAvatarHat::Beanie => draw_beanie(pixmap, view, &owner, &m, wear.color, space, body_clip),
+        BotAvatarHat::Party => draw_party(pixmap, view, &owner, &m, wear.color, space, body_clip),
         BotAvatarHat::Crown => draw_crown(pixmap, view, &owner, &m, space, body_clip),
     }
 }
@@ -2172,11 +2193,12 @@ mod tests {
             cp: 1.0,
             sp: 0.0,
             facing: 1.0,
-            half_depth: 15.0,
             lx: -0.5,
             ly: -0.86,
         };
-        let space = Affine::scale(1.0, 1.0);
+        // The view projects around the body's centre, so a standalone
+        // accessory needs the same 50-unit offset the body transform carries.
+        let space = Affine::translate(50.0, 50.0);
         let view = view_of(rig, 1.0);
         let base = bot_avatar_preset(BotAvatarType::Clover).color;
         draw_beret(

@@ -12,8 +12,8 @@
 use tiny_skia::{Mask, PathBuilder, Pixmap};
 
 use super::super::canvas::{Affine, fill, paint_alpha, stroke};
-use super::super::engine::Pose;
 use super::super::color::Rgba;
+use super::super::engine::Pose;
 use super::super::types::BotAvatarFace;
 
 /// Radius of the sphere the face is drawn on, in body units.
@@ -112,7 +112,7 @@ pub(crate) fn draw_face(
     let look_x = pose.look_x;
     let look_y = pose.look_y;
 
-    let mut at = |x: f32, y: f32, alpha: f32, f: &mut dyn FnMut(f32, Affine)| {
+    let at = |x: f32, y: f32, alpha: f32, f: &mut dyn FnMut(f32, Affine)| {
         let q = on_sphere(x, y, pose.yaw, pose.pitch);
         if q.z <= 0.02 || alpha <= 0.01 {
             return;
@@ -134,10 +134,7 @@ pub(crate) fn draw_face(
         }
     };
     let clamp1 = |v: f32| v.clamp(-1.0, 1.0);
-    let up = past(
-        clamp1(-pose.pitch / 0.26 - pose.look_y / 7.0),
-        0.34,
-    );
+    let up = past(clamp1(-pose.pitch / 0.26 - pose.look_y / 7.0), 0.34);
     let side = past(clamp1(pose.look_x / 4.5), 0.4).abs();
     let tall = (1.0 + 0.55 * up - 0.1 * side).max(0.3);
     let wide = 1.0 - 0.05 * up + 0.12 * side;
@@ -147,7 +144,11 @@ pub(crate) fn draw_face(
     let sag = 0.5 + 0.5 * pose.breath;
 
     for side in [-1.0_f32, 1.0] {
-        let lid = if side < 0.0 { pose.blink_l } else { pose.blink_r };
+        let lid = if side < 0.0 {
+            pose.blink_l
+        } else {
+            pose.blink_r
+        };
         let e = (pose.eye_open * (1.0 - lid)).clamp(0.0, 1.0);
         let k_open = open * e;
         let k_shut = open * (1.0 - e);
@@ -212,7 +213,11 @@ fn eye_numbers(pose: &Pose, face: BotAvatarFace) -> Vec<(f32, f32, f32, f32, f32
     let laugh = ww * pose.laugh;
     let mut out = Vec::new();
     for side in [-1.0_f32, 1.0] {
-        let lid = if side < 0.0 { pose.blink_l } else { pose.blink_r };
+        let lid = if side < 0.0 {
+            pose.blink_l
+        } else {
+            pose.blink_r
+        };
         let e = (pose.eye_open * (1.0 - lid)).clamp(0.0, 1.0);
         let k_open = open * e;
         let k_shut = open * (1.0 - e);

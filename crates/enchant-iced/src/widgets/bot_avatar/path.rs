@@ -61,6 +61,11 @@ pub(crate) fn split_subpaths(data: &str) -> Vec<&str> {
     out
 }
 
+type Pair = Option<Option<(f64, f64)>>;
+type Sextet = Option<Option<(f64, f64, f64, f64, f64, f64)>>;
+type Quad = Option<Option<(f64, f64, f64, f64)>>;
+type ArcArgs = Option<Option<(f64, f64, f64, bool, bool, f64, f64)>>;
+
 struct Parser<'a> {
     bytes: &'a [u8],
     pos: usize,
@@ -129,8 +134,16 @@ impl<'a> Parser<'a> {
                 }
                 b'C' => {
                     while let Some((x1, y1, x2, y2, x, y)) = self.sextet()? {
-                        let (x1, y1) = if relative { (cx + x1, cy + y1) } else { (x1, y1) };
-                        let (x2, y2) = if relative { (cx + x2, cy + y2) } else { (x2, y2) };
+                        let (x1, y1) = if relative {
+                            (cx + x1, cy + y1)
+                        } else {
+                            (x1, y1)
+                        };
+                        let (x2, y2) = if relative {
+                            (cx + x2, cy + y2)
+                        } else {
+                            (x2, y2)
+                        };
                         let (x, y) = if relative { (cx + x, cy + y) } else { (x, y) };
                         builder.cubic_to(
                             x1 as f32, y1 as f32, x2 as f32, y2 as f32, x as f32, y as f32,
@@ -143,7 +156,11 @@ impl<'a> Parser<'a> {
                 b'S' => {
                     let mut reflect = matches!(self.previous, Some(b'C' | b'S'));
                     while let Some((x2, y2, x, y)) = self.quad_pair()? {
-                        let (x2, y2) = if relative { (cx + x2, cy + y2) } else { (x2, y2) };
+                        let (x2, y2) = if relative {
+                            (cx + x2, cy + y2)
+                        } else {
+                            (x2, y2)
+                        };
                         let (x, y) = if relative { (cx + x, cy + y) } else { (x, y) };
                         let (x1, y1) = if reflect {
                             self.last_cubic
@@ -162,7 +179,11 @@ impl<'a> Parser<'a> {
                 }
                 b'Q' => {
                     while let Some((x1, y1, x, y)) = self.quad_pair()? {
-                        let (x1, y1) = if relative { (cx + x1, cy + y1) } else { (x1, y1) };
+                        let (x1, y1) = if relative {
+                            (cx + x1, cy + y1)
+                        } else {
+                            (x1, y1)
+                        };
                         let (x, y) = if relative { (cx + x, cy + y) } else { (x, y) };
                         builder.quad_to(x1 as f32, y1 as f32, x as f32, y as f32);
                         self.last_quad = Some((x1, y1));
@@ -286,91 +307,48 @@ impl<'a> Parser<'a> {
 
     /// One coordinate pair. `None` inside the option means "no more numbers";
     /// an outer `None` means malformed.
-    fn pair(&mut self) -> Option<Option<(f64, f64)>> {
+    fn pair(&mut self) -> Pair {
         let Some(x) = self.number()? else {
             return Some(None);
         };
-        let Some(y) = self.number()? else {
-            return None;
-        };
+        let y = self.number()??;
         Some(Some((x, y)))
     }
 
-    fn triplet(&mut self) -> Option<Option<(f64, f64, f64)>> {
-        let Some(x) = self.number()? else {
-            return Some(None);
-        };
-        let Some(y) = self.number()? else {
-            return None;
-        };
-        let Some(z) = self.number()? else {
-            return None;
-        };
-        Some(Some((x, y, z)))
-    }
-
-    fn sextet(&mut self) -> Option<Option<(f64, f64, f64, f64, f64, f64)>> {
+    fn sextet(&mut self) -> Sextet {
         let Some(a) = self.number()? else {
             return Some(None);
         };
-        let Some(b) = self.number()? else {
-            return None;
-        };
-        let Some(c) = self.number()? else {
-            return None;
-        };
-        let Some(d) = self.number()? else {
-            return None;
-        };
-        let Some(e) = self.number()? else {
-            return None;
-        };
-        let Some(f) = self.number()? else {
-            return None;
-        };
+        let b = self.number()??;
+        let c = self.number()??;
+        let d = self.number()??;
+        let e = self.number()??;
+        let f = self.number()??;
         Some(Some((a, b, c, d, e, f)))
     }
 
-    fn quad_pair(&mut self) -> Option<Option<(f64, f64, f64, f64)>> {
+    fn quad_pair(&mut self) -> Quad {
         let Some(a) = self.number()? else {
             return Some(None);
         };
-        let Some(b) = self.number()? else {
-            return None;
-        };
-        let Some(c) = self.number()? else {
-            return None;
-        };
-        let Some(d) = self.number()? else {
-            return None;
-        };
+        let b = self.number()??;
+        let c = self.number()??;
+        let d = self.number()??;
         Some(Some((a, b, c, d)))
     }
 
     /// The seven arguments of an arc. Flags are the characters `0` or `1`,
     /// which may run together with the numbers that follow (`A5 5 0 0110 10`).
-    fn arc_args(&mut self) -> Option<Option<(f64, f64, f64, bool, bool, f64, f64)>> {
+    fn arc_args(&mut self) -> ArcArgs {
         let Some(rx) = self.number()? else {
             return Some(None);
         };
-        let Some(ry) = self.number()? else {
-            return None;
-        };
-        let Some(rotation) = self.number()? else {
-            return None;
-        };
-        let Some(large) = self.flag()? else {
-            return None;
-        };
-        let Some(sweep) = self.flag()? else {
-            return None;
-        };
-        let Some(x) = self.number()? else {
-            return None;
-        };
-        let Some(y) = self.number()? else {
-            return None;
-        };
+        let ry = self.number()??;
+        let rotation = self.number()??;
+        let large = self.flag()??;
+        let sweep = self.flag()??;
+        let x = self.number()??;
+        let y = self.number()??;
         Some(Some((rx, ry, rotation, large, sweep, x, y)))
     }
 
@@ -424,7 +402,11 @@ fn arc_to(
     let sign = if large == sweep { -1.0 } else { 1.0 };
     let num = (rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1).max(0.0);
     let den = rx * rx * y1 * y1 + ry * ry * x1 * x1;
-    let coef = if den == 0.0 { 0.0 } else { sign * (num / den).sqrt() };
+    let coef = if den == 0.0 {
+        0.0
+    } else {
+        sign * (num / den).sqrt()
+    };
     let cx1 = coef * rx * y1 / ry;
     let cy1 = -coef * ry * x1 / rx;
     let cx = cos_phi * cx1 - sin_phi * cy1 + (x0 + x) / 2.0;
@@ -525,13 +507,10 @@ mod tests {
 
     #[test]
     fn splits_parts_per_moveto() {
-        let parts = split_subpaths(
-            "M47.5 14H52.5V32H47.5ZM43 11A7 7 0 1 1 57 11A7 7 0 1 1 43 11Z",
-        );
+        let parts = split_subpaths("M47.5 14H52.5V32H47.5ZM43 11A7 7 0 1 1 57 11A7 7 0 1 1 43 11Z");
         assert_eq!(parts.len(), 2);
-        let paths = parse_svg_subpaths(
-            "M47.5 14H52.5V32H47.5ZM43 11A7 7 0 1 1 57 11A7 7 0 1 1 43 11Z",
-        );
+        let paths =
+            parse_svg_subpaths("M47.5 14H52.5V32H47.5ZM43 11A7 7 0 1 1 57 11A7 7 0 1 1 43 11Z");
         assert_eq!(paths.len(), 2);
     }
 

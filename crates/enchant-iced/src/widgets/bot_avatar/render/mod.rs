@@ -69,9 +69,7 @@ pub(crate) struct RenderConfig {
     pub shine: f32,
     pub sheen: f32,
     pub back_softness: f32,
-    pub theme: super::types::BotAvatarTheme,
     pub whirl: whirl::WhirlConfig,
-    pub still: bool,
     /// What the bot wears.
     pub wear: wear::Wear,
 }

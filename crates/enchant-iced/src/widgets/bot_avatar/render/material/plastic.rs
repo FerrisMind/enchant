@@ -16,8 +16,8 @@ use tiny_skia::{
 
 use super::super::super::canvas::{Affine, fill, paint_alpha};
 use super::super::super::color::{Rgba, shade};
-use super::super::palette::Palette;
 use super::super::RenderConfig;
+use super::super::palette::Palette;
 use super::form::{self, Form, Rig, cap_frame, relief_for};
 use super::matcap::{Material, build_matcap, sample_matcap, shade_texels};
 
@@ -57,6 +57,8 @@ fn color(c: [f32; 3]) -> tiny_skia::Color {
     .unwrap_or(tiny_skia::Color::BLACK)
 }
 
+type ShadedCap = (Arc<Form>, Vec<f32>, Vec<u8>, f32);
+
 /// Shade the cap for the current light and turn.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shaded_cap(
@@ -70,7 +72,7 @@ pub(crate) fn shaded_cap(
     lx: f32,
     ly: f32,
     n: usize,
-) -> Option<(Arc<Form>, Vec<f32>, Vec<u8>, f32)> {
+) -> Option<ShadedCap> {
     let form = form::form_for(&cfg.type_key, &cfg.path, n, half_depth)?;
     let rig = Rig {
         cy,
@@ -215,17 +217,23 @@ pub(crate) fn draw_body(
         )
     };
     let stops = [
-        (0.0, color([
-            side_light[0].clamp(0.0, 255.0),
-            side_light[1].clamp(0.0, 255.0),
-            side_light[2].clamp(0.0, 255.0),
-        ])),
+        (
+            0.0,
+            color([
+                side_light[0].clamp(0.0, 255.0),
+                side_light[1].clamp(0.0, 255.0),
+                side_light[2].clamp(0.0, 255.0),
+            ]),
+        ),
         (0.5, color(side_mid)),
-        (1.0, color([
-            side_dark[0].clamp(0.0, 255.0),
-            side_dark[1].clamp(0.0, 255.0),
-            side_dark[2].clamp(0.0, 255.0),
-        ])),
+        (
+            1.0,
+            color([
+                side_dark[0].clamp(0.0, 255.0),
+                side_dark[1].clamp(0.0, 255.0),
+                side_dark[2].clamp(0.0, 255.0),
+            ]),
+        ),
     ];
     let side_shader = LinearGradient::new(
         tiny_skia::Point::from_xy(lx0 * 60.0, ly0 * 60.0),
@@ -237,17 +245,14 @@ pub(crate) fn draw_body(
         SpreadMode::Pad,
         Transform::identity(),
     );
-    let mut side_paint = Paint::default();
-    side_paint.anti_alias = true;
+    let mut side_paint = Paint {
+        anti_alias: true,
+        ..Paint::default()
+    };
     if let Some(shader) = side_shader {
         side_paint.shader = shader;
     } else {
-        side_paint.set_color_rgba8(
-            side_mid[0] as u8,
-            side_mid[1] as u8,
-            side_mid[2] as u8,
-            255,
-        );
+        side_paint.set_color_rgba8(side_mid[0] as u8, side_mid[1] as u8, side_mid[2] as u8, 255);
     }
 
     let near_sign = if facing >= 0.0 { 1.0 } else { -1.0 };
@@ -257,7 +262,7 @@ pub(crate) fn draw_body(
         (0.55 * (cfg.shadow / 0.35).min(1.6)).min(0.7)
     };
     let c0 = (rel.cx[0], rel.cy[0]);
-    let mut slice_path = |k: usize, z: f32| -> Option<tiny_skia::Path> {
+    let slice_path = |k: usize, z: f32| -> Option<tiny_skia::Path> {
         let sk = rel.scale[k];
         let local = Affine([
             sk,

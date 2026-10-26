@@ -10,34 +10,26 @@ use iced::advanced::image::{self, FilterMethod, Image, Renderer as _};
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::widget::{self, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
-use iced::{
-    Element, Event, Length, Rectangle, Renderer, Size, Theme, mouse, window,
-};
+use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme, mouse, window};
 use tiny_skia::{Path, Pixmap};
 
 use super::color::{auto_ink, parse_color, richer, shade};
-use super::data::{
-    bot_avatar_parts, bot_avatar_preset, bot_avatar_shape, bot_avatar_state_label,
-};
+use super::data::{bot_avatar_parts, bot_avatar_preset, bot_avatar_shape, bot_avatar_state_label};
 use super::engine::{BotAvatarSim, JUMP_DEFAULTS, JumpConfig, Pose, rest_pose};
 use super::path::{parse_svg_path, parse_svg_subpaths};
-use super::types::{
-    BotAvatarFace, BotAvatarFur, BotAvatarGlasses, BotAvatarHat, BotAvatarShading, BotAvatarState,
-    BotAvatarTheme, BotAvatarType,
-};
 use super::render::draw::{LIGHT_FABRIC, LIGHT_OTHER};
 use super::render::wear::Wear;
-use super::render::{FurStyle, OVERSCAN, RISE, RenderConfig, draw_frame};
 use super::render::whirl::WhirlConfig;
+use super::render::{FurStyle, OVERSCAN, RISE, RenderConfig, draw_frame};
+use super::types::{
+    BotAvatarFace, BotAvatarFur, BotAvatarGlasses, BotAvatarHat, BotAvatarShading,
+    BotAvatarSquashEase, BotAvatarState, BotAvatarTheme, BotAvatarType,
+};
 
 const DEFAULT_ACCESSORY: &str = "#27272b";
 
 fn clamp(v: f32, lo: f32, hi: f32) -> f32 {
-    if v.is_finite() {
-        v.clamp(lo, hi)
-    } else {
-        lo
-    }
+    if v.is_finite() { v.clamp(lo, hi) } else { lo }
 }
 
 fn q20(v: f32, lo: f32, hi: f32) -> f32 {
@@ -55,7 +47,7 @@ fn q20(v: f32, lo: f32, hi: f32) -> f32 {
 /// [`reduce_motion`](Self::reduce_motion) to hold the state's rest pose.
 ///
 /// Frames are rasterised with `tiny-skia` and drawn through iced's image
-/// renderer, with the canvas overscanned [`OVERSCAN`] times so a hop or a
+/// renderer, with the canvas overscanned `OVERSCAN` times so a hop or a
 /// flip has room to leave the avatar's box.
 ///
 /// # Examples
@@ -72,7 +64,7 @@ fn q20(v: f32, lo: f32, hi: f32) -> f32 {
 ///     .glasses(BotAvatarGlasses::Round)
 ///     .size(96.0)
 ///     .on_click(|| ())
-///     .into_element::<()>();
+///     .into_element();
 /// # let _ = avatar;
 /// ```
 #[must_use = "widgets do nothing unless turned into an iced Element"]
@@ -549,6 +541,55 @@ impl<Message> BotAvatar<Message> {
         self
     }
 
+    /// Sets the seconds the landing squash takes, contact to recovered.
+    pub fn jump_squash_time(mut self, seconds: f32) -> Self {
+        self.jump.squash_time = clamp(seconds, 0.02, 10.0);
+        self
+    }
+
+    /// Sets the landing squash's shape.
+    pub fn jump_squash_ease(mut self, ease: BotAvatarSquashEase) -> Self {
+        self.jump.squash_ease = ease;
+        self
+    }
+
+    /// Sets the seconds the body holds its deepest squash on the ground.
+    pub fn jump_ground_time(mut self, seconds: f32) -> Self {
+        self.jump.ground_time = clamp(seconds, 0.0, 10.0);
+        self
+    }
+
+    /// Sets how the weight settles through that hold.
+    pub fn jump_ground_ease(mut self, ease: BotAvatarSquashEase) -> Self {
+        self.jump.ground_ease = ease;
+        self
+    }
+
+    /// Sets the seconds the body takes to rise back to its own shape.
+    pub fn jump_rise_time(mut self, seconds: f32) -> Self {
+        self.jump.rise_time = clamp(seconds, 0.02, 10.0);
+        self
+    }
+
+    /// Sets how it rises.
+    pub fn jump_rise_ease(mut self, ease: BotAvatarSquashEase) -> Self {
+        self.jump.rise_ease = ease;
+        self
+    }
+
+    /// Sets the seconds a click's landing squash takes.
+    pub fn jump_click_squash_time(mut self, seconds: f32) -> Self {
+        self.jump.click_squash_time = clamp(seconds, 0.02, 10.0);
+        self
+    }
+
+    /// Sets when the landing squash begins: seconds before (negative) or
+    /// after touch-down; 0 is the moment of contact.
+    pub fn jump_land(mut self, seconds: f32) -> Self {
+        self.jump.land = clamp(seconds, -2.0, 2.0);
+        self
+    }
+
     /// Sets whole turns in the air.
     pub fn jump_spin(mut self, spin: f32) -> Self {
         self.jump.spin = clamp(spin, 0.0, 8.0).round();
@@ -647,7 +688,7 @@ impl<Message> BotAvatar<Message> {
     /// pipeline the widget draws, which makes it useful for snapshots and
     /// for comparing against the web reference.
     pub fn render_rgba(&self, size: f32, density: f32, pose: &Pose) -> (u32, u32, Vec<u8>) {
-        let cfg = self.render_config(pose, BotAvatarTheme::Dark);
+        let cfg = self.render_config(pose);
         let frame = draw_frame(size, density, pose, &cfg);
         to_straight_rgba(&frame)
     }
@@ -701,29 +742,25 @@ impl<Message> BotAvatar<Message> {
 
     fn body_colors(&self) -> (super::color::Rgba, super::color::Rgba) {
         let preset = bot_avatar_preset(self.bot_type);
-        let picked = parse_color(
-            self.color
-                .as_deref()
-                .unwrap_or(preset.color),
-        )
-        .unwrap_or_else(|| {
-            parse_color(preset.color).unwrap_or_else(|| super::color::Rgba::from_rgb(65, 196, 255))
-        });
+        let picked =
+            parse_color(self.color.as_deref().unwrap_or(preset.color)).unwrap_or_else(|| {
+                parse_color(preset.color)
+                    .unwrap_or_else(|| super::color::Rgba::from_rgb(65, 196, 255))
+            });
         let brightness = self.brightness.unwrap_or(preset.brightness.unwrap_or(1.0));
         let saturation = self.saturation.unwrap_or(preset.saturation.unwrap_or(1.5));
         let vivid = clamp(saturation, 1.5, 2.5) - 1.5;
-        let body = if (brightness - 1.0).abs() < f32::EPSILON
-            && (saturation - 1.0).abs() < f32::EPSILON
-        {
-            picked
-        } else {
-            let shaded = shade(
-                picked,
-                f64::from((clamp(brightness, 0.0, 2.0) - 1.0) * 0.35),
-                f64::from((clamp(saturation, 0.0, 1.5) - 1.0) * 0.5),
-            );
-            richer(shaded, f64::from(vivid))
-        };
+        let body =
+            if (brightness - 1.0).abs() < f32::EPSILON && (saturation - 1.0).abs() < f32::EPSILON {
+                picked
+            } else {
+                let shaded = shade(
+                    picked,
+                    f64::from((clamp(brightness, 0.0, 2.0) - 1.0) * 0.35),
+                    f64::from((clamp(saturation, 0.0, 1.5) - 1.0) * 0.5),
+                );
+                richer(shaded, f64::from(vivid))
+            };
         let ink = self
             .ink
             .as_deref()
@@ -732,7 +769,12 @@ impl<Message> BotAvatar<Message> {
         (body, ink)
     }
 
-    fn resolve_theme(&self, theme: &Theme) -> BotAvatarTheme {
+    /// Resolves [`BotAvatarTheme::Auto`] against a UI theme.
+    ///
+    /// The renderer itself does not read this: like the web package, the
+    /// surface choice only describes where the avatar sits. Ink still falls
+    /// back to `auto_ink`, which looks at the body colour alone.
+    pub fn resolved_theme(&self, theme: &Theme) -> BotAvatarTheme {
         match self.theme {
             BotAvatarTheme::Auto => {
                 if theme.palette().background.r > 0.5 {
@@ -745,7 +787,7 @@ impl<Message> BotAvatar<Message> {
         }
     }
 
-    fn render_config(&self, _pose: &Pose, theme: BotAvatarTheme) -> RenderConfig {
+    fn render_config(&self, _pose: &Pose) -> RenderConfig {
         let preset = bot_avatar_preset(self.bot_type);
         let (body, ink) = self.body_colors();
         let (path, type_key) = self.resolved_outline();
@@ -776,8 +818,7 @@ impl<Message> BotAvatar<Message> {
             rim: self.rim.unwrap_or(lit.rim),
             spread: self.spread.unwrap_or(lit.spread),
             vivid: clamp(
-                self.saturation
-                    .unwrap_or(preset.saturation.unwrap_or(1.5)),
+                self.saturation.unwrap_or(preset.saturation.unwrap_or(1.5)),
                 1.5,
                 2.5,
             ) - 1.5,
@@ -794,9 +835,7 @@ impl<Message> BotAvatar<Message> {
             shine: self.shine.unwrap_or(0.0),
             sheen: self.sheen.unwrap_or(0.0),
             back_softness: self.back_softness.unwrap_or(1.0),
-            theme,
             whirl: self.whirl,
-            still: !self.is_animated(),
             wear: Wear {
                 hat: self.hat,
                 glasses: self.glasses,
@@ -822,7 +861,7 @@ impl<Message> BotAvatar<Message> {
         *inner.sim.pose()
     }
 
-    fn frame_key(&self, pose: &Pose, density: f32, theme: BotAvatarTheme) -> u64 {
+    fn frame_key(&self, pose: &Pose, density: f32) -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         let f = |v: f32, h: &mut std::collections::hash_map::DefaultHasher| v.to_bits().hash(h);
         self.bot_type.key().hash(&mut h);
@@ -865,7 +904,6 @@ impl<Message> BotAvatar<Message> {
         f(self.whirl.width, &mut h);
         f(self.whirl.length, &mut h);
         f(self.whirl.tilt, &mut h);
-        theme.key().hash(&mut h);
         f(pose.yaw, &mut h);
         f(pose.pitch, &mut h);
         f(pose.roll, &mut h);
@@ -971,13 +1009,11 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
         _renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        layout::Node::new(
-            limits.resolve(
-                Length::Fixed(self.size),
-                Length::Fixed(self.size),
-                Size::new(self.size, self.size),
-            ),
-        )
+        layout::Node::new(limits.resolve(
+            Length::Fixed(self.size),
+            Length::Fixed(self.size),
+            Size::new(self.size, self.size),
+        ))
     }
 
     fn update(
@@ -999,20 +1035,21 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
         let mut inner = state.inner.borrow_mut();
         self.sync_sim(&mut inner);
 
-        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event {
-            if cursor.is_over(bounds) && self.interactive {
-                if self.is_animated() {
-                    inner.sim.poke();
-                    shell.request_redraw();
-                }
-                if let Some(message) = &self.on_click {
-                    shell.publish(message());
-                }
+        if let Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) = event
+            && cursor.is_over(bounds)
+            && self.interactive
+        {
+            if self.is_animated() {
+                inner.sim.poke();
+                shell.request_redraw();
+            }
+            if let Some(message) = &self.on_click {
+                shell.publish(message());
             }
         }
 
         if let Event::Window(window::Event::Rescaled(scale)) = event {
-            let scale = clamp(*scale as f32, 0.5, 4.0);
+            let scale = clamp(*scale, 0.5, 4.0);
             if (inner.scale - scale).abs() > f32::EPSILON {
                 inner.scale = scale;
                 shell.request_redraw();
@@ -1050,9 +1087,7 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
             } else {
                 inner.sim.set_pointer(0.0, 0.0, 0.0);
             }
-            inner
-                .sim
-                .update((dt * f64::from(self.speed)) as f32);
+            inner.sim.update((dt * f64::from(self.speed)) as f32);
             shell.request_redraw();
         } else {
             inner.last = None;
@@ -1063,7 +1098,7 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
         &self,
         tree: &Tree,
         renderer: &mut Renderer,
-        theme: &Theme,
+        _theme: &Theme,
         _style: &iced::advanced::renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
@@ -1076,12 +1111,11 @@ impl<Message> Widget<Message, Theme, Renderer> for BotAvatar<Message> {
         let state = tree.state.downcast_ref::<AvatarState>();
         let mut inner = state.inner.borrow_mut();
         self.sync_sim(&mut inner);
-        let theme = self.resolve_theme(theme);
         let pose = self.current_pose(&inner);
         let density = self.pixel_density.unwrap_or(inner.scale);
-        let key = self.frame_key(&pose, density, theme);
+        let key = self.frame_key(&pose, density);
         if inner.key != key || inner.image.is_none() {
-            let cfg = self.render_config(&pose, theme);
+            let cfg = self.render_config(&pose);
             let frame = draw_frame(self.size, density, &pose, &cfg);
             let (w, h, rgba) = to_straight_rgba(&frame);
             inner.image = Some(image::Handle::from_rgba(w, h, rgba));
@@ -1157,9 +1191,7 @@ mod tests {
 
     #[test]
     fn a_custom_path_is_parsed_and_can_be_reset() {
-        let avatar = BotAvatar::<()>::new()
-            .path("M10 10H90V90H10Z")
-            .reset_path();
+        let avatar = BotAvatar::<()>::new().path("M10 10H90V90H10Z").reset_path();
         assert!(avatar.custom_path.is_none());
         let avatar = avatar.path("M10 10H90V90H10Z");
         assert!(avatar.custom_path.is_some());

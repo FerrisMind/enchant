@@ -9,11 +9,12 @@
 //!
 //! ```
 //! use enchant_iced::widgets::bot_avatar::{BotAvatar, BotAvatarType};
+//! use iced::Element;
 //!
-//! let avatar = BotAvatar::new()
+//! let avatar: Element<'_, ()> = BotAvatar::new()
 //!     .bot_type(BotAvatarType::Cat)
 //!     .size(96.0)
-//!     .into_element::<()>();
+//!     .into_element();
 //! # let _ = avatar;
 //! ```
 //!

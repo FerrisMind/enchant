@@ -16,6 +16,8 @@
 //! cell at a time, flat. Small spheres — pearls, beads, rivets — are single
 //! radial fills.
 
+#![allow(clippy::too_many_arguments)] // signatures follow the reference meshing helpers
+
 use std::collections::HashMap;
 use std::f32::consts::TAU;
 use std::rc::Rc;
@@ -160,13 +162,7 @@ pub(crate) struct Mesh {
 /// care over its winding. With `smooth`, each corner gets the mean of its
 /// cells' normals — a surface closed round u, or pinched to a pole, is
 /// joined up.
-pub(crate) fn make_mesh<P, I>(
-    surf: P,
-    nu: usize,
-    nv: usize,
-    inside: I,
-    smooth: bool,
-) -> Mesh
+pub(crate) fn make_mesh<P, I>(surf: P, nu: usize, nv: usize, inside: I, smooth: bool) -> Mesh
 where
     P: Fn(f32, f32) -> V3,
     I: Fn(f32, f32) -> V3,
@@ -182,9 +178,7 @@ where
             pos[k * 3] = p[0];
             pos[k * 3 + 1] = p[1];
             pos[k * 3 + 2] = p[2];
-            ext = ext.max(
-                (p[0] - pos[0]).abs() + (p[1] - pos[1]).abs() + (p[2] - pos[2]).abs(),
-            );
+            ext = ext.max((p[0] - pos[0]).abs() + (p[1] - pos[1]).abs() + (p[2] - pos[2]).abs());
             k += 1;
         }
     }
@@ -300,14 +294,7 @@ where
 /// A tube along a curve: `path(u)` its centre line, `up` the direction its
 /// cross-section is squared to, `prof(u, φ)` the cross-section's offset at
 /// angle φ — along the up direction and across it.
-pub(crate) fn make_tube<P, F>(
-    path: P,
-    up: V3,
-    prof: F,
-    nu: usize,
-    nv: usize,
-    closed: bool,
-) -> Mesh
+pub(crate) fn make_tube<P, F>(path: P, up: V3, prof: F, nu: usize, nv: usize, closed: bool) -> Mesh
 where
     P: Fn(f32) -> V3,
     F: Fn(f32, f32) -> [f32; 2],
@@ -339,7 +326,6 @@ where
 
 /// A cross-section: an ellipse (`p` = 1) squared toward a rounded box as `p`
 /// falls, `a` along the up direction and `b` across it.
-#[must_use]
 pub(crate) fn section(a: f32, b: f32, p: f32) -> impl Fn(f32, f32) -> [f32; 2] {
     move |_u, ph| {
         let c = ph.cos();
@@ -360,7 +346,6 @@ pub(crate) struct Proj {
     pub closed: bool,
     pub x: Vec<f32>,
     pub y: Vec<f32>,
-    pub d: Vec<f32>,
     /// The corners' normals, three a corner; `None` for a faceted mesh.
     pub n: Option<Vec<f32>>,
     /// The cells' normals, three a cell.
@@ -425,7 +410,6 @@ pub(crate) fn project_mesh(view: View, mesh: &Mesh) -> Proj {
         closed: mesh.closed,
         x,
         y,
-        d,
         n: nout,
         f,
         cd,
@@ -435,7 +419,12 @@ pub(crate) fn project_mesh(view: View, mesh: &Mesh) -> Proj {
 /// The screen bounds of some projected meshes.
 #[must_use]
 pub(crate) fn bounds_of(ps: &[&Proj]) -> (f32, f32, f32, f32) {
-    let (mut x0, mut y0, mut x1, mut y1) = (f32::INFINITY, f32::INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+    let (mut x0, mut y0, mut x1, mut y1) = (
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+    );
     for p in ps {
         for k in 0..p.x.len() {
             x0 = x0.min(p.x[k]);
@@ -504,7 +493,8 @@ fn clamp_byte(v: f32) -> u8 {
 
 /// A colour as tiny-skia's paint understands it.
 fn rgba(c: Rgb, alpha: f32) -> Rgba {
-    Rgba::from_rgb(clamp_byte(c[0]), clamp_byte(c[1]), clamp_byte(c[2])).with_alpha(alpha.clamp(0.0, 1.0))
+    Rgba::from_rgb(clamp_byte(c[0]), clamp_byte(c[1]), clamp_byte(c[2]))
+        .with_alpha(alpha.clamp(0.0, 1.0))
 }
 
 /// Options for one paint call.
@@ -730,19 +720,16 @@ pub(crate) fn paint_layers(
             let m0y = (p.y[t0] + p.y[t0 + w]) * 0.5;
             let mut stops: Vec<GradientStop> = Vec::with_capacity(nc);
             let mut last: Option<Rgb> = None;
-            for k in 0..nc {
+            for (k, &col) in cols.iter().enumerate() {
                 let c = colour(k);
-                if let Some(prev) = last {
-                    if k < nc - 1
-                        && (c[0] - prev[0]).abs()
-                            + (c[1] - prev[1]).abs()
-                            + (c[2] - prev[2]).abs()
-                            < 5.0
-                    {
-                        continue;
-                    }
+                if let Some(prev) = last
+                    && k < nc - 1
+                    && (c[0] - prev[0]).abs() + (c[1] - prev[1]).abs() + (c[2] - prev[2]).abs()
+                        < 5.0
+                {
+                    continue;
                 }
-                let t = j * w + cols[k];
+                let t = j * w + col;
                 let off = (((p.x[t] + p.x[t + w]) * 0.5 - m0x) * ax
                     + ((p.y[t] + p.y[t + w]) * 0.5 - m0y) * ay)
                     / (al * al);
@@ -774,13 +761,7 @@ pub(crate) fn paint_layers(
                 pnt.set_color_rgba8(c.r, c.g, c.b, c.a);
             }
         }
-        pixmap.fill_path(
-            &path,
-            &pnt,
-            FillRule::Winding,
-            space.transform(),
-            opts.mask,
-        );
+        pixmap.fill_path(&path, &pnt, FillRule::Winding, space.transform(), opts.mask);
     }
     corners
 }
@@ -863,7 +844,10 @@ pub(crate) fn contact(
         return;
     };
     let stops = vec![
-        GradientStop::new(0.0, tiny_skia::Color::from_rgba8(0, 0, 0, (a * 255.0) as u8)),
+        GradientStop::new(
+            0.0,
+            tiny_skia::Color::from_rgba8(0, 0, 0, (a * 255.0) as u8),
+        ),
         GradientStop::new(
             0.55,
             tiny_skia::Color::from_rgba8(0, 0, 0, (a * 0.45 * 255.0) as u8),
@@ -882,13 +866,7 @@ pub(crate) fn contact(
     };
     let mut p = paint(Rgba::from_rgb(0, 0, 0));
     p.shader = shader;
-    pixmap.fill_path(
-        &path,
-        &p,
-        FillRule::Winding,
-        space.transform(),
-        clip,
-    );
+    pixmap.fill_path(&path, &p, FillRule::Winding, space.transform(), clip);
 }
 
 /// A stable pseudo-random per index, so fuzz does not shimmer frame to frame.
@@ -902,14 +880,28 @@ pub(crate) fn rnd(i: i32, k: i32) -> f32 {
 }
 
 fn bounds2(pts: &[P2]) -> (f32, f32, f32, f32, f32, f32, f32, f32) {
-    let (mut x0, mut y0, mut x1, mut y1) = (f32::INFINITY, f32::INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+    let (mut x0, mut y0, mut x1, mut y1) = (
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+    );
     for p in pts {
         x0 = x0.min(p[0]);
         y0 = y0.min(p[1]);
         x1 = x1.max(p[0]);
         y1 = y1.max(p[1]);
     }
-    (x0, y0, x1, y1, (x0 + x1) * 0.5, (y0 + y1) * 0.5, x1 - x0, y1 - y0)
+    (
+        x0,
+        y0,
+        x1,
+        y1,
+        (x0 + x1) * 0.5,
+        (y0 + y1) * 0.5,
+        x1 - x0,
+        y1 - y0,
+    )
 }
 
 fn grain_tile() -> &'static [u8; 48 * 48] {
@@ -917,7 +909,7 @@ fn grain_tile() -> &'static [u8; 48 * 48] {
     TILE.get_or_init(|| {
         let n = 48usize;
         let mut out = [0u8; 48 * 48];
-        for i in 0..n * n {
+        for (i, cell) in out.iter_mut().enumerate() {
             let x = i % n;
             let y = i / n;
             let mut v = 0.0;
@@ -927,7 +919,7 @@ fn grain_tile() -> &'static [u8; 48 * 48] {
                 v += rnd((xx + yy * n) as i32, 5);
             }
             v /= 5.0;
-            out[i] = (255.0 * (0.82 + 0.36 * v)).round().clamp(0.0, 255.0) as u8;
+            *cell = (255.0 * (0.82 + 0.36 * v)).round().clamp(0.0, 255.0) as u8;
         }
         out
     })
@@ -951,13 +943,13 @@ pub(crate) fn grain_over(
         return;
     };
     let mut clip = Mask::new(pixmap.width(), pixmap.height()).expect("non-zero mask");
-    clip.fill_path(
-        &poly,
-        FillRule::Winding,
-        true,
-        space.transform(),
+    clip.fill_path(&poly, FillRule::Winding, true, space.transform());
+    let (mut sx0, mut sy0, mut sx1, mut sy1) = (
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
     );
-    let (mut sx0, mut sy0, mut sx1, mut sy1) = (f32::INFINITY, f32::INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
     for p in outline {
         let (x, y) = space.point(p[0], p[1]);
         sx0 = sx0.min(x);
@@ -965,10 +957,7 @@ pub(crate) fn grain_over(
         sx1 = sx1.max(x);
         sy1 = sy1.max(y);
     }
-    let (px0, py0) = (
-        sx0.floor().max(0.0) as u32,
-        sy0.floor().max(0.0) as u32,
-    );
+    let (px0, py0) = (sx0.floor().max(0.0) as u32, sy0.floor().max(0.0) as u32);
     let (px1, py1) = (
         sx1.ceil().clamp(0.0, pixmap.width() as f32) as u32,
         sy1.ceil().clamp(0.0, pixmap.height() as f32) as u32,
@@ -1027,9 +1016,7 @@ pub(crate) fn fuzz(
         seg.push(d);
         total += d;
     }
-    let count = (total * (px * 0.5).min(2.4))
-        .round()
-        .clamp(24.0, 360.0) as usize;
+    let count = (total * (px * 0.5).min(2.4)).round().clamp(24.0, 360.0) as usize;
     let (_, _, _, _, cx, cy, ..) = bounds2(outline);
     let mut light = PathBuilder::new();
     let mut dark = PathBuilder::new();
@@ -1074,13 +1061,21 @@ pub(crate) fn fuzz(
         p.line_to(x + hx * l, y + hy * l);
     }
     let light_c = super::super::color::shade(
-        Rgba::from_rgb(clamp_byte(base[0]), clamp_byte(base[1]), clamp_byte(base[2])),
-        f64::from(0.14),
+        Rgba::from_rgb(
+            clamp_byte(base[0]),
+            clamp_byte(base[1]),
+            clamp_byte(base[2]),
+        ),
+        0.14,
         0.0,
     );
     let dark_c = super::super::color::shade(
-        Rgba::from_rgb(clamp_byte(base[0]), clamp_byte(base[1]), clamp_byte(base[2])),
-        f64::from(-0.06),
+        Rgba::from_rgb(
+            clamp_byte(base[0]),
+            clamp_byte(base[1]),
+            clamp_byte(base[2]),
+        ),
+        -0.06,
         0.0,
     );
     if let Some(p) = light.finish() {
@@ -1179,10 +1174,7 @@ pub(crate) fn sphere_sprite(
     let stops: Vec<GradientStop> = kind
         .iter()
         .map(|&(t, col)| {
-            GradientStop::new(
-                t,
-                tiny_skia::Color::from_rgba8(col[0], col[1], col[2], 255),
-            )
+            GradientStop::new(t, tiny_skia::Color::from_rgba8(col[0], col[1], col[2], 255))
         })
         .collect();
     let Some(shader) = RadialGradient::new(
@@ -1209,13 +1201,7 @@ pub(crate) fn sphere_sprite(
     };
     let mut p = paint(Rgba::from_rgb(0, 0, 0));
     p.shader = shader;
-    pixmap.fill_path(
-        &path,
-        &p,
-        FillRule::Winding,
-        space.transform(),
-        None,
-    );
+    pixmap.fill_path(&path, &p, FillRule::Winding, space.transform(), None);
 }
 
 /// A small sphere in an arbitrary colour.
@@ -1242,7 +1228,12 @@ pub(crate) fn sphere_sprite_rgb(
         ),
         GradientStop::new(
             0.35,
-            tiny_skia::Color::from_rgba8(clamp_byte(col[0]), clamp_byte(col[1]), clamp_byte(col[2]), 255),
+            tiny_skia::Color::from_rgba8(
+                clamp_byte(col[0]),
+                clamp_byte(col[1]),
+                clamp_byte(col[2]),
+                255,
+            ),
         ),
         GradientStop::new(
             0.85,
@@ -1442,11 +1433,7 @@ pub(crate) fn paper(view: View, base: Rgb) -> Shade {
     Rc::new(move |n: V3| {
         let dif = clamp01((dot(n, view.l) + 0.2) / 1.2);
         let spec = clamp01(dot(n, view.h)).powf(22.0) * 0.3;
-        mix(
-            scale(base, 0.36 + 0.7 * dif),
-            [255.0, 255.0, 255.0],
-            spec,
-        )
+        mix(scale(base, 0.36 + 0.7 * dif), [255.0, 255.0, 255.0], spec)
     })
 }
 
@@ -1520,24 +1507,6 @@ pub(crate) fn silver(view: View) -> Shade {
     )
 }
 
-/// A pearl: soft white with a pink-blue play and a small bright glint.
-#[must_use]
-pub(crate) fn pearl(view: View) -> Shade {
-    Rc::new(move |n: V3| {
-        let dif = clamp01((dot(n, view.l) + 0.4) / 1.4);
-        let base = mix(
-            [238.0, 228.0, 228.0],
-            [212.0, 222.0, 242.0],
-            1.0 - clamp01(n[2]),
-        );
-        mix(
-            scale(base, 0.62 + 0.42 * dif),
-            [255.0, 255.0, 255.0],
-            clamp01(dot(n, view.h)).powf(40.0) * 0.8,
-        )
-    })
-}
-
 /// A cut gem's facet: its colour deepening toward the edges, the facets
 /// turned to the light bright, a white fire on the one that catches it.
 #[must_use]
@@ -1550,7 +1519,11 @@ pub(crate) fn gem(view: View, base: Rgb) -> Shade {
             clear,
             clamp01(clamp01(n[2]) * 0.75 + dot(n, view.l) * 0.4),
         );
-        mix(c, [255.0, 255.0, 255.0], clamp01(dot(n, view.h)).powf(24.0) * 0.95)
+        mix(
+            c,
+            [255.0, 255.0, 255.0],
+            clamp01(dot(n, view.h)).powf(24.0) * 0.95,
+        )
     })
 }
 
@@ -1563,10 +1536,10 @@ where
 {
     static CACHE: OnceLock<Mutex<HashMap<String, Arc<Mesh>>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Ok(c) = cache.lock() {
-        if let Some(m) = c.get(key) {
-            return Arc::clone(m);
-        }
+    if let Ok(c) = cache.lock()
+        && let Some(m) = c.get(key)
+    {
+        return Arc::clone(m);
     }
     let mesh = Arc::new(make());
     if let Ok(mut c) = cache.lock() {

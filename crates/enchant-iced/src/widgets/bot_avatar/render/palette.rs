@@ -12,7 +12,6 @@ pub(crate) const SLICES: usize = 17;
 #[derive(Clone, Debug)]
 pub(crate) struct Palette {
     pub base: Rgba,
-    pub far: Rgba,
     pub near: Rgba,
     pub light: Rgba,
     pub dark: Rgba,
@@ -44,7 +43,6 @@ pub(crate) fn palette(color: Rgba, shadow: f32, highlight: f32) -> Palette {
     }
     Palette {
         base: color,
-        far,
         near,
         light: shade(color, 0.04 * highlight, 0.0),
         dark: shade(color, -0.3 * shadow, 0.05 * shadow),
@@ -62,7 +60,7 @@ mod tests {
     #[test]
     fn ramps_start_dark_and_end_at_the_body() {
         let p = palette(Rgba::from_rgb(65, 196, 255), 0.35, 1.3);
-        assert_eq!(p.crisp_mix[0], p.far);
+        assert_eq!(p.crisp_mix[0], p.dark);
         assert_eq!(p.smooth_mix[SLICES - 1], p.base);
         let l0 = p.crisp_mix[0].to_hsl().2;
         let l1 = p.crisp_mix[10].to_hsl().2;

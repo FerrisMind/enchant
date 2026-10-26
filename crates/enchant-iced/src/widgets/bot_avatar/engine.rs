@@ -244,7 +244,11 @@ fn squash_pulse(u: f32, ease: BotAvatarSquashEase) -> f32 {
             k * k * (2.0 - k).exp() / 4.0
         }
     };
-    let tail = if u > 0.85 { 1.0 - (u - 0.85) / 0.15 } else { 1.0 };
+    let tail = if u > 0.85 {
+        1.0 - (u - 0.85) / 0.15
+    } else {
+        1.0
+    };
     x * tail * tail * (3.0 - 2.0 * tail)
 }
 
@@ -268,7 +272,11 @@ fn whirl_ring_angle(q: f32) -> f32 {
 /// The crouch before a flip's take-off: a click's builds over its squash time,
 /// an idle jump's is the hop's short bump.
 fn flip_pre(j: JumpConfig, poked: bool) -> f32 {
-    if poked { j.click_squash_time } else { FLIP_PRE * j.time }
+    if poked {
+        j.click_squash_time
+    } else {
+        FLIP_PRE * j.time
+    }
 }
 
 /// How long a whole flip lasts, crouch to settled landing.
@@ -1074,8 +1082,14 @@ impl BotAvatarSim {
                 }
             }
             // Lean into each hop, alternating sides.
-            roll_add +=
-                (if self.hop_count.is_multiple_of(2) { 1.0 } else { -1.0 }) * 6.0 * DEG * arc * g;
+            roll_add += (if self.hop_count.is_multiple_of(2) {
+                1.0
+            } else {
+                -1.0
+            }) * 6.0
+                * DEG
+                * arc
+                * g;
         }
 
         // Working: now and then a laugh shuts the eyes into arcs, then they

@@ -3,12 +3,10 @@
 //! The renderer composes a frame as a `Pixmap`, which is then handed to iced
 //! as an image. This module keeps the small affine type the port's maths was
 //! written in, plus the handful of wrappers used all over the renderer:
-//! filling and stroking a path, building a coverage mask, blitting a sprite,
-//! and converting one of the crate's [`Rgba`] colours into a paint.
+//! filling and stroking a path, building a coverage mask, and converting one
+//! of the crate's [`Rgba`] colours into a paint.
 
-use tiny_skia::{
-    FillRule, Mask, Paint, Path, Pixmap, PixmapPaint, PixmapRef, Stroke, Transform,
-};
+use tiny_skia::{FillRule, Mask, Paint, Path, Pixmap, Stroke, Transform};
 
 use super::color::Rgba;
 
@@ -85,13 +83,6 @@ impl Affine {
     }
 }
 
-/// Compose two affines, applying `a` first. A free function to mirror the
-/// reference's `mulAffine` at call sites that read like the port.
-#[must_use]
-pub(crate) fn mul(a: Affine, b: Affine) -> Affine {
-    a.then(b)
-}
-
 /// A paint of one opaque colour.
 #[must_use]
 pub(crate) fn paint(color: Rgba) -> Paint<'static> {
@@ -116,13 +107,7 @@ pub(crate) fn fill(
     transform: Affine,
     mask: Option<&Mask>,
 ) {
-    pixmap.fill_path(
-        path,
-        paint,
-        FillRule::Winding,
-        transform.transform(),
-        mask,
-    );
+    pixmap.fill_path(path, paint, FillRule::Winding, transform.transform(), mask);
 }
 
 /// Stroke a path with round caps and joins, the reference's default.
@@ -142,7 +127,6 @@ pub(crate) fn stroke(
     };
     pixmap.stroke_path(path, paint, &stroke, transform.transform(), mask);
 }
-
 
 /// Stroke a path with butt caps and round joins, for a run of segment arcs
 /// that should not grow past its ends.
@@ -174,23 +158,8 @@ pub(crate) fn mask_fill(mask: &mut Mask, path: &Path, transform: Affine) {
     mask.fill_path(path, FillRule::Winding, true, transform.transform());
 }
 
-/// Blit a sprite, optionally through a mask.
-pub(crate) fn blit(
-    pixmap: &mut Pixmap,
-    sprite: PixmapRef<'_>,
-    transform: Affine,
-    quality: tiny_skia::FilterQuality,
-    mask: Option<&Mask>,
-) {
-    let paint = PixmapPaint {
-        opacity: 1.0,
-        blend_mode: tiny_skia::BlendMode::SourceOver,
-        quality,
-    };
-    pixmap.draw_pixmap(0, 0, sprite, &paint, transform.transform(), mask);
-}
-
 /// One rounded rectangle path.
+#[cfg(test)]
 #[must_use]
 pub(crate) fn round_rect(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Option<Path> {
     let r = radius.max(0.0).min(w.abs() / 2.0).min(h.abs() / 2.0);
@@ -214,6 +183,7 @@ pub(crate) fn round_rect(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Option<
 }
 
 /// One ellipse path centred on `(cx, cy)`.
+#[cfg(test)]
 #[must_use]
 pub(crate) fn ellipse(cx: f32, cy: f32, rx: f32, ry: f32) -> Option<Path> {
     let mut b = tiny_skia::PathBuilder::new();
@@ -229,6 +199,7 @@ pub(crate) fn ellipse(cx: f32, cy: f32, rx: f32, ry: f32) -> Option<Path> {
 }
 
 /// One polygon path from `(x, y)` pairs.
+#[cfg(test)]
 #[must_use]
 pub(crate) fn polygon(points: &[(f32, f32)]) -> Option<Path> {
     if points.len() < 2 {
@@ -241,14 +212,6 @@ pub(crate) fn polygon(points: &[(f32, f32)]) -> Option<Path> {
     }
     b.close();
     b.finish()
-}
-
-/// The coverage of a path as a fresh mask.
-#[must_use]
-pub(crate) fn path_mask(pixmap: &Pixmap, path: &Path, transform: Affine) -> Mask {
-    let mut m = mask(pixmap);
-    mask_fill(&mut m, path, transform);
-    m
 }
 
 #[cfg(test)]

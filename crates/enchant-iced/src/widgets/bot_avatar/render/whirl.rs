@@ -7,6 +7,8 @@
 //! The near half is larger, thicker and stronger and is drawn over the body
 //! and face; the far half is smaller and fainter and goes behind.
 
+#![allow(clippy::too_many_arguments)] // signature follows the reference whirl pass
+
 use tiny_skia::{PathBuilder, Pixmap};
 
 use super::super::canvas::{Affine, paint_alpha, stroke_butt};
@@ -84,7 +86,9 @@ pub(crate) fn draw(
     let rx = RADIUS * knobs.size;
     let ry = rx * RATIO * knobs.tilt * if near { 1.14 } else { 0.86 };
     let light_a = ly.atan2(lx) - TILT;
-    let to_device = Affine::rotate(TILT).then(Affine::translate(0.0, 5.0)).then(body);
+    let to_device = Affine::rotate(TILT)
+        .then(Affine::translate(0.0, 5.0))
+        .then(body);
 
     // The near half casts a soft shadow on the body it crosses.
     if near {
@@ -97,11 +101,15 @@ pub(crate) fn draw(
             }
             let fade = (1.0 - f).powf(1.3);
             if let Some(path) = arc_path(rx, ry, a1, a0, 3.5) {
-                let p = paint_alpha(
-                    Rgba::new(0, 0, 0, 255),
-                    (0.2 * k * fade).clamp(0.0, 1.0),
+                let p = paint_alpha(Rgba::new(0, 0, 0, 255), (0.2 * k * fade).clamp(0.0, 1.0));
+                stroke_butt(
+                    pixmap,
+                    &path,
+                    &p,
+                    (2.0 + 8.0 * fade) * 1.5 * knobs.width,
+                    to_device,
+                    None,
                 );
-                stroke_butt(pixmap, &path, &p, (2.0 + 8.0 * fade) * 1.5 * knobs.width, to_device, None);
             }
         }
     }
@@ -120,9 +128,6 @@ pub(crate) fn draw(
         let width = (2.0 + 8.0 * fade) * depth * knobs.width * puff;
         let a = k * (0.3 + 0.7 * fade) * depth;
         let facing = 0.5 + 0.5 * (mid - light_a).cos();
-        let Some(path) = arc_path(rx, ry, a1, a0, 0.0) else {
-            continue;
-        };
         let pass = |pixmap: &mut Pixmap, color: Rgba, alpha: f32, width: f32, dy: f32| {
             let Some(p) = arc_path(rx, ry, a1, a0, dy) else {
                 return;

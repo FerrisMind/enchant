@@ -128,7 +128,13 @@ pub(crate) fn build_matcap(c: [f32; 3], frame: &super::form::Frame, p: &Material
             let rx = 2.0 * nv * nx - frame.v[0];
             let ry = 2.0 * nv * ny - frame.v[1];
             let rz = 2.0 * nv * nz - frame.v[2];
-            let sky = 0.45 + 0.55 * smooth(-0.4, 0.6, rx * frame.u[0] + ry * frame.u[1] + rz * frame.u[2]);
+            let sky = 0.45
+                + 0.55
+                    * smooth(
+                        -0.4,
+                        0.6,
+                        rx * frame.u[0] + ry * frame.u[1] + rz * frame.u[2],
+                    );
             let rw = rx * frame.w[0] + ry * frame.w[1] + rz * frame.w[2];
             let mut win = 0.0;
             if rw > 0.5 {
@@ -234,8 +240,7 @@ pub(crate) fn build_fabric_matcap(
             let sheen = sheen_k * q * q * lit;
             let bl = smooth(-0.3, 0.6, nb);
             let rq = smooth(0.18 - 0.12 * back_soft, 0.62 + 0.18 * back_soft, q);
-            let rim =
-                rim_k * rq * rq.sqrt() * (0.3 + 0.7 * bl) * (1.0 - 0.7 * nd.max(0.0));
+            let rim = rim_k * rq * rq.sqrt() * (0.3 + 0.7 * bl) * (1.0 - 0.7 * nd.max(0.0));
             let hot = rq * rq * rq.sqrt() * (1.0 - 0.5 * back_soft);
             let mut rgb = [0.0f32; 3];
             for ch in 0..3 {
@@ -303,7 +308,6 @@ fn fabric_back(k: [f32; 3], v: [f32; 3]) -> [f32; 3] {
     ])
 }
 
-
 pub(crate) fn sample_matcap(mc: &[f32], nx: f32, ny: f32) -> [f32; 3] {
     let fx = (nx * 0.5 + 0.5) * (MATCAP - 1) as f32;
     let fy = (ny * 0.5 + 0.5) * (MATCAP - 1) as f32;
@@ -350,9 +354,7 @@ pub(crate) fn shade_texels(
         let y = f32::from(form.wy[i]) / 255.0;
         if lift.is_some() {
             let g = (mc[b + 1] * (1.0 - x) + mc[b + 4] * x) * (1.0 - y)
-                + (mc[b + MATCAP * 3 + 1] * (1.0 - x)
-                    + mc[b + MATCAP * 3 + 4] * x)
-                    * y;
+                + (mc[b + MATCAP * 3 + 1] * (1.0 - x) + mc[b + MATCAP * 3 + 4] * x) * y;
             m = 1.0 - (1.0 - m) * (1.1 - 0.75 * (g / 235.0).min(1.0));
         }
         let w00 = (1.0 - x) * (1.0 - y) * m;
@@ -397,17 +399,21 @@ mod tests {
             bx: None,
             by: None,
         });
-        let mc = build_matcap([0.05, 0.5, 1.0], &frame, &Material {
-            shadow: 0.35,
-            highlight: 1.3,
-            spread: 1.55,
-            rim: 0.5,
-            vivid: 0.09,
-            front: 32.0f32.to_radians(),
-            shine: 1.0,
-            back_soft: 1.0,
-            sheen: 0.0,
-        });
+        let mc = build_matcap(
+            [0.05, 0.5, 1.0],
+            &frame,
+            &Material {
+                shadow: 0.35,
+                highlight: 1.3,
+                spread: 1.55,
+                rim: 0.5,
+                vivid: 0.09,
+                front: 32.0f32.to_radians(),
+                shine: 1.0,
+                back_soft: 1.0,
+                sheen: 0.0,
+            },
+        );
         let center = (MATCAP / 2 * MATCAP + MATCAP / 2) * 3;
         assert!(mc[center + 2] > 100.0);
         assert!(mc[0] == 0.0 && mc[1] == 0.0 && mc[2] == 0.0);

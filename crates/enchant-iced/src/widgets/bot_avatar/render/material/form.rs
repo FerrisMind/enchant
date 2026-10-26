@@ -22,13 +22,8 @@ pub(crate) const PAD: f32 = 3.0;
 pub(crate) const SPAN: f32 = 100.0 + 2.0 * PAD;
 /// The matcap's side, in cells.
 pub(crate) const MATCAP: usize = 64;
-/// Stops on the side gradients.
-pub(crate) const CONIC_STOPS: usize = 24;
-
 const INF: f32 = 1e12;
 
-/// The light's elevation off the screen plane.
-const EL: f32 = 48.0 * std::f32::consts::PI / 180.0;
 const E_XY: f32 = 0.669_130_6;
 const E_Z: f32 = 0.743_144_8;
 
@@ -50,9 +45,6 @@ pub(crate) struct Form {
     pub h: Vec<f32>,
     /// The surface's highest point.
     pub top: f32,
-    /// The shape's inradius.
-    pub r_in: f32,
-    pub half_depth: f32,
 }
 
 /// A level set of the height field, used to draw the body's side.
@@ -162,10 +154,10 @@ pub(crate) fn surface_at(key: &str, half_depth: f32, x: f32, y: f32, round: f32)
 pub(crate) fn relief_for(form: &Form, k: usize, round: f32) -> Arc<Relief> {
     let q = round.clamp(0.05, 1.0);
     let key = (form.id, k as u32, (q * 100.0).round() as u16);
-    if let Ok(c) = cache().lock() {
-        if let Some(r) = c.reliefs.get(&key) {
-            return Arc::clone(r);
-        }
+    if let Ok(c) = cache().lock()
+        && let Some(r) = c.reliefs.get(&key)
+    {
+        return Arc::clone(r);
     }
     let relief = Arc::new(build_relief(form, k, q));
     if let Ok(mut c) = cache().lock() {
@@ -180,10 +172,10 @@ pub(crate) fn relief_for(form: &Form, k: usize, round: f32) -> Arc<Relief> {
 /// Undo the edge factor the material bakes into the form's occlusion, so a
 /// pile's sheen can be laid over its edge without a second shadow.
 pub(crate) fn edge_lift(form: &Form) -> Arc<Lift> {
-    if let Ok(c) = cache().lock() {
-        if let Some(l) = c.lifts.get(&form.id) {
-            return Arc::clone(l);
-        }
+    if let Ok(c) = cache().lock()
+        && let Some(l) = c.lifts.get(&form.id)
+    {
+        return Arc::clone(l);
     }
     let mut ao = vec![0u8; form.n * form.n];
     let mut k = vec![0.0f32; form.n * form.n];
@@ -306,14 +298,13 @@ fn build_form(cov: &[u8], n: usize, half_depth: f32) -> Form {
     let mut tmp = vec![0.0f32; nn];
     for i in 0..nn {
         let a = f32::from(cov[i]) / 255.0;
-        sd[i] = u
-            * if a > 0.0 && a < 1.0 {
-                a - 0.5
-            } else if mask[i] != 0 {
-                d_in[i].sqrt() - 0.5
-            } else {
-                0.5 - d_out[i].sqrt()
-            };
+        sd[i] = u * if a > 0.0 && a < 1.0 {
+            a - 0.5
+        } else if mask[i] != 0 {
+            d_in[i].sqrt() - 0.5
+        } else {
+            0.5 - d_out[i].sqrt()
+        };
     }
     blur5(&mut sd, n, &mut tmp);
     blur5(&mut sd, n, &mut tmp);
@@ -360,8 +351,6 @@ fn build_form(cov: &[u8], n: usize, half_depth: f32) -> Form {
         sd,
         h,
         top,
-        r_in,
-        half_depth,
     };
     let steps: &[usize] = if n <= 64 {
         &[1, 2, 3, 5, 8]
@@ -426,7 +415,6 @@ fn build_form(cov: &[u8], n: usize, half_depth: f32) -> Form {
                 len = (nx * nx + ny * ny + nz * nz).sqrt().max(1e-6);
                 nx /= len;
                 ny /= len;
-                nz /= len;
             }
             let h0 = form.h[src];
             let mut occ = 0.0f32;
@@ -468,8 +456,8 @@ fn edt1d(f: &[f32], d: &mut [f32], near: &mut [i32]) {
     for q in 1..n {
         loop {
             let vk = v[k.max(0) as usize] as usize;
-            let x = (f[q] + (q * q) as f32 - f[vk] - (vk * vk) as f32)
-                / (2.0 * (q as f32 - vk as f32));
+            let x =
+                (f[q] + (q * q) as f32 - f[vk] - (vk * vk) as f32) / (2.0 * (q as f32 - vk as f32));
             if x > z[k.max(0) as usize] {
                 k += 1;
                 v[k as usize] = q as i32;
@@ -534,8 +522,9 @@ fn blur5(a: &mut [f32], n: usize, tmp: &mut [f32]) {
             let x1 = x.saturating_sub(1);
             let x3 = (x + 1).min(n - 1);
             let x4 = (x + 2).min(n - 1);
-            tmp[o + x] = (a[o + x0] + 4.0 * a[o + x1] + 6.0 * a[o + x] + 4.0 * a[o + x3] + a[o + x4])
-                * 0.0625;
+            tmp[o + x] =
+                (a[o + x0] + 4.0 * a[o + x1] + 6.0 * a[o + x] + 4.0 * a[o + x3] + a[o + x4])
+                    * 0.0625;
         }
     }
     for x in 0..n {
@@ -565,7 +554,7 @@ fn poisson(cov: &[u8], n: usize, u: f32) -> Vec<f32> {
     let mut size = n;
     let mut factor = 1usize;
     loop {
-        if factor != 1 && !(factor <= 4 && size % 2 == 0) {
+        if factor != 1 && !(factor <= 4 && size.is_multiple_of(2)) {
             break;
         }
         let mut mask = vec![0u8; size * size];
@@ -655,7 +644,11 @@ fn sweep(level: &mut Level, s: f32, iters: usize, om: f32) {
                 if level.mask[i] == 0 {
                     continue;
                 }
-                let v = (level.phi[i - 1] + level.phi[i + 1] + level.phi[i - n] + level.phi[i + n] + s2)
+                let v = (level.phi[i - 1]
+                    + level.phi[i + 1]
+                    + level.phi[i - n]
+                    + level.phi[i + n]
+                    + s2)
                     * 0.25;
                 level.phi[i] += om * (v - level.phi[i]);
             }
@@ -759,11 +752,20 @@ pub(crate) fn cap_frame(rig: &Rig) -> Frame {
         _ => back_from_key(rig.lx, rig.ly),
     };
     let k = local(cr * kx + sr * ky, -sr * kx + cr * ky, 0.0, mirror);
-    Frame { l, v, h, u, w, a, b, d, k }
+    Frame {
+        l,
+        v,
+        h,
+        u,
+        w,
+        a,
+        b,
+        d,
+        k,
+    }
 }
 
 /// The light defaults for the materials.
-pub(crate) const _: f32 = EL;
 
 #[cfg(test)]
 mod tests {
@@ -820,7 +822,8 @@ mod tests {
             bx: None,
             by: None,
         });
-        let l = (frame.l[0] * frame.l[0] + frame.l[1] * frame.l[1] + frame.l[2] * frame.l[2]).sqrt();
+        let l =
+            (frame.l[0] * frame.l[0] + frame.l[1] * frame.l[1] + frame.l[2] * frame.l[2]).sqrt();
         assert!((l - 1.0).abs() < 1e-4);
     }
 }

@@ -237,7 +237,7 @@ pub fn shade(color: Rgba, dl: f64, ds: f64) -> Rgba {
 /// and the chroma stops at whatever the gamut can show.
 #[must_use]
 pub fn richer(color: Rgba, t: f64) -> Rgba {
-    if !(t > 0.0) {
+    if t.is_nan() || t <= 0.0 {
         return color;
     }
 

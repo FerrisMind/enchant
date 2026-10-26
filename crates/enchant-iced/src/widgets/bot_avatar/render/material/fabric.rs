@@ -7,13 +7,15 @@
 //! style, and is kept in a process-wide cache; the draw lays the slices, the
 //! front, the halo and the pile's film over them.
 
+#![allow(clippy::too_many_arguments)] // signatures follow the reference pile passes
+
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use tiny_skia::{
-    BlendMode, FilterQuality, FillRule, LineCap, LineJoin, Mask, Path, PathBuilder,
-    Pixmap, PixmapPaint, Stroke, Transform,
+    BlendMode, FillRule, FilterQuality, LineCap, LineJoin, Mask, Path, PathBuilder, Pixmap,
+    PixmapPaint, Stroke, Transform,
 };
 
 use super::super::super::canvas::Affine;
@@ -28,6 +30,8 @@ use super::plastic::{tier_for, to_pixmap};
 const FUR_MID: f32 = 128.0;
 const LOCK_COVER: f32 = 3.2;
 const LOCK_DENSE: f32 = 1.0 / 2.56;
+// Kept at the reference's precision; this is not an f32 round number.
+#[allow(clippy::excessive_precision)]
 const LOCK_TAPER: f32 = 2.598_076_2;
 const LOCK_PART: f32 = 0.6;
 const PILE_AMB: f32 = 0.07;
@@ -40,7 +44,6 @@ const PILE_KK: f32 = 0.3;
 const PILE_GAIN: f32 = 1.26;
 const PILE_LIFT: f32 = 1.6;
 const PILE_BIAS: f32 = 0.045;
-const PILE_STAND: f32 = 0.5;
 const PILE_COS: f32 = 0.877_582_6;
 const PILE_SIN: f32 = 0.479_425_54;
 const PILE_CREASE: f32 = 0.22;
@@ -65,9 +68,7 @@ const HALO_CORE: f32 = 1.2;
 const HALO_INSET: f32 = 3.0;
 const HALO_VEIL: f32 = 0.8;
 const HALO_BLEND: f32 = 0.3;
-const HALO_EASE: f32 = 0.1;
 const KEY_EL: f32 = 32.0 * PI / 180.0;
-const BACK_SOFT: f32 = 1.0;
 const MISS_N: usize = 96;
 const MISS_STEP: f32 = 0.1;
 const GAP_DEEP: f32 = 0.28;
@@ -135,7 +136,7 @@ impl Rng {
         self.0 = self.0.wrapping_add(0x6d2b_79f5);
         let mut t = (self.0 ^ (self.0 >> 15)).wrapping_mul(1 | self.0);
         t = t.wrapping_add((t ^ (t >> 7)).wrapping_mul(61 | t));
-        ((t ^ (t >> 14)) as u32) as f32 / 4_294_967_296.0
+        (t ^ (t >> 14)) as f32 / 4_294_967_296.0
     }
 }
 
@@ -158,12 +159,7 @@ impl ValueNoise {
         let ty = fy - y0;
         let sx = tx * tx * (3.0 - 2.0 * tx);
         let sy = ty * ty * (3.0 - 2.0 * ty);
-        let h = |i: i32, j: i32| {
-            hash2(
-                i + self.seed * 131,
-                j - self.seed * 71,
-            )
-        };
+        let h = |i: i32, j: i32| hash2(i + self.seed * 131, j - self.seed * 71);
         let (x0, y0) = (x0 as i32, y0 as i32);
         let a = h(x0, y0);
         let b = h(x0 + 1, y0);
@@ -197,11 +193,7 @@ impl ValueNoise3 {
         let sy = ty * ty * (3.0 - 2.0 * ty);
         let sz = tz * tz * (3.0 - 2.0 * tz);
         let h = |i: i32, j: i32, k: i32| {
-            hash3(
-                i + self.seed * 131,
-                j - self.seed * 71,
-                k + self.seed * 17,
-            )
+            hash3(i + self.seed * 131, j - self.seed * 71, k + self.seed * 17)
         };
         let lerp = |a: f32, b: f32, t: f32| a + (b - a) * t;
         let c00 = lerp(h(x0, y0, z0), h(x0 + 1, y0, z0), sx);
@@ -230,14 +222,6 @@ impl Alpha {
 
     fn from_vec(w: usize, h: usize, a: Vec<u8>) -> Self {
         Self { w, h, a }
-    }
-
-    fn get(&self, x: i32, y: i32) -> f32 {
-        if x < 0 || y < 0 || x >= self.w as i32 || y >= self.h as i32 {
-            0.0
-        } else {
-            f32::from(self.a[y as usize * self.w + x as usize]) / 255.0
-        }
     }
 
     fn sample(&self, x: f32, y: f32) -> f32 {
@@ -280,27 +264,20 @@ impl Alpha {
         for (a, &m) in self.a.iter_mut().zip(mask.data()) {
             let c = f32::from(m) / 255.0 * opacity;
             let v = f32::from(*a) / 255.0;
-            let v = if out { v * (1.0 - c) } else { v + c * (1.0 - v) };
+            let v = if out {
+                v * (1.0 - c)
+            } else {
+                v + c * (1.0 - v)
+            };
             *a = (v.clamp(0.0, 1.0) * 255.0).round() as u8;
         }
     }
-}
-
-fn stroke_path(path: &Path, width: f32) -> Option<Path> {
-    let stroke = Stroke {
-        width,
-        line_cap: LineCap::Round,
-        line_join: LineJoin::Round,
-        ..Stroke::default()
-    };
-    path.stroke(&stroke, 1.0)
 }
 
 /// The pile's layers, all alpha only at their own resolution.
 #[derive(Clone)]
 struct Fur {
     r: usize,
-    rb: usize,
     mask: Alpha,
     haze: Alpha,
     core: Alpha,
@@ -312,12 +289,8 @@ struct Fur {
     back_soft: Alpha,
     fringe: Option<Arc<Path>>,
     tufts: Option<Arc<Path>>,
-    tuft_tips: Vec<Option<Arc<Path>>>,
-    fringe_back: Vec<Option<Arc<Path>>>,
-    tuft_back: Vec<Option<Arc<Path>>>,
     fringe_width: f32,
     tuft_width: f32,
-    fringe_light_alpha: f32,
 }
 
 fn fur_cache() -> &'static Mutex<HashMap<String, Arc<Fur>>> {
@@ -354,10 +327,10 @@ fn fur_for(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Arc<Fur>
         light_bin(lx, ly),
         style_id(&style)
     );
-    if let Ok(c) = fur_cache().lock() {
-        if let Some(f) = c.get(&key) {
-            return Arc::clone(f);
-        }
+    if let Ok(c) = fur_cache().lock()
+        && let Some(f) = c.get(&key)
+    {
+        return Arc::clone(f);
     }
     let fur = Arc::new(build_fur(form, r, lx, ly, style));
     if let Ok(mut c) = fur_cache().lock() {
@@ -371,15 +344,8 @@ fn fur_for(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Arc<Fur>
 
 // ── the outline's rim, and the halo's geometry ─────────────────────────
 
-struct Ring {
-    x: Vec<f32>,
-    y: Vec<f32>,
-    d: Vec<f32>,
-}
-
 struct RimCache {
     rim: Vec<f32>,
-    ring: Ring,
 }
 
 fn rims() -> &'static Mutex<HashMap<usize, Arc<RimCache>>> {
@@ -388,10 +354,10 @@ fn rims() -> &'static Mutex<HashMap<usize, Arc<RimCache>>> {
 }
 
 fn rim_of(form: &Form) -> Arc<RimCache> {
-    if let Ok(c) = rims().lock() {
-        if let Some(r) = c.get(&form.id) {
-            return Arc::clone(r);
-        }
+    if let Ok(c) = rims().lock()
+        && let Some(r) = c.get(&form.id)
+    {
+        return Arc::clone(r);
     }
     let n = form.n;
     let u = SPAN / n as f32;
@@ -406,33 +372,7 @@ fn rim_of(form: &Form) -> Arc<RimCache> {
             }
         }
     }
-    let mut all: Vec<(f32, f32, f32, f32)> = Vec::new();
-    let mut mx = 0.0;
-    let mut my = 0.0;
-    let count = (rim.len() / 3).max(1) as f32;
-    for p in rim.chunks_exact(3) {
-        mx += p[0];
-        my += p[1];
-    }
-    mx /= count;
-    my /= count;
-    for p in rim.chunks_exact(3) {
-        all.push((p[0], p[1], (p[1] - my).atan2(p[0] - mx), p[2]));
-    }
-    all.sort_by(|a, b| a.2.total_cmp(&b.2));
-    let step = (all.len() / 96).max(1);
-    let thin: Vec<(f32, f32, f32)> = all
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| i % step == 0)
-        .map(|(_, p)| (p.0, p.1, p.3))
-        .collect();
-    let ring = Ring {
-        x: thin.iter().map(|p| p.0).collect(),
-        y: thin.iter().map(|p| p.1).collect(),
-        d: thin.iter().map(|p| p.2).collect(),
-    };
-    let cache = Arc::new(RimCache { rim, ring });
+    let cache = Arc::new(RimCache { rim });
     if let Ok(mut c) = rims().lock() {
         if c.len() > 24 {
             c.clear();
@@ -451,16 +391,6 @@ fn reach(rim: &[f32], ex: f32, ey: f32) -> f32 {
         }
     }
     m
-}
-
-fn ring_order(n: usize, a: f32, k: usize) -> usize {
-    let start = (((a + PI) / (2.0 * PI)) * n as f32).round() as isize;
-    let off = if k & 1 == 1 {
-        ((k + 1) >> 1) as isize
-    } else {
-        -((k >> 1) as isize)
-    };
-    (((start + off) % n as isize + n as isize) % n as isize) as usize
 }
 
 struct ReachAt {
@@ -602,10 +532,10 @@ fn halo_miss(
         (dxs / MISS_STEP).round() as i32,
         (dys / MISS_STEP).round() as i32
     );
-    if let Ok(c) = miss_cache().lock() {
-        if let Some(v) = c.get(&key) {
-            return *v;
-        }
+    if let Ok(c) = miss_cache().lock()
+        && let Some(v) = c.get(&key)
+    {
+        return *v;
     }
     let value = measure_miss(form, path, rel, k, s, dxs, dys);
     if let Ok(mut c) = miss_cache().lock() {
@@ -661,14 +591,7 @@ fn measure_miss(
             };
             let m = Affine::scale(sk, sk)
                 .then(Affine::translate(tx + z * dxs, ty + z * dys))
-                .then(Affine([
-                    ia,
-                    ib,
-                    ic,
-                    id,
-                    ie,
-                    jf,
-                ]))
+                .then(Affine([ia, ib, ic, id, ie, jf]))
                 .then(Affine::scale(MISS_N as f32 / SPAN, MISS_N as f32 / SPAN))
                 .then(Affine::translate(
                     PAD * MISS_N as f32 / SPAN,
@@ -750,7 +673,11 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
     let k3 = {
         let c = KEY_EL.cos();
         let s = KEY_EL.sin();
-        norm3([uf[0] * c + s * 0.0, uf[1] * c + s * 0.0, uf[2] * c + s * vf[2]])
+        norm3([
+            uf[0] * c + s * 0.0,
+            uf[1] * c + s * 0.0,
+            uf[2] * c + s * vf[2],
+        ])
     };
     let b3 = norm3([
         0.94 * lx - 0.34 * vf[0],
@@ -810,8 +737,7 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             dx = dx * (1.0 - w) + ex * w * 1.6;
             dy = dy * (1.0 - w) + ey * w * 1.6;
         }
-        let a = (lean.at(x, y) - 0.5) * (0.5 + 1.6 * curl)
-            + (swirl.at(x, y) - 0.5) * (0.6 + curl);
+        let a = (lean.at(x, y) - 0.5) * (0.5 + 1.6 * curl) + (swirl.at(x, y) - 0.5) * (0.6 + curl);
         let (ca, sa) = (a.cos(), a.sin());
         let qx = dx * ca - dy * sa;
         let qy = dx * sa + dy * ca;
@@ -887,7 +813,11 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             tone_g[i] = tone.at(xx, yy);
             h_g[i] = if d0 > 0.0 { h_at(xx, yy) } else { 0.0 };
             let s = (nx * nx + ny * ny).sqrt();
-            let (gx, gy) = if s > 1e-4 { (nx / s, ny / s) } else { (0.0, 0.0) };
+            let (gx, gy) = if s > 1e-4 {
+                (nx / s, ny / s)
+            } else {
+                (0.0, 0.0)
+            };
             let a = fx * gx + fy * gy;
             let k = (1.0 - nz.max(0.0)) * a;
             let mut qx = PILE_COS * (fx - k * gx) + PILE_SIN * s * gx;
@@ -940,20 +870,26 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             }
         }
     }
-    let grid_at = |f: &[f32], x: f32, y: f32| {
-        bilerp(f, g, (x + o) / gu - 0.5, (y + o) / gu - 0.5)
-    };
+    let grid_at = |f: &[f32], x: f32, y: f32| bilerp(f, g, (x + o) / gu - 0.5, (y + o) / gu - 0.5);
     let dir_at = |x: f32, y: f32| -> (f32, f32) {
         let ux = grid_at(&pf_x, x, y);
         let uy = grid_at(&pf_y, x, y);
         let ul = (ux * ux + uy * uy).sqrt();
-        if ul > 1e-4 { (ux / ul, uy / ul) } else { (0.0, 1.0) }
+        if ul > 1e-4 {
+            (ux / ul, uy / ul)
+        } else {
+            (0.0, 1.0)
+        }
     };
     let free_dir_at = |x: f32, y: f32| -> (f32, f32) {
         let ux = grid_at(&flow_x, x, y);
         let uy = grid_at(&flow_y, x, y);
         let ul = (ux * ux + uy * uy).sqrt();
-        if ul > 1e-4 { (ux / ul, uy / ul) } else { (0.0, 1.0) }
+        if ul > 1e-4 {
+            (ux / ul, uy / ul)
+        } else {
+            (0.0, 1.0)
+        }
     };
 
     // locks
@@ -961,9 +897,7 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
     let pl = rl as f32 / FILM_SPAN;
     let mut lock = vec![0.0f32; rl * rl];
     let mut lock_lit = vec![0.0f32; rl * rl];
-    let lock_at = |f: &[f32], x: f32, y: f32| {
-        bilerp(f, rl, (x + o) * pl - 0.5, (y + o) * pl - 0.5)
-    };
+    let lock_at = |f: &[f32], x: f32, y: f32| bilerp(f, rl, (x + o) * pl - 0.5, (y + o) * pl - 0.5);
     let bump = ValueNoise::new(0.7 + 0.35 * k_len, 61);
     let swell = ValueNoise::new(2.2 + 0.6 * k_len, 67);
     let tuft_k = (0.2 + 0.5 * fuzz) * k_len.min(1.8);
@@ -1053,8 +987,9 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             let wa = (0.5 * wd * px * across.max(0.15)).max(0.6);
             let seen = (la / (ld * px)) * (wa / (0.5 * wd * px));
             let tn = tuft_n.at(x, y, h_at(x, y));
-            if r5 > (LOCK_DENSE / LOCK_DENSE.max(seen))
-                * (1.0 - LOCK_PART * clumps * (1.0 - smooth(0.25, 0.65, tn)))
+            if r5
+                > (LOCK_DENSE / LOCK_DENSE.max(seen))
+                    * (1.0 - LOCK_PART * clumps * (1.0 - smooth(0.25, 0.65, tn)))
             {
                 continue;
             }
@@ -1248,30 +1183,29 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
         let mut w = vec![0.0f32; l + 1];
         let mut m1 = 0.0f32;
         let mut v2 = 0.0f32;
-        for t in 0..=l {
+        for (t, wt) in w.iter_mut().enumerate() {
             let tau = if l > 0 { t as f32 / l as f32 } else { 0.0 };
             let p = if tau <= STRAND_SHORT {
                 1.0
             } else {
                 (1.0 - tau) / (1.0 - STRAND_SHORT)
             };
-            w[t] = 1.0 - STRAND_TAPER * tau;
-            m1 += w[t] * p * W_MEAN;
-            v2 += w[t] * w[t] * (p / 7.0 - W_MEAN * W_MEAN * p * p);
+            *wt = 1.0 - STRAND_TAPER * tau;
+            m1 += *wt * p * W_MEAN;
+            v2 += *wt * *wt * (p / 7.0 - W_MEAN * W_MEAN * p * p);
         }
         strand_w.push(w);
         strand_mean[l] = m1;
         strand_sd[l] = v2.max(1e-6).sqrt();
     }
-    let strand_k = 0.12
-        * (if r >= 512 {
+    let strand_k =
+        0.12 * (if r >= 512 {
             1.0
         } else if r >= 320 {
             0.75
         } else {
             0.4
-        })
-        * k_den.mul_add(0.35, 0.55).min(1.4);
+        }) * k_den.mul_add(0.35, 0.55).min(1.4);
     let shadow_reach = (1.5 * lock_wd * px).max(1.0);
     let n_sh = (shadow_reach.round() as usize).clamp(1, 5);
     let mut sh_x = vec![0i32; n_sh];
@@ -1335,16 +1269,13 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             let tilt = grid_at(&tilt_g, xx, yy);
             let fore = grid_at(&fore_g, xx, yy);
             let l = (2.0
-                * (strand_half as f32
-                    * (0.5 + 0.5 * tilt)
-                    * fore
-                    / PILE_COS)
+                * (strand_half as f32 * (0.5 + 0.5 * tilt) * fore / PILE_COS)
                     .round()
                     .clamp(1.0, strand_half as f32)) as usize;
             let sw = &strand_w[l];
             let mut acc = 0.0f32;
             let mut acc_r = 0.0f32;
-            for t in 0..=l {
+            for (t, &swt) in sw.iter().enumerate() {
                 let sx = (x as f32 - ux * t as f32).round() as i32;
                 let sy = (y as f32 - uy * t as f32).round() as i32;
                 if sx < 0 || sy < 0 || sx >= rb as i32 || sy >= rb as i32 {
@@ -1355,13 +1286,13 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
                 let f = m * 53.7;
                 let ls = l as f32 * (STRAND_SHORT + (1.0 - STRAND_SHORT) * (f - f.floor()));
                 if t as f32 <= ls {
-                    acc += m * sw[t];
-                    acc_r += m * sw[t] * t as f32 / ls.max(1.0);
+                    acc += m * swt;
+                    acc_r += m * swt * t as f32 / ls.max(1.0);
                 }
             }
             let strand = (acc - strand_mean[l]) / strand_sd[l];
             let along = if acc > 1e-4 { acc_r / acc } else { 0.5 };
-            strand_buf[i] = strand + STRAND_RISE * strand.max(0.0).min(2.5) * (along - 0.45);
+            strand_buf[i] = strand + STRAND_RISE * strand.clamp(0.0, 2.5) * (along - 0.45);
         }
     }
     let gam = |v: f32| -> f32 {
@@ -1395,7 +1326,11 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             let gx = ((pile_h[xr0] - pile_h[xl0]) * px) / (xr0 - xl0) as f32;
             let gy = ((pile_h[yd0] - pile_h[yu0]) * px * rb as f32) / (yd0 - yu0) as f32;
             let l1 = (nx * nx + ny * ny).sqrt();
-            let (t1x, t1y) = if l1 > 1e-3 { (-ny / l1, nx / l1) } else { (1.0, 0.0) };
+            let (t1x, t1y) = if l1 > 1e-3 {
+                (-ny / l1, nx / l1)
+            } else {
+                (1.0, 0.0)
+            };
             let (t2x, t2y, t2z) = if l1 > 1e-3 {
                 (-nz * nx / l1, -nz * ny / l1, l1)
             } else {
@@ -1421,8 +1356,7 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
                 let fz = 0.9 * tz + 0.44 * nz;
                 let fk = (fx * k3[0] + fy * k3[1] + fz * k3[2])
                     / (fx * fx + fy * fy + fz * fz).sqrt().max(1e-6);
-                kk = 1.0 - PILE_KK
-                    + PILE_KK * (1.0 - fk * fk).max(0.0).sqrt().min(1.2) / 0.85;
+                kk = 1.0 - PILE_KK + PILE_KK * (1.0 - fk * fk).max(0.0).sqrt().min(1.2) / 0.85;
             }
             let nkp = mx * k3[0] + my * k3[1] + mz * k3[2];
             let h0 = pile_h[i];
@@ -1450,16 +1384,14 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             }
             let fill_p = PILE_AMB + PILE_FILL * (mx * f3[0] + my * f3[1] + mz * f3[2]).max(0.0);
             let fill_b = PILE_AMB + PILE_FILL * (nx * f3[0] + ny * f3[1] + nz * f3[2]).max(0.0);
-            let mut rr = (ao * (fill_p + key_on(nkp) * sh * kk) * PILE_GAIN)
-                / (fill_b + key_on(nkb));
+            let mut rr =
+                (ao * (fill_p + key_on(nkp) * sh * kk) * PILE_GAIN) / (fill_b + key_on(nkb));
             if k >= 0 {
                 rr *= (1.0 + 0.15 * s * s) * (1.0 + 0.08 * (hash2(k, 5) - 0.5));
             }
             let crease = fib[8];
-            rr *= 1.0
-                - PILE_CREASE
-                    * crease
-                    * (0.6 + 0.4 * smooth(0.0, 0.6 * h_max, pile_b[i] - h0));
+            rr *=
+                1.0 - PILE_CREASE * crease * (0.6 + 0.4 * smooth(0.0, 0.6 * h_max, pile_b[i] - h0));
             rr = 1.0 + (rr - 1.0) * depth_k;
             let on = fib[9];
             let lq = (fill_b + key_on(nkb)) / PILE_LIT;
@@ -1493,9 +1425,7 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             let mut m = m0
                 * (1.0
                     + strand_k
-                        * (strand
-                            * (0.45 + 0.55 * fib[2])
-                            * (0.75 + 0.5 * s)
+                        * (strand * (0.45 + 0.55 * fib[2]) * (0.75 + 0.5 * s)
                             - STRAND_CAST * cast))
                 + 0.04 * (fib[10] - 0.5)
                 + PILE_BIAS * depth_k * on;
@@ -1513,16 +1443,13 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             };
             m = 1.0 + (m - 1.0) * fade_e;
             if m < 1.0 {
-                dark[i] = (255.0
-                    * (((1.0 - m) * lbs) / (lbs - GAP_REF).max(0.4))
-                        .min(1.0))
-                    .round() as u8;
+                dark[i] =
+                    (255.0 * (((1.0 - m) * lbs) / (lbs - GAP_REF).max(0.4)).min(1.0)).round() as u8;
             } else {
                 light[i] = (255.0
-                    * ((PILE_LIFT * (TIP_TOP - 1.0) * lbs) / (TIP_TOP - lbs))
-                        .min(1.0)
-                        * (m - 1.0)
-                        * (1.0 - 0.7 * crease))
+                    * ((PILE_LIFT * (TIP_TOP - 1.0) * lbs) / (TIP_TOP - lbs)).min(1.0)
+                    * (m - 1.0)
+                    * (1.0 - 0.7 * crease))
                     .clamp(0.0, 1.0)
                     .round() as u8;
             }
@@ -1536,19 +1463,17 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             }
             let tip_k = smooth(-0.4, 1.0, lit) * (0.65 + 0.25 * strand).clamp(0.0, 1.4);
             glint[i] = (255.0 * (fib[0] * tip_k).min(1.0)).round() as u8;
-            back[i] = (255.0
-                * (fib[1] * (0.5 + 0.4 * strand).clamp(0.0, 1.6))
-                    .min(1.0))
-                .round() as u8;
+            back[i] =
+                (255.0 * (fib[1] * (0.5 + 0.4 * strand).clamp(0.0, 1.6)).min(1.0)).round() as u8;
             let on_pile = (0.85 + 0.15 * strand + 0.12 * lit).clamp(0.55, 1.3);
             soft_back[i] = (255.0 * (0.85 * fib[3] * on_pile).min(1.0)).round() as u8;
         }
     }
     {
         let count = (rl * rl) as f32;
-        for i in 0..rl * rl {
-            lsum += lock[i];
-            lsum2 += lock[i] * lock[i];
+        for &v in &lock {
+            lsum += v;
+            lsum2 += v * v;
         }
         let mean = lsum / count;
         let sdv = (lsum2 / count - mean * mean).max(1e-9).sqrt();
@@ -1630,16 +1555,15 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             short: 1.0,
         },
     ];
-    let shade_of = |v: f32| -> usize {
-        (((v.clamp(-1.0, 1.0) + 1.0) / 2.0) * 15.0).round() as usize
-    };
+    let shade_of =
+        |v: f32| -> usize { (((v.clamp(-1.0, 1.0) + 1.0) / 2.0) * 15.0).round() as usize };
     let glint_of = |v: f32| -> usize { ((v * 6.0) as usize).min(5) };
     let area = FILM_SPAN * FILM_SPAN;
     let mut film_dark = Alpha::from_vec(rb, rb, dark);
     let mut film_light = Alpha::from_vec(rb, rb, light);
     let mut film_glint = Alpha::from_vec(rb, rb, glint);
     let mut film_back = Alpha::from_vec(rb, rb, back);
-    let mut film_soft = Alpha::from_vec(rb, rb, soft_back);
+    let film_soft = Alpha::from_vec(rb, rb, soft_back);
     for kind in &kinds {
         if kind.count <= 0.0 {
             continue;
@@ -1662,7 +1586,12 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             let r3 = rand.next();
             let r4 = rand.next();
             let r5 = rand.next();
-            if r5 * 8.0 > (xx + o).min(FILM_SPAN - o - xx).min(yy + o).min(FILM_SPAN - o - yy) {
+            if r5 * 8.0
+                > (xx + o)
+                    .min(FILM_SPAN - o - xx)
+                    .min(yy + o)
+                    .min(FILM_SPAN - o - yy)
+            {
                 continue;
             }
             if kind.crowd
@@ -1715,8 +1644,16 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             let w_c = kind.clump_w * px * k_len.min(1.5);
             for k in 0..hairs as i32 {
                 let oo = if hairs > 1.0 { rand.next() - 0.5 } else { 0.0 };
-                let f = if hairs > 1.0 { 0.7 + 0.3 * rand.next() } else { 1.0 };
-                let j = if hairs > 1.0 { (rand.next() - 0.5) * 0.3 } else { 0.0 };
+                let f = if hairs > 1.0 {
+                    0.7 + 0.3 * rand.next()
+                } else {
+                    1.0
+                };
+                let j = if hairs > 1.0 {
+                    (rand.next() - 0.5) * 0.3
+                } else {
+                    0.0
+                };
                 let rx = x0 - uy * oo * w_c;
                 let ry = y0 + ux * oo * w_c;
                 let lk = len * f;
@@ -1745,7 +1682,11 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
                     hx[s] = a * rx + b * c1x + c * c2x + d * x1;
                     hy[s] = a * ry + b * c1y + c * c2y + d * y1;
                 }
-                let vh = v + if hairs > 1.0 { (rand.next() - 0.5) * 0.25 } else { 0.0 };
+                let vh = v + if hairs > 1.0 {
+                    (rand.next() - 0.5) * 0.25
+                } else {
+                    0.0
+                };
                 let rise = 0.3 + 0.15 * fib[2];
                 for s in 0..sg {
                     let idx = shade_of(
@@ -1793,22 +1734,26 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
         }
         let short_k = k_len.min(1.0).powf(kind.short);
         let lw = (kind.width * px * (0.5 + 0.5 * short_k)).max(0.45);
-        if kind.over > 0.0 {
-            if let Some(p) = over.finish() {
-                film_dark.stroke(&p, lw, kind.over * short_k, true);
-            }
+        if kind.over > 0.0
+            && let Some(p) = over.finish()
+        {
+            film_dark.stroke(&p, lw, kind.over * short_k, true);
         }
         for (i, shade) in shades.into_iter().enumerate() {
-            if kind.shadow > 0.0 {
-                if let Some(p) = shade.finish() {
-                    film_dark.stroke(&p, lw * kind.shadow_w, 0.03 * (i as f32 + 1.0) * short_k, true);
-                }
+            if kind.shadow > 0.0
+                && let Some(p) = shade.finish()
+            {
+                film_dark.stroke(
+                    &p,
+                    lw * kind.shadow_w,
+                    0.03 * (i as f32 + 1.0) * short_k,
+                    true,
+                );
             }
         }
         for (i, bucket) in buckets.into_iter().enumerate() {
             let Some(p) = bucket.finish() else { continue };
-            let v = FUR_MID
-                + (((i as f32 / 15.0) * 2.0) - 1.0) * kind.spread;
+            let v = FUR_MID + (((i as f32 / 15.0) * 2.0) - 1.0) * kind.spread;
             if v < FUR_MID {
                 let a = kind.alpha * short_k * kind.deep * (1.0 - v / FUR_MID);
                 film_dark.stroke(&p, lw, a, false);
@@ -1897,7 +1842,9 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
     {
         let band = cells.len() as f32 * cu * cu;
         let around = band / 3.8;
-        let count = ((around / (0.45 + 0.3 * k_len)) * (0.3 + 0.8 * fuzz) * k_den.sqrt()
+        let count = ((around / (0.45 + 0.3 * k_len))
+            * (0.3 + 0.8 * fuzz)
+            * k_den.sqrt()
             * (1.0 + 0.6 * fine))
             .round() as usize;
         let mut n_done = 0usize;
@@ -1986,12 +1933,18 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
     let fringe_light_alpha = 0.5 * ((140.0 - FUR_MID) / (255.0 - FUR_MID));
     let fringe_path = fringe.finish().map(Arc::new);
     let tufts_path = tufts.finish().map(Arc::new);
-    let tuft_tip_paths: Vec<Option<Arc<Path>>> =
-        tuft_tips.into_iter().map(|p| p.finish().map(Arc::new)).collect();
-    let fringe_back_paths: Vec<Option<Arc<Path>>> =
-        fringe_back.into_iter().map(|p| p.finish().map(Arc::new)).collect();
-    let tuft_back_paths: Vec<Option<Arc<Path>>> =
-        tuft_back.into_iter().map(|p| p.finish().map(Arc::new)).collect();
+    let tuft_tip_paths: Vec<Option<Arc<Path>>> = tuft_tips
+        .into_iter()
+        .map(|p| p.finish().map(Arc::new))
+        .collect();
+    let fringe_back_paths: Vec<Option<Arc<Path>>> = fringe_back
+        .into_iter()
+        .map(|p| p.finish().map(Arc::new))
+        .collect();
+    let tuft_back_paths: Vec<Option<Arc<Path>>> = tuft_back
+        .into_iter()
+        .map(|p| p.finish().map(Arc::new))
+        .collect();
     // the halo
     let h_out = 0.5 + 1.2 * fuzz;
     let reach_out = h_out + tuft_k;
@@ -2027,9 +1980,13 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             }
             let z = (-d / (2.0 * h_out)).min(1.0);
             let nb = grid_at(&nx_g, xx, yy) * b3[0] + grid_at(&ny_g, xx, yy) * b3[1];
-            zi[k] = (255.0 * HALO_LIFT * z * z * (3.0 - 2.0 * z)
+            zi[k] = (255.0
+                * HALO_LIFT
+                * z
+                * z
+                * (3.0 - 2.0 * z)
                 * (0.45 + 0.55 * smooth(-0.3, 0.6, nb)))
-                .round() as u8;
+            .round() as u8;
             if d <= -h_out {
                 continue;
             }
@@ -2063,13 +2020,14 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
                     (((y as f32 + 0.5) / px) / SPAN) * n2 as f32 - 0.5,
                 );
                 let t = (d + 0.2) / 0.6;
-                a.a[y * r + x] = (255.0 * if t >= 1.0 {
-                    1.0
-                } else if t <= 0.0 {
-                    0.0
-                } else {
-                    t * t * (3.0 - 2.0 * t)
-                })
+                a.a[y * r + x] = (255.0
+                    * if t >= 1.0 {
+                        1.0
+                    } else if t <= 0.0 {
+                        0.0
+                    } else {
+                        t * t * (3.0 - 2.0 * t)
+                    })
                 .round() as u8;
             }
         }
@@ -2084,8 +2042,8 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
     if let Some(p) = &tufts_path {
         mask.stroke(p, tuft_w, 0.8, false);
     }
-    for i in 0..3 {
-        if let Some(p) = &tuft_tip_paths[i] {
+    for (i, p) in tuft_tip_paths.iter().enumerate().take(3) {
+        if let Some(p) = p {
             film_dark.stroke(p, tuft_w, 0.6, true);
             film_light.stroke(p, tuft_w, 0.08 + 0.11 * i as f32, false);
         }
@@ -2100,9 +2058,8 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
             film_back.stroke(p, fringe_w, (i as f32 + 0.5) / 6.0, false);
         }
     }
-    let mut fur = Fur {
+    Fur {
         r,
-        rb,
         mask,
         haze: Alpha::from_vec(r, r, zi),
         core: Alpha::from_vec(r, r, ci),
@@ -2114,27 +2071,8 @@ fn build_fur(form: &Form, r: usize, lx: f32, ly: f32, style: FurStyle) -> Fur {
         back_soft: film_soft,
         fringe: fringe_path,
         tufts: tufts_path,
-        tuft_tips: tuft_tip_paths,
-        fringe_back: fringe_back_paths,
-        tuft_back: tuft_back_paths,
         fringe_width: fringe_w,
         tuft_width: tuft_w,
-        fringe_light_alpha,
-    };
-    fur
-}
-
-impl Alpha {
-    fn stroke_paths(&mut self, other: &Alpha) {
-        // source-over of an alpha layer; used where the reference strokes
-        // into a canvas already holding the computed film
-        debug_assert_eq!(self.w, other.w);
-        debug_assert_eq!(self.h, other.h);
-        for (a, &b) in self.a.iter_mut().zip(&other.a) {
-            let vb = f32::from(b) / 255.0;
-            let va = f32::from(*a) / 255.0;
-            *a = ((va + vb * (1.0 - va)).clamp(0.0, 1.0) * 255.0).round() as u8;
-        }
     }
 }
 
@@ -2260,8 +2198,7 @@ fn haze_color(rays: &Rays, base: Rgba, rim: f32, vivid: f32) -> [f32; 3] {
     let k = (0.75 * rim).min(0.85);
     let pale = 0.45 + 0.55 * vivid.min(1.0);
     let q = |i: usize| {
-        f32::from(b[i])
-            + (255.0 + ((255.0 * e[i]) / mx - 255.0) * pale - f32::from(b[i])) * k
+        f32::from(b[i]) + (255.0 + ((255.0 * e[i]) / mx - 255.0) * pale - f32::from(b[i])) * k
     };
     [q(0), q(1), q(2)]
 }
@@ -2341,7 +2278,15 @@ fn fill_angular(
     }
 }
 
-fn apply_dark_ramp(body: &mut Pixmap, inv: Affine, ex: f32, ey: f32, hn: f32, span: f32, back_shade: f32) {
+fn apply_dark_ramp(
+    body: &mut Pixmap,
+    inv: Affine,
+    ex: f32,
+    ey: f32,
+    hn: f32,
+    span: f32,
+    back_shade: f32,
+) {
     let w = body.width() as usize;
     let h = body.height() as usize;
     let data = body.data_mut();
@@ -2366,22 +2311,6 @@ fn apply_dark_ramp(body: &mut Pixmap, inv: Affine, ex: f32, ey: f32, hn: f32, sp
     }
 }
 
-fn tint_alpha(alpha: &Alpha, color: [f32; 3], scale: f32) -> Vec<u8> {
-    // premultiplied RGBA at the alpha layer's size
-    let mut out = vec![0u8; alpha.w * alpha.h * 4];
-    for (i, &a) in alpha.a.iter().enumerate() {
-        let aa = f32::from(a) / 255.0 * scale;
-        if aa <= 0.0 {
-            continue;
-        }
-        for ch in 0..3 {
-            out[i * 4 + ch] = (color[ch] * aa).round().clamp(0.0, 255.0) as u8;
-        }
-        out[i * 4 + 3] = (aa * 255.0).round().clamp(0.0, 255.0) as u8;
-    }
-    out
-}
-
 fn gap_film(base: Rgba, vivid: f32) -> ([f32; 3], f32) {
     let lin = base.linear();
     let e = [
@@ -2396,9 +2325,7 @@ fn gap_film(base: Rgba, vivid: f32) -> ([f32; 3], f32) {
     let vq = ((vivid.min(1.0) * 10.0).round() / 10.0).clamp(0.0, 1.0);
     let ch = |v: f32| 255.0 * kd * v * (v / mx).powf(3.2 + 3.0 * vq);
     let color = [ch(e[0]), ch(e[1]), ch(e[2])];
-    let deep = (0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2])
-        / 255.0
-        / lu.max(1e-3);
+    let deep = (0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]) / 255.0 / lu.max(1e-3);
     let scale = ((1.0 - GAP_REF) / (1.0 - deep).max(0.05)).sqrt().min(1.0);
     (color, scale)
 }
@@ -2478,7 +2405,8 @@ fn composite_film(
             for ch in 0..3 {
                 let dst = f32::from(data[idx + ch]) / 255.0;
                 let src = color[ch] / 255.0 * a;
-                data[idx + ch] = ((src * da + dst * (1.0 - a)).clamp(0.0, 1.0) * 255.0).round() as u8;
+                data[idx + ch] =
+                    ((src * da + dst * (1.0 - a)).clamp(0.0, 1.0) * 255.0).round() as u8;
             }
             data[idx + 3] = (da * 255.0).round() as u8;
         }
@@ -2505,6 +2433,13 @@ pub(crate) fn draw(
     let Some(form) = form::form_for(&cfg.type_key, &cfg.path, n, half_depth) else {
         return false;
     };
+    let (bx, by) = match cfg.back_light {
+        Some(deg) if deg.is_finite() => {
+            let a = deg.to_radians();
+            (Some(a.sin()), Some(-a.cos()))
+        }
+        _ => (None, None),
+    };
     let rig = Rig {
         cy,
         sy,
@@ -2514,8 +2449,8 @@ pub(crate) fn draw(
         roll: 0.0,
         lx,
         ly,
-        bx: None,
-        by: None,
+        bx,
+        by,
     };
     let frame = cap_frame(&rig);
     let material = Material {
@@ -2544,14 +2479,14 @@ pub(crate) fn draw(
     shade_texels(&form, &mc, &ao_mul, Some(&lift), &mut tex);
     let cap_px = (SPAN * dev / 100.0).ceil();
     let fur = fur_for(&form, fur_tier(cap_px), lx, ly, cfg.fur);
-    let K = if dev <= 100.0 {
+    let levels = if dev <= 100.0 {
         14
     } else if dev <= 224.0 {
         20
     } else {
         26
     };
-    let rel = relief_for(&form, K, cfg.roundness);
+    let rel = relief_for(&form, levels, cfg.roundness);
     let m1 = sy * sp;
     let rot = Affine([cy, m1, 0.0, cp, 0.0, 0.0]);
     // The slice's own affine, centred on the body box: rotate about the
@@ -2571,7 +2506,7 @@ pub(crate) fn draw(
     };
     let dl1 = (dxs * dxs + dys * dys).sqrt();
     let mut lead = 50.0f32;
-    for k in 1..K {
+    for k in 1..levels {
         lead = lead.max(50.0 * rel.scale[k] + rel.z[k] * dl1);
     }
     let (ex, ey) = if dl1 > 1e-6 {
@@ -2580,7 +2515,7 @@ pub(crate) fn draw(
         (1.0, 0.0)
     };
     let back_shade = (0.55 * (cfg.shadow / 0.35).min(1.6)).min(0.7);
-    let halos = halo_stretch(&form, &rel, K, ex, ey, dl1);
+    let halos = halo_stretch(&form, &rel, levels, ex, ey, dl1);
     let center = (rel.cx[0], rel.cy[0]);
     let rays = rays_of(&tex, &form, center);
     let stretch = (lead + 50.0) / 100.0;
@@ -2617,14 +2552,27 @@ pub(crate) fn draw(
         } else {
             local.then(slice_at(z)).then(body)
         };
-        cfg.path.as_ref().clone().transform(full.transform()).map(|p| (p, full))
+        cfg.path
+            .as_ref()
+            .clone()
+            .transform(full.transform())
+            .map(|p| (p, full))
     };
     // far half
-    for k in (1..K).rev() {
+    for k in (1..levels).rev() {
         let z = -near * rel.z[k];
         if let Some((path, full)) = slice_path(k, z) {
             let inset = HALO_INSET.max(rel.inset[k]);
-            fill_angular(&mut buffer, &path, full.inverse(), &rays, inset, 0.0, center, None);
+            fill_angular(
+                &mut buffer,
+                &path,
+                full.inverse(),
+                &rays,
+                inset,
+                0.0,
+                center,
+                None,
+            );
         }
     }
     // fabric's far ramp
@@ -2632,7 +2580,15 @@ pub(crate) fn draw(
         let cache = rim_of(&form);
         let hn = reach(&cache.rim, -ex, -ey);
         let span = 1.3 * rel.top * dl1;
-        apply_dark_ramp(&mut buffer, body.inverse(), ex, ey, hn, span, back_shade);
+        apply_dark_ramp(
+            &mut buffer,
+            slice_at(0.0).then(body).inverse(),
+            ex,
+            ey,
+            hn,
+            span,
+            back_shade,
+        );
     }
     // the equator, soft-edged
     if let Some((path, full)) = slice_path(0, 0.0) {
@@ -2649,11 +2605,20 @@ pub(crate) fn draw(
         );
     }
     // near half
-    for k in 1..K {
+    for k in 1..levels {
         let z = near * rel.z[k];
         if let Some((path, full)) = slice_path(k, z) {
             let inset = HALO_INSET.max(rel.inset[k]);
-            fill_angular(&mut buffer, &path, full.inverse(), &rays, inset, 0.0, center, None);
+            fill_angular(
+                &mut buffer,
+                &path,
+                full.inverse(),
+                &rays,
+                inset,
+                0.0,
+                center,
+                None,
+            );
         }
     }
     // the front
@@ -2665,39 +2630,47 @@ pub(crate) fn draw(
     } else {
         ((face - 0.34) / 0.38).powf(1.5)
     };
-    if front_a > 0.01 {
-        if let Some(front) = to_pixmap(tex.clone(), n) {
-            let tex_scale = SPAN / n as f32;
-            let sprite_m = Affine::scale(tex_scale, tex_scale)
-                .then(Affine::translate(-PAD, -PAD))
-                .then(cap_m);
-            buffer.draw_pixmap(
-                0,
-                0,
-                front.as_ref(),
-                &PixmapPaint {
-                    opacity: front_a,
-                    blend_mode: BlendMode::SourceOver,
-                    quality: FilterQuality::Bicubic,
-                },
-                sprite_m.transform(),
-                None,
-            );
-        }
+    if front_a > 0.01
+        && let Some(front) = to_pixmap(tex.clone(), n)
+    {
+        let tex_scale = SPAN / n as f32;
+        let sprite_m = Affine::scale(tex_scale, tex_scale)
+            .then(Affine::translate(-PAD, -PAD))
+            .then(cap_m);
+        buffer.draw_pixmap(
+            0,
+            0,
+            front.as_ref(),
+            &PixmapPaint {
+                opacity: front_a,
+                blend_mode: BlendMode::SourceOver,
+                quality: FilterQuality::Bicubic,
+            },
+            sprite_m.transform(),
+            None,
+        );
     }
 
     // the halo
     let spx = cap_px.round().max(1.0) as usize;
     let dev_halo = halo_dev(&fur, spx);
     let [miss_cut, miss_over] = if dl1 > 1e-4 {
-        halo_miss(&form, &cfg.path, &rel, K, &halos, near * dxs, near * dys)
+        halo_miss(
+            &form,
+            &cfg.path,
+            &rel,
+            levels,
+            &halos,
+            near * dxs,
+            near * dys,
+        )
     } else {
         [0.0, 0.0]
     };
     let miss = miss_cut.max(miss_over);
     let back = smooth(HALO_FIT / 2.0, 2.0 * HALO_FIT, miss);
     let gone = smooth(HALO_FIT / 2.0, HALO_FIT, miss_over);
-    let hr = halo_rays(&form, &rel, K, ex, ey, dl1, &halos, back_shade);
+    let hr = halo_rays(&form, &rel, levels, ex, ey, dl1, &halos, back_shade);
     let haze_col = haze_color(&rays, pal.base, cfg.rim, cfg.vivid);
     // The halo is laid on the same frame as the slices: `at(0)` (which
     // centres the shape on the body) then the halo's own stretch then the
@@ -2709,9 +2682,18 @@ pub(crate) fn draw(
         // x,y already in the halo's design space (canvas -> design is done
         // by the caller through `s_inv`); returns alpha, core, haze alpha
         // and colour
-        let ha = dev_halo.sample((x + PAD) * (spx as f32 / SPAN) - 0.5, (y + PAD) * (spx as f32 / SPAN) - 0.5);
-        let hz = fur.haze.sample((x + PAD) * (fur.r as f32 / SPAN) - 0.5, (y + PAD) * (fur.r as f32 / SPAN) - 0.5);
-        let co = fur.core.sample((x + PAD) * (fur.r as f32 / SPAN) - 0.5, (y + PAD) * (fur.r as f32 / SPAN) - 0.5);
+        let ha = dev_halo.sample(
+            (x + PAD) * (spx as f32 / SPAN) - 0.5,
+            (y + PAD) * (spx as f32 / SPAN) - 0.5,
+        );
+        let hz = fur.haze.sample(
+            (x + PAD) * (fur.r as f32 / SPAN) - 0.5,
+            (y + PAD) * (fur.r as f32 / SPAN) - 0.5,
+        );
+        let co = fur.core.sample(
+            (x + PAD) * (fur.r as f32 / SPAN) - 0.5,
+            (y + PAD) * (fur.r as f32 / SPAN) - 0.5,
+        );
         let angle = (y - c0.1).atan2(x - c0.0);
         let f = (angle / (2.0 * PI)).rem_euclid(1.0) * 24.0;
         let s0 = (f.floor() as usize) % 24;
@@ -2773,7 +2755,8 @@ pub(crate) fn draw(
                     for ch in 0..3 {
                         let dst = f32::from(data[idx + ch]) / 255.0;
                         let src = base[ch] / 255.0 * a;
-                        data[idx + ch] = ((src * da + dst * (1.0 - a)).clamp(0.0, 1.0) * 255.0) as u8;
+                        data[idx + ch] =
+                            ((src * da + dst * (1.0 - a)).clamp(0.0, 1.0) * 255.0) as u8;
                     }
                 }
             }
@@ -2781,23 +2764,24 @@ pub(crate) fn draw(
     };
     let lay = 1.0 - smooth(0.0, HALO_BLEND, back);
     let mut temp: Option<Pixmap> = None;
-    if lay > 0.0 && lay < 1.0 {
-        if let Some(mut t) = Pixmap::new(pixmap.width(), pixmap.height()) {
-            t.draw_pixmap(
-                0,
-                0,
-                buffer.as_ref(),
-                &PixmapPaint {
-                    opacity: 1.0,
-                    blend_mode: BlendMode::Source,
-                    quality: FilterQuality::Nearest,
-                },
-                Transform::identity(),
-                None,
-            );
-            laid(&mut t);
-            temp = Some(t);
-        }
+    if lay > 0.0
+        && lay < 1.0
+        && let Some(mut t) = Pixmap::new(pixmap.width(), pixmap.height())
+    {
+        t.draw_pixmap(
+            0,
+            0,
+            buffer.as_ref(),
+            &PixmapPaint {
+                opacity: 1.0,
+                blend_mode: BlendMode::Source,
+                quality: FilterQuality::Nearest,
+            },
+            Transform::identity(),
+            None,
+        );
+        laid(&mut t);
+        temp = Some(t);
     }
     if lay >= 1.0 || (temp.is_none() && lay >= 0.5) {
         laid(&mut buffer);
@@ -2811,10 +2795,15 @@ pub(crate) fn draw(
             let cxx = rel.cx[0];
             let cyy = rel.cy[0];
             let complement = |dx: f32, dy: f32| -> f32 {
+                // dx,dy are already in the halo's design space (the caller
+                // mapped the pixel through `s_inv`); grow about the centre,
+                // then sample the cut sprite there.
                 let px = cxx + (dx - cxx) / f;
                 let py = cyy + (dy - cyy) / f;
-                let (sx, sy) = s_inv.point(px, py);
-                let ha = dev_halo.sample((sx + PAD) * (spx as f32 / SPAN) - 0.5, (sy + PAD) * (spx as f32 / SPAN) - 0.5);
+                let ha = dev_halo.sample(
+                    (px + PAD) * (spx as f32 / SPAN) - 0.5,
+                    (py + PAD) * (spx as f32 / SPAN) - 0.5,
+                );
                 1.0 - ha
             };
             for y in 0..h {
@@ -2850,7 +2839,8 @@ pub(crate) fn draw(
                         for ch in 0..3 {
                             let dst = f32::from(data[idx + ch]) / 255.0;
                             let src = color[ch] / 255.0 * ha;
-                            data[idx + ch] = ((src * (1.0 - da) + dst).clamp(0.0, 1.0) * 255.0) as u8;
+                            data[idx + ch] =
+                                ((src * (1.0 - da) + dst).clamp(0.0, 1.0) * 255.0) as u8;
                         }
                         data[idx + 3] = ((ha * (1.0 - da) + da).clamp(0.0, 1.0) * 255.0) as u8;
                     }
@@ -2860,9 +2850,8 @@ pub(crate) fn draw(
             if let Some(t) = &temp {
                 let td = t.data();
                 for (i, d) in data.iter_mut().enumerate() {
-                    *d = ((f32::from(*d) * (1.0 - lay)
-                        + f32::from(td[i]) * lay)
-                        .clamp(0.0, 255.0)) as u8;
+                    *d = ((f32::from(*d) * (1.0 - lay) + f32::from(td[i]) * lay).clamp(0.0, 255.0))
+                        as u8;
                 }
             }
         }
@@ -2873,8 +2862,27 @@ pub(crate) fn draw(
     let tip_color = tip_film(pal.base, cfg.vivid);
     let lin = pal.base.linear();
     let lum = (0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]).powf(1.0 / 2.2) as f32;
-    composite_film(&mut buffer, &fur.dark, gap_color, gap_scale, cap_m);
-    composite_film(&mut buffer, &fur.light, tip_color, 0.25 + 0.75 * lum, cap_m);
+    // Turned far round, the front's projection squeezes into a strip that
+    // no longer covers the body; the film then gives way to a square lay
+    // over the whole stack (below), so its edge never shows as a seam.
+    let side_u = if face >= 0.62 {
+        0.0
+    } else if face <= 0.36 {
+        1.0
+    } else {
+        (0.62 - face) / 0.26
+    };
+    let cap_a = 1.0 - side_u;
+    if cap_a > 0.001 {
+        composite_film(&mut buffer, &fur.dark, gap_color, gap_scale * cap_a, cap_m);
+        composite_film(
+            &mut buffer,
+            &fur.light,
+            tip_color,
+            (0.25 + 0.75 * lum) * cap_a,
+            cap_m,
+        );
+    }
     let sheen_a = if dev < 160.0 {
         0.0
     } else if face >= 0.88 {
@@ -2884,35 +2892,58 @@ pub(crate) fn draw(
     } else {
         (face - 0.55) / 0.33
     };
-    if sheen_a > 0.01 {
-        if let Some(layers) = sheen_film(pal.base, cfg.vivid, &material) {
-            let lift = near * PILE_H * cfg.fur.length;
-            let cap_t = Affine::translate(lift * sy, -lift * cy * sp).then(cap_m);
-            if layers[0].1 > 0.01 {
-                composite_film(&mut buffer, &fur.back, layers[0].0, layers[0].1 * sheen_a, cap_t);
-            }
-            if layers[1].1 > 0.01 {
-                composite_film(&mut buffer, &fur.back_soft, layers[1].0, layers[1].1 * sheen_a, cap_m);
-            }
-            if layers[2].1 > 0.01 {
-                composite_film(&mut buffer, &fur.glint, layers[2].0, layers[2].1 * sheen_a, cap_m);
-            }
+    if sheen_a > 0.01
+        && let Some(layers) = sheen_film(pal.base, cfg.vivid, &material)
+    {
+        let lift = near * PILE_H * cfg.fur.length;
+        let cap_t = Affine::translate(lift * sy, -lift * cy * sp).then(cap_m);
+        if layers[0].1 > 0.01 {
+            composite_film(
+                &mut buffer,
+                &fur.back,
+                layers[0].0,
+                layers[0].1 * sheen_a * cap_a,
+                cap_t,
+            );
+        }
+        if layers[1].1 > 0.01 {
+            composite_film(
+                &mut buffer,
+                &fur.back_soft,
+                layers[1].0,
+                layers[1].1 * sheen_a * cap_a,
+                cap_m,
+            );
+        }
+        if layers[2].1 > 0.01 {
+            composite_film(
+                &mut buffer,
+                &fur.glint,
+                layers[2].0,
+                layers[2].1 * sheen_a * cap_a,
+                cap_m,
+            );
         }
     }
     // a far turn lays the pile square to the view
-    let side_u = if face >= 0.62 {
-        0.0
-    } else if face <= 0.36 {
-        1.0
-    } else {
-        (0.62 - face) / 0.26
-    };
     if side_u > 0.0 {
         let k = dev / 100.0;
         let (cxs, cys) = stack_center(&rel, body);
         let square = Affine::scale(k, k).then(Affine::translate(cxs - 50.0 * k, cys - 50.0 * k));
-        composite_film(&mut buffer, &fur.dark, gap_color, gap_scale * side_u, square);
-        composite_film(&mut buffer, &fur.light, tip_color, (0.25 + 0.75 * lum) * side_u, square);
+        composite_film(
+            &mut buffer,
+            &fur.dark,
+            gap_color,
+            gap_scale * side_u,
+            square,
+        );
+        composite_film(
+            &mut buffer,
+            &fur.light,
+            tip_color,
+            (0.25 + 0.75 * lum) * side_u,
+            square,
+        );
     }
     pixmap.draw_pixmap(
         0,
@@ -2957,15 +2988,15 @@ fn halo_dev(fur: &Fur, spx: usize) -> Alpha {
             out.a[y * spx + x] = (fur.mask.sample(sx, sy) * 255.0).round() as u8;
         }
     }
-    if let Some(p) = &fur.fringe {
-        if let Some(p) = p.as_ref().clone().transform(Transform::from_scale(k, k)) {
-            out.stroke(&p, fur.fringe_width * k, 0.45, false);
-        }
+    if let Some(p) = &fur.fringe
+        && let Some(p) = p.as_ref().clone().transform(Transform::from_scale(k, k))
+    {
+        out.stroke(&p, fur.fringe_width * k, 0.45, false);
     }
-    if let Some(p) = &fur.tufts {
-        if let Some(p) = p.as_ref().clone().transform(Transform::from_scale(k, k)) {
-            out.stroke(&p, fur.tuft_width * k, 0.8, false);
-        }
+    if let Some(p) = &fur.tufts
+        && let Some(p) = p.as_ref().clone().transform(Transform::from_scale(k, k))
+    {
+        out.stroke(&p, fur.tuft_width * k, 0.8, false);
     }
     out
 }
@@ -3010,8 +3041,7 @@ mod tests {
         .unwrap();
         let form = form::form_for("test-pile", &path, 32, 8.0).unwrap();
         let fur = build_fur(&form, 64, -1.0, 0.0, FurStyle::default());
-        assert!(fur.rb >= fur.r);
-        let mid = fur.mask.get(32, 32);
+        let mid = fur.mask.sample(32.0, 32.0);
         assert!(mid > 0.9, "middle of the pile should be solid, got {mid}");
         assert!(fur.dark.sample(32.0, 32.0) >= 0.0);
     }

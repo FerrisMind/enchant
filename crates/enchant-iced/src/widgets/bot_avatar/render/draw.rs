@@ -7,24 +7,20 @@
 //! side. The nearest copies are lit with a directional gradient, the far side
 //! sits in shade, and the face lives on the front cap and follows it.
 
-use std::sync::Arc;
-
 use tiny_skia::{
-    BlendMode, Color, GradientStop, LinearGradient, Mask, Path, PathBuilder, Pixmap, RadialGradient,
-    Shader, SpreadMode, Transform,
+    BlendMode, Color, GradientStop, LinearGradient, Mask, Path, PathBuilder, Pixmap,
+    RadialGradient, Shader, SpreadMode, Transform,
 };
 
-use super::super::canvas::{
-    Affine, fill, mask, mask_fill, paint,
-};
+use super::super::canvas::{Affine, fill, mask, mask_fill, paint};
 use super::super::color::Rgba;
 use super::super::engine::Pose;
 use super::super::types::BotAvatarShading;
-use super::face::{FACE_R, draw_face};
-use super::palette::{SLICES, Palette, palette};
-use super::wear;
-use super::whirl::{self, WhirlConfig};
 use super::RenderConfig;
+use super::face::{FACE_R, draw_face};
+use super::palette::{Palette, SLICES, palette};
+use super::wear;
+use super::whirl;
 
 /// The canvas is drawn larger than the avatar's layout box, so a hop or a
 /// flip can leave the box without being clipped.
@@ -81,13 +77,7 @@ fn color(c: Rgba) -> Color {
     Color::from_rgba8(c.r, c.g, c.b, c.a)
 }
 
-fn linear(
-    x0: f32,
-    y0: f32,
-    x1: f32,
-    y1: f32,
-    stops: &[(f32, Rgba)],
-) -> Option<Shader<'static>> {
+fn linear(x0: f32, y0: f32, x1: f32, y1: f32, stops: &[(f32, Rgba)]) -> Option<Shader<'static>> {
     LinearGradient::new(
         tiny_skia::Point::from_xy(x0, y0),
         tiny_skia::Point::from_xy(x1, y1),
@@ -100,13 +90,7 @@ fn linear(
     )
 }
 
-fn radial(
-    cx: f32,
-    cy: f32,
-    r0: f32,
-    r1: f32,
-    stops: &[(f32, Rgba)],
-) -> Option<Shader<'static>> {
+fn radial(cx: f32, cy: f32, r0: f32, r1: f32, stops: &[(f32, Rgba)]) -> Option<Shader<'static>> {
     let mut adjusted = Vec::with_capacity(stops.len() + 1);
     let base = (r0 / r1).clamp(0.0, 1.0);
     if base > 0.0 {
@@ -114,7 +98,10 @@ fn radial(
         adjusted.push(GradientStop::new(base, color(stops[0].1)));
     }
     for &(p, c) in stops {
-        adjusted.push(GradientStop::new((base + p * (1.0 - base)).clamp(0.0, 1.0), color(c)));
+        adjusted.push(GradientStop::new(
+            (base + p * (1.0 - base)).clamp(0.0, 1.0),
+            color(c),
+        ));
     }
     RadialGradient::new(
         tiny_skia::Point::from_xy(cx, cy),
@@ -140,9 +127,7 @@ struct Painter<'a> {
     pal: Palette,
     lx: f32,
     ly: f32,
-    half_depth: f32,
     cap: f32,
-    rim_k: f32,
     shadow: f32,
     highlight: f32,
     spread: f32,
@@ -216,18 +201,10 @@ impl Painter<'_> {
         let soft = mode == BotAvatarShading::Smooth;
 
         let order = if self.facing >= 0.0 { 1.0 } else { -1.0 };
-        let mut union: Option<Mask> = if soft {
-            Some(mask(self.pixmap))
-        } else {
-            None
-        };
+        let mut union: Option<Mask> = if soft { Some(mask(self.pixmap)) } else { None };
         if !material_done {
             for j in 0..SLICES {
-                let k = if order > 0.0 {
-                    j
-                } else {
-                    SLICES - 1 - j
-                };
+                let k = if order > 0.0 { j } else { SLICES - 1 - j };
                 let z = -1.0 + (2.0 * k as f32) / (SLICES - 1) as f32;
                 let s = profile(z, self.cap);
                 let near = j as f32 / (SLICES - 1) as f32;
@@ -251,10 +228,22 @@ impl Painter<'_> {
                             p.shader = shader;
                             fill(self.pixmap, &transformed, &p, self.body, None);
                         } else {
-                            fill(self.pixmap, &transformed, &paint(self.pal.base), self.body, None);
+                            fill(
+                                self.pixmap,
+                                &transformed,
+                                &paint(self.pal.base),
+                                self.body,
+                                None,
+                            );
                         }
                     } else {
-                        fill(self.pixmap, &transformed, &paint(self.pal.base), self.body, None);
+                        fill(
+                            self.pixmap,
+                            &transformed,
+                            &paint(self.pal.base),
+                            self.body,
+                            None,
+                        );
                     }
                 } else if near > 0.6 && mode == BotAvatarShading::Crisp {
                     if let Some(shader) = lit_gradient.clone() {
@@ -262,7 +251,13 @@ impl Painter<'_> {
                         p.shader = shader;
                         fill(self.pixmap, &transformed, &p, self.body, None);
                     } else {
-                        fill(self.pixmap, &transformed, &paint(self.pal.near), self.body, None);
+                        fill(
+                            self.pixmap,
+                            &transformed,
+                            &paint(self.pal.near),
+                            self.body,
+                            None,
+                        );
                     }
                 } else {
                     fill(
@@ -281,42 +276,42 @@ impl Painter<'_> {
 
         // Smooth: a soft shadow from the lower right and a light from the
         // upper left, laid over the whole form so nothing has an edge.
-        if let Some(m) = union.as_ref() {
-            if mode == BotAvatarShading::Smooth {
-                let sa = (0.34 * self.shadow).min(1.0);
-                if let Some(path) = rect_path(-120.0, -120.0, 240.0, 240.0) {
-                    if let Some(shader) = radial(
-                        -self.lx * 45.0,
-                        -self.ly * 45.0,
-                        4.0 * self.spread,
-                        84.0 * self.spread,
-                        &[
-                            (0.0, Rgba::new(0, 0, 0, 255).with_alpha(sa)),
-                            (0.5, Rgba::new(0, 0, 0, 255).with_alpha(sa * 0.35)),
-                            (1.0, Rgba::new(0, 0, 0, 0)),
-                        ],
-                    ) {
-                        let mut p = paint(Rgba::new(0, 0, 0, 255));
-                        p.shader = shader;
-                        p.blend_mode = BlendMode::Multiply;
-                        fill(self.pixmap, &path, &p, self.body, Some(m));
-                    }
-                    let ha = (0.22 * self.highlight).min(1.0);
-                    if let Some(shader) = radial(
-                        self.lx * 37.0,
-                        self.ly * 37.0,
-                        0.0,
-                        62.0 * self.spread,
-                        &[
-                            (0.0, Rgba::new(255, 255, 255, 255).with_alpha(ha)),
-                            (0.6, Rgba::new(255, 255, 255, 255).with_alpha(ha * 0.23)),
-                            (1.0, Rgba::new(255, 255, 255, 0)),
-                        ],
-                    ) {
-                        let mut p = paint(Rgba::new(255, 255, 255, 255));
-                        p.shader = shader;
-                        fill(self.pixmap, &path, &p, self.body, Some(m));
-                    }
+        if mode == BotAvatarShading::Smooth
+            && let Some(m) = union.as_ref()
+        {
+            let sa = (0.34 * self.shadow).min(1.0);
+            if let Some(path) = rect_path(-120.0, -120.0, 240.0, 240.0) {
+                if let Some(shader) = radial(
+                    -self.lx * 45.0,
+                    -self.ly * 45.0,
+                    4.0 * self.spread,
+                    84.0 * self.spread,
+                    &[
+                        (0.0, Rgba::new(0, 0, 0, 255).with_alpha(sa)),
+                        (0.5, Rgba::new(0, 0, 0, 255).with_alpha(sa * 0.35)),
+                        (1.0, Rgba::new(0, 0, 0, 0)),
+                    ],
+                ) {
+                    let mut p = paint(Rgba::new(0, 0, 0, 255));
+                    p.shader = shader;
+                    p.blend_mode = BlendMode::Multiply;
+                    fill(self.pixmap, &path, &p, self.body, Some(m));
+                }
+                let ha = (0.22 * self.highlight).min(1.0);
+                if let Some(shader) = radial(
+                    self.lx * 37.0,
+                    self.ly * 37.0,
+                    0.0,
+                    62.0 * self.spread,
+                    &[
+                        (0.0, Rgba::new(255, 255, 255, 255).with_alpha(ha)),
+                        (0.6, Rgba::new(255, 255, 255, 255).with_alpha(ha * 0.23)),
+                        (1.0, Rgba::new(255, 255, 255, 0)),
+                    ],
+                ) {
+                    let mut p = paint(Rgba::new(255, 255, 255, 255));
+                    p.shader = shader;
+                    fill(self.pixmap, &path, &p, self.body, Some(m));
                 }
             }
         }
@@ -383,9 +378,7 @@ pub(crate) fn draw_frame(box_px: f32, density: f32, pose: &Pose, cfg: &RenderCon
         pal,
         lx,
         ly,
-        half_depth,
         cap,
-        rim_k,
         shadow,
         highlight,
         spread,
@@ -417,7 +410,6 @@ pub(crate) fn draw_frame(box_px: f32, density: f32, pose: &Pose, cfg: &RenderCon
         cp,
         sp,
         facing,
-        half_depth,
         lx,
         ly,
     };
@@ -437,20 +429,9 @@ pub(crate) fn draw_frame(box_px: f32, density: f32, pose: &Pose, cfg: &RenderCon
     // other comes to the front, and past the side they go.
     let zf = if facing >= 0.0 { 1.0 } else { -1.0 };
     let cushion = material_done;
-    let sf = if cushion {
-        1.0
-    } else {
-        profile(zf, cap)
-    };
+    let sf = if cushion { 1.0 } else { profile(zf, cap) };
     let z_face = if cushion {
-        0.55
-            * super::material::surface_at(
-                key,
-                half_depth,
-                cfg.face_x,
-                cfg.face_y,
-                cfg.roundness,
-            )
+        0.55 * super::material::surface_at(key, half_depth, cfg.face_x, cfg.face_y, cfg.roundness)
             .unwrap_or(0.8 * half_depth)
     } else {
         half_depth
@@ -466,10 +447,7 @@ pub(crate) fn draw_frame(box_px: f32, density: f32, pose: &Pose, cfg: &RenderCon
     mask_fill(&mut front_clip, &cfg.path, front.then(body));
     if facing > -0.2 {
         let face_transform = Affine::scale(cfg.face_scale, cfg.face_scale)
-            .then(Affine::translate(
-                cfg.face_x - 50.0,
-                cfg.face_y - 50.0,
-            ))
+            .then(Affine::translate(cfg.face_x - 50.0, cfg.face_y - 50.0))
             .then(body);
         let eyes = draw_face(
             painter.pixmap,
@@ -545,10 +523,13 @@ pub(crate) fn draw_frame(box_px: f32, density: f32, pose: &Pose, cfg: &RenderCon
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::widgets::bot_avatar::data::{bot_avatar_preset, bot_avatar_shape};
     use crate::widgets::bot_avatar::engine::{BotAvatarSim, rest_pose};
     use crate::widgets::bot_avatar::path::parse_svg_path;
+    use crate::widgets::bot_avatar::render::whirl::WhirlConfig;
     use crate::widgets::bot_avatar::types::{BotAvatarState, BotAvatarType};
 
     fn config(shading: BotAvatarShading) -> RenderConfig {
@@ -578,9 +559,7 @@ mod tests {
             shine: 0.0,
             sheen: 0.0,
             back_softness: 1.0,
-            theme: crate::widgets::bot_avatar::BotAvatarTheme::Dark,
             whirl: WhirlConfig::default(),
-            still: true,
             wear: Default::default(),
         }
     }

@@ -234,7 +234,13 @@ pub enum BotAvatarHat {
 
 impl BotAvatarHat {
     /// Every hat, in the web package's order.
-    pub const ALL: [Self; 5] = [Self::None, Self::Beret, Self::Beanie, Self::Party, Self::Crown];
+    pub const ALL: [Self; 5] = [
+        Self::None,
+        Self::Beret,
+        Self::Beanie,
+        Self::Party,
+        Self::Crown,
+    ];
 
     /// The lowercase identifier the web package uses.
     #[must_use]
@@ -409,9 +415,15 @@ mod tests {
             assert_eq!(BotAvatarType::from_key(t.key()), Some(t));
             assert!(!BotAvatarType::ALL[..i].contains(&t));
         }
-        assert_eq!(BotAvatarState::from_key("default"), Some(BotAvatarState::Idle));
+        assert_eq!(
+            BotAvatarState::from_key("default"),
+            Some(BotAvatarState::Idle)
+        );
         assert_eq!(BotAvatarState::from_key("idle"), Some(BotAvatarState::Idle));
-        assert_eq!(BotAvatarState::from_key("sleeping"), Some(BotAvatarState::Sleeping));
+        assert_eq!(
+            BotAvatarState::from_key("sleeping"),
+            Some(BotAvatarState::Sleeping)
+        );
         assert_eq!(BotAvatarState::from_key("nope"), None);
     }
 
