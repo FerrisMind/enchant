@@ -12,7 +12,7 @@ version = "0.29.0"
 authors = ["FerrisMind"]
 homepage = "https://github.com/FerrisMind/enchant-iced"
 repository = "https://github.com/FerrisMind/enchant-iced"
-description = "Magic UI-inspired premium interaction layer for iced"
+description = "Premium interaction layer for iced — animated text, glow surfaces, patterned backgrounds, builder-first widgets"
 
 [workspace.dependencies]
 enchant-iced = { path = "crates/enchant-iced", version = "0.29.0" }

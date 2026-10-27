@@ -215,6 +215,16 @@ See the crate README for installation, feature flags, platform notes, and the fu
 
 **[crates/enchant-iced/README.md](crates/enchant-iced/README.md)**
 
+## Ecosystem
+
+| Project | Role | Links |
+| --- | --- | --- |
+| **enchant** (this repo) | Premium interaction layer for iced (effects, motion, marketing widgets) | [GitHub](https://github.com/FerrisMind/enchant) · [crates.io](https://crates.io/crates/enchant-iced) |
+| [twill](https://github.com/FerrisMind/twill) | Type-safe styling tokens and `Style` composition (Tailwind-inspired) | [GitHub](https://github.com/FerrisMind/twill) · [crates.io](https://crates.io/crates/twill) |
+| [shadcn-rs](https://github.com/FerrisMind/shadcn-rs) | shadcn/ui-style component kits for egui and iced | [GitHub](https://github.com/FerrisMind/shadcn-rs) · [iced-shadcn](https://crates.io/crates/iced-shadcn) |
+
+`enchant-iced` builds on `iced-shadcn` surfaces and `twill` tokens.
+
 ## Workspace layout
 
 - `crates/enchant-iced` — library crate (widgets, primitives, sections, theme helpers)
