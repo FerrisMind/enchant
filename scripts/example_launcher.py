@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -37,16 +38,33 @@ def log_path() -> Path:
     return logs_dir() / "example-parity.log"
 
 
+def launch_log_path() -> Path:
+    return logs_dir() / "example-launch.log"
+
+
 def discover_examples() -> list[str]:
     return sorted(
         path.stem
         for path in examples_dir().glob("*.rs")
-        if path.name != "_shared.rs"
+        if not path.name.startswith("_")
     )
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def tail_text(path: Path, max_chars: int = 1200) -> str:
+    if not path.exists():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    text = text.replace("\r\n", "\n").strip()
+    if len(text) <= max_chars:
+        return text
+    return "…\n" + text[-max_chars:]
 
 
 @dataclass
@@ -154,6 +172,19 @@ class ExampleRunner:
         self.lock = threading.Lock()
         self.process: subprocess.Popen[str] | None = None
         self.running: str | None = None
+        self.phase: str = "idle"
+        self.message: str = "Idle."
+        self.started_at: float | None = None
+        self._log_handle: object | None = None
+
+    def _close_log(self) -> None:
+        handle = self._log_handle
+        self._log_handle = None
+        if handle is not None:
+            try:
+                handle.close()  # type: ignore[attr-defined]
+            except OSError:
+                pass
 
     def run(self, name: str) -> tuple[bool, str]:
         with self.lock:
@@ -163,19 +194,43 @@ class ExampleRunner:
                     self.process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     self.process.kill()
+            self._close_log()
+
+            log_file = launch_log_path()
+            try:
+                handle = log_file.open("w", encoding="utf-8", errors="replace")
+            except OSError as error:
+                self.phase = "error"
+                self.message = str(error)
+                return False, str(error)
+
+            header = (
+                f"# launch {name} @ {utc_now()}\n"
+                f"# cargo run -p enchant-iced --example {name}\n\n"
+            )
+            handle.write(header)
+            handle.flush()
+            self._log_handle = handle
 
             cmd = ["cargo", "run", "-p", "enchant-iced", "--example", name]
             try:
                 self.process = subprocess.Popen(
                     cmd,
                     cwd=repo_root(),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=handle,
+                    stderr=subprocess.STDOUT,
+                    text=True,
                 )
             except OSError as error:
+                self._close_log()
+                self.phase = "error"
+                self.message = str(error)
                 return False, str(error)
 
             self.running = name
+            self.phase = "starting"
+            self.started_at = time.monotonic()
+            self.message = f"Starting {name} (pid {self.process.pid}) — cargo may compile first…"
             return True, f"pid {self.process.pid}"
 
     def stop(self) -> None:
@@ -186,15 +241,49 @@ class ExampleRunner:
                     self.process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     self.process.kill()
+            self._close_log()
             self.process = None
             self.running = None
+            self.phase = "idle"
+            self.message = "Stopped."
+            self.started_at = None
 
-    def status(self) -> dict[str, str | None]:
+    def status(self) -> dict[str, object]:
         with self.lock:
-            alive = self.process is not None and self.process.poll() is None
+            proc = self.process
+            alive = proc is not None and proc.poll() is None
+            elapsed = None
+            if self.started_at is not None:
+                elapsed = round(time.monotonic() - self.started_at, 1)
+
+            if alive:
+                phase = "starting" if (elapsed or 0) < 2.0 else "running"
+                # After a few seconds still alive: treat as building/running.
+                if (elapsed or 0) >= 2.0:
+                    phase = "building_or_running"
+                self.phase = phase
+                self.message = (
+                    f"{self.running}: cargo is working (pid {proc.pid}, {elapsed}s). "
+                    "First build can take a while — watch the log below."
+                )
+                running = self.running
+                pid = str(proc.pid)
+            else:
+                code = proc.poll() if proc is not None else None
+                if self.phase in {"starting", "building_or_running", "running"} and code is not None:
+                    self.phase = "exited"
+                    self.message = f"{self.running} exited (code {code})."
+                    self._close_log()
+                running = None
+                pid = None
+
             return {
-                "running": self.running if alive else None,
-                "pid": str(self.process.pid) if alive and self.process else None,
+                "running": running,
+                "pid": pid,
+                "phase": self.phase,
+                "message": self.message,
+                "elapsed_s": elapsed,
+                "log_tail": tail_text(launch_log_path()),
             }
 
 
@@ -257,6 +346,9 @@ def build_web_app(
                         "logs": str(logs_dir()),
                     }
                 )
+                return
+            if path == "/api/status":
+                self._json({"runner": runner.status()})
                 return
             self.send_error(404)
 
@@ -349,7 +441,7 @@ def build_web_app(
 
 
 WEB_PAGE = """<!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Magic Iced — Example Launcher</title>
@@ -363,6 +455,7 @@ WEB_PAGE = """<!doctype html>
     input, button { background: #1d1d1d; color: #eee; border: 1px solid #333; border-radius: 8px; padding: 8px 12px; }
     button { cursor: pointer; }
     button:hover { background: #262626; }
+    button:disabled { opacity: 0.55; cursor: wait; }
     .summary { margin-left: auto; color: #9cdcfe; }
     table { width: 100%; border-collapse: collapse; background: #171717; border: 1px solid #2a2a2a; border-radius: 12px; overflow: hidden; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #242424; }
@@ -371,33 +464,55 @@ WEB_PAGE = """<!doctype html>
     tr.selected { background: #243041; }
     .ok-col { width: 72px; text-align: center; }
     .status { margin-top: 12px; color: #bdbdbd; min-height: 1.2em; }
+    .status.busy::before {
+      content: "";
+      display: inline-block;
+      width: 10px; height: 10px; margin-right: 8px;
+      border-radius: 50%;
+      border: 2px solid #555;
+      border-top-color: #9cdcfe;
+      animation: spin 0.8s linear infinite;
+      vertical-align: -1px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .problem { color: #f48771; }
     .good { color: #89d185; }
     input[type="checkbox"] { width: 18px; height: 18px; }
+    .log {
+      margin-top: 10px; padding: 10px 12px; background: #0d0d0d;
+      border: 1px solid #2a2a2a; border-radius: 8px;
+      font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #c8c8c8; white-space: pre-wrap; max-height: 220px; overflow: auto;
+      display: none;
+    }
+    .log.visible { display: block; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Magic Iced — Example Launcher</h1>
-    <div class="sub">Галочка справа = компонент совпадает с референсом. Без галочки = есть проблема. При запуске открывается окно комментариев; заметки пишутся в <code>logs/example-parity.log</code>.</div>
+    <div class="sub">Check the box when the component matches the reference. Unchecked means it still needs work. Launching opens a comment window; notes go to <code>logs/example-parity.log</code>. Cargo output streams to <code>logs/example-launch.log</code>.</div>
     <div class="toolbar">
-      <input id="search" placeholder="Поиск..." />
-      <button id="runBtn">Запустить</button>
-      <button id="stopBtn">Остановить</button>
-      <button id="reloadBtn">Обновить</button>
+      <input id="search" placeholder="Search…" />
+      <button id="runBtn">Run</button>
+      <button id="stopBtn">Stop</button>
+      <button id="reloadBtn">Refresh</button>
       <div class="summary" id="summary"></div>
     </div>
     <table>
       <thead>
-        <tr><th>Пример</th><th class="ok-col">OK</th></tr>
+        <tr><th>Example</th><th class="ok-col">OK</th></tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
     <div class="status" id="status"></div>
+    <pre class="log" id="log"></pre>
   </div>
   <script>
     let examples = [];
     let selected = null;
+    let pollTimer = null;
+    let busy = false;
 
     async function api(path, body) {
       const res = await fetch(path, {
@@ -423,7 +538,7 @@ WEB_PAGE = """<!doctype html>
           if (event.target.matches('input[type="checkbox"]')) return;
           selected = row.name;
           renderRows(document.getElementById("search").value);
-          setStatus(`Выбран: ${row.name}`);
+          setStatus(`Selected: ${row.name}`);
         });
         tr.querySelector('input[type="checkbox"]').addEventListener("change", async (event) => {
           const name = event.target.dataset.name;
@@ -431,7 +546,7 @@ WEB_PAGE = """<!doctype html>
           const data = await api("/api/set", { name, ok });
           selected = name;
           await refresh(data);
-          setStatus(`${name}: ${ok ? "OK" : "нужно исправить"}`, ok ? "good" : "problem");
+          setStatus(`${name}: ${ok ? "OK" : "needs work"}`, ok ? "good" : "problem");
         });
         tbody.appendChild(tr);
       }
@@ -443,40 +558,100 @@ WEB_PAGE = """<!doctype html>
       node.className = "status " + cls;
     }
 
+    function setBusy(isBusy) {
+      busy = isBusy;
+      document.getElementById("runBtn").disabled = isBusy;
+      const node = document.getElementById("status");
+      if (isBusy) node.classList.add("busy");
+      else node.classList.remove("busy");
+    }
+
+    function showLog(tail) {
+      const log = document.getElementById("log");
+      if (!tail) {
+        log.classList.remove("visible");
+        log.textContent = "";
+        return;
+      }
+      log.textContent = tail;
+      log.classList.add("visible");
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function applyRunner(runner) {
+      if (!runner) return;
+      const phase = runner.phase || "idle";
+      const active = phase === "starting" || phase === "building_or_running" || phase === "running";
+      setBusy(active);
+      if (runner.message) {
+        setStatus(runner.message, active ? "" : (phase === "exited" ? "problem" : ""));
+      }
+      showLog(runner.log_tail || "");
+      if (!active && pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        try {
+          const data = await api("/api/status");
+          applyRunner(data.runner);
+        } catch (err) {
+          setStatus(String(err), "problem");
+          setBusy(false);
+        }
+      }, 700);
+    }
+
     async function refresh(patch) {
       if (patch && patch.summary) {
         document.getElementById("summary").textContent =
-          `OK: ${patch.summary.ok}/${patch.summary.total} · проблем: ${patch.summary.problems}`;
+          `OK: ${patch.summary.ok}/${patch.summary.total} · issues: ${patch.summary.problems}`;
       }
       const data = await api("/api/examples");
       examples = data.examples;
       if (!selected && examples.length) selected = examples[0].name;
       document.getElementById("summary").textContent =
-        `OK: ${data.summary.ok}/${data.summary.total} · проблем: ${data.summary.problems}`;
+        `OK: ${data.summary.ok}/${data.summary.total} · issues: ${data.summary.problems}`;
       renderRows(document.getElementById("search").value);
-      if (data.runner.running) {
-        setStatus(`Запущен: ${data.runner.running} (${data.runner.pid})`);
-      }
+      applyRunner(data.runner);
     }
 
     document.getElementById("search").addEventListener("input", (event) => {
       renderRows(event.target.value);
     });
-  function openCommentWindow(name, url) {
-    const features = "width=520,height=420,menubar=no,toolbar=no,location=no,status=no";
-    const win = window.open(url || `/comment?name=${encodeURIComponent(name)}`, `comment_${name}`, features);
-    if (win) win.focus();
-  }
+
+    function openCommentWindow(name, url) {
+      const features = "width=520,height=420,menubar=no,toolbar=no,location=no,status=no";
+      const win = window.open(url || `/comment?name=${encodeURIComponent(name)}`, `comment_${name}`, features);
+      if (win) win.focus();
+    }
 
     document.getElementById("runBtn").addEventListener("click", async () => {
-      if (!selected) return setStatus("Выберите пример", "problem");
-      const data = await api("/api/run", { name: selected });
-      setStatus(`Запущен: ${data.started} (${data.message})`);
-      openCommentWindow(data.started, data.comment_url);
+      if (!selected) return setStatus("Select an example first", "problem");
+      setBusy(true);
+      setStatus(`Starting ${selected}… spawning cargo`, "");
+      showLog("");
+      try {
+        const data = await api("/api/run", { name: selected });
+        applyRunner(data.runner);
+        setStatus(`Started ${data.started} (${data.message}). Compiling if needed…`);
+        openCommentWindow(data.started, data.comment_url);
+        startPolling();
+      } catch (err) {
+        setBusy(false);
+        setStatus(String(err), "problem");
+      }
     });
     document.getElementById("stopBtn").addEventListener("click", async () => {
       await api("/api/stop", {});
-      setStatus("Остановлено");
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      setBusy(false);
+      setStatus("Stopped");
+      showLog("");
     });
     document.getElementById("reloadBtn").addEventListener("click", refresh);
     refresh();
@@ -486,10 +661,10 @@ WEB_PAGE = """<!doctype html>
 """
 
 COMMENT_PAGE = """<!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Комментарий — {{EXAMPLE}}</title>
+  <title>Comment — {{EXAMPLE}}</title>
   <style>
     :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
     body { margin: 0; background: #111; color: #eee; }
@@ -509,11 +684,11 @@ COMMENT_PAGE = """<!doctype html>
   <div class="wrap">
     <div>
       <h1>{{EXAMPLE}}</h1>
-      <div class="sub">Комментарий будет записан в <code>logs/example-parity.log</code> для этого примера.</div>
+      <div class="sub">This note is appended to <code>logs/example-parity.log</code> for this example.</div>
     </div>
-    <textarea id="comment" placeholder="Заметки по визуалу, расхождениям с референсом, багам..."></textarea>
+    <textarea id="comment" placeholder="Visual notes, reference diffs, bugs…"></textarea>
     <div class="toolbar">
-      <button id="saveBtn">Сохранить в лог</button>
+      <button id="saveBtn">Save to log</button>
       <div class="status" id="status"></div>
     </div>
   </div>
@@ -530,7 +705,7 @@ COMMENT_PAGE = """<!doctype html>
     async function saveComment() {
       const text = comment.value.trim();
       if (!text) {
-        setStatus("Введите комментарий", "problem");
+        setStatus("Enter a comment", "problem");
         return;
       }
       const res = await fetch("/api/comment", {
@@ -544,7 +719,7 @@ COMMENT_PAGE = """<!doctype html>
         return;
       }
       comment.value = "";
-      setStatus("Сохранено в лог", "good");
+      setStatus("Saved to log", "good");
     }
 
     document.getElementById("saveBtn").addEventListener("click", saveComment);
@@ -605,7 +780,7 @@ def run_tk_ui() -> int:
             super().__init__(master)
             self.example = example
             self.state = state
-            self.title(f"Комментарий — {example}")
+            self.title(f"Comment — {example}")
             self.geometry(f"520x420+{40 + offset}+{40 + offset}")
             self.minsize(420, 280)
 
@@ -614,12 +789,12 @@ def run_tk_ui() -> int:
 
             ttk.Label(
                 frame,
-                text=f"Пример: {example}",
+                text=f"Example: {example}",
                 font=("", 11, "bold"),
             ).pack(anchor=tk.W)
             ttk.Label(
                 frame,
-                text="Комментарий будет записан в logs/example-parity.log для этого примера.",
+                text="This note is appended to logs/example-parity.log for this example.",
                 wraplength=480,
             ).pack(anchor=tk.W, pady=(4, 8))
 
@@ -630,7 +805,7 @@ def run_tk_ui() -> int:
             toolbar = ttk.Frame(frame)
             toolbar.pack(fill=tk.X)
 
-            ttk.Button(toolbar, text="Сохранить в лог", command=self._save).pack(
+            ttk.Button(toolbar, text="Save to log", command=self._save).pack(
                 side=tk.LEFT
             )
             self.status_var = tk.StringVar()
@@ -642,10 +817,10 @@ def run_tk_ui() -> int:
         def _save(self) -> None:
             comment = self.text.get("1.0", tk.END)
             if not self.state.append_comment(self.example, comment):
-                self.status_var.set("Введите комментарий")
+                self.status_var.set("Enter a comment")
                 return
             self.text.delete("1.0", tk.END)
-            self.status_var.set("Сохранено в лог")
+            self.status_var.set("Saved to log")
 
         def _on_close(self) -> None:
             self.destroy()
@@ -654,14 +829,15 @@ def run_tk_ui() -> int:
         def __init__(self) -> None:
             super().__init__()
             self.title("Magic Iced — Example Launcher")
-            self.geometry("920x640")
-            self.minsize(720, 480)
+            self.geometry("920x720")
+            self.minsize(720, 520)
 
             self.examples = discover_examples()
             self.state = ParityState.load(self.examples)
             self.runner = ExampleRunner()
             self.row_vars: dict[str, tk.BooleanVar] = {}
             self.comment_windows: dict[str, CommentWindow] = {}
+            self._poll_job: str | None = None
 
             self._build_ui()
             self._refresh_summary()
@@ -673,28 +849,29 @@ def run_tk_ui() -> int:
 
             ttk.Label(
                 root,
-                text="Выберите пример, запустите и отметьте галочкой, если компонент совпадает с референсом. При запуске открывается окно комментариев.",
+                text="Select an example, run it, and check the box when it matches the reference. Launching opens a comment window. Cargo output appears below while building.",
                 wraplength=860,
             ).pack(fill=tk.X, pady=(0, 8))
 
             toolbar = ttk.Frame(root)
             toolbar.pack(fill=tk.X, pady=(0, 8))
 
-            ttk.Label(toolbar, text="Поиск:").pack(side=tk.LEFT)
+            ttk.Label(toolbar, text="Search:").pack(side=tk.LEFT)
             self.search_var = tk.StringVar()
             self.search_var.trace_add("write", lambda *_: self._apply_filter())
             ttk.Entry(toolbar, textvariable=self.search_var, width=32).pack(
                 side=tk.LEFT, padx=(6, 12)
             )
 
-            ttk.Button(toolbar, text="Запустить", command=self._run_selected).pack(side=tk.LEFT)
-            ttk.Button(toolbar, text="Остановить", command=self._stop_running).pack(
+            self.run_btn = ttk.Button(toolbar, text="Run", command=self._run_selected)
+            self.run_btn.pack(side=tk.LEFT)
+            ttk.Button(toolbar, text="Stop", command=self._stop_running).pack(
                 side=tk.LEFT, padx=(6, 0)
             )
-            ttk.Button(toolbar, text="Обновить список", command=self._reload_examples).pack(
+            ttk.Button(toolbar, text="Refresh list", command=self._reload_examples).pack(
                 side=tk.LEFT, padx=(6, 0)
             )
-            ttk.Button(toolbar, text="Открыть logs/", command=self._open_logs_dir).pack(
+            ttk.Button(toolbar, text="Open logs/", command=self._open_logs_dir).pack(
                 side=tk.LEFT, padx=(6, 0)
             )
 
@@ -707,9 +884,9 @@ def run_tk_ui() -> int:
                 columns=columns,
                 show="headings",
                 selectmode="browse",
-                height=24,
+                height=20,
             )
-            self.tree.heading("name", text="Пример")
+            self.tree.heading("name", text="Example")
             self.tree.heading("ok", text="OK")
             self.tree.column("name", width=700, anchor=tk.W)
             self.tree.column("ok", width=80, anchor=tk.CENTER)
@@ -718,10 +895,23 @@ def run_tk_ui() -> int:
             self.tree.bind("<space>", self._toggle_selected_checkbox)
             self.tree.bind("<Button-1>", self._on_tree_click)
 
-            self.status_var = tk.StringVar(value="Готово.")
-            ttk.Label(root, textvariable=self.status_var).pack(fill=tk.X, pady=(8, 0))
+            self.status_var = tk.StringVar(value="Ready.")
+            ttk.Label(root, textvariable=self.status_var).pack(fill=tk.X, pady=(8, 4))
+
+            self.log_text = scrolledtext.ScrolledText(
+                root, wrap=tk.WORD, height=8, state=tk.DISABLED
+            )
+            self.log_text.pack(fill=tk.BOTH, expand=False, pady=(0, 0))
 
             self._populate_rows()
+
+        def _set_log(self, text: str) -> None:
+            self.log_text.configure(state=tk.NORMAL)
+            self.log_text.delete("1.0", tk.END)
+            if text:
+                self.log_text.insert(tk.END, text)
+                self.log_text.see(tk.END)
+            self.log_text.configure(state=tk.DISABLED)
 
         def _populate_rows(self) -> None:
             self.tree.delete(*self.tree.get_children())
@@ -744,12 +934,12 @@ def run_tk_ui() -> int:
             self.state = ParityState.load(self.examples)
             self._populate_rows()
             self._refresh_summary()
-            self.status_var.set(f"Найдено примеров: {len(self.examples)}")
+            self.status_var.set(f"Found {len(self.examples)} examples")
 
         def _refresh_summary(self) -> None:
             summary = self.state.summary()
             self.summary_var.set(
-                f"OK: {summary['ok']}/{summary['total']} · проблем: {summary['problems']}"
+                f"OK: {summary['ok']}/{summary['total']} · issues: {summary['problems']}"
             )
 
         def _selected_name(self) -> str | None:
@@ -783,7 +973,7 @@ def run_tk_ui() -> int:
             self.state.write_problems_snapshot()
             self.tree.set(name, "ok", "☑" if ok else "☐")
             self._refresh_summary()
-            self.status_var.set(f"{name}: {'OK' if ok else 'нужно исправить'}")
+            self.status_var.set(f"{name}: {'OK' if ok else 'needs work'}")
 
         def _open_comment_window(self, name: str) -> None:
             existing = self.comment_windows.get(name)
@@ -804,22 +994,51 @@ def run_tk_ui() -> int:
 
             window.bind("<Destroy>", _forget)
 
+        def _poll_runner(self) -> None:
+            status = self.runner.status()
+            phase = str(status.get("phase", "idle"))
+            message = str(status.get("message", ""))
+            if message:
+                self.status_var.set(message)
+            self._set_log(str(status.get("log_tail") or ""))
+            active = phase in {"starting", "building_or_running", "running"}
+            self.run_btn.configure(state=tk.DISABLED if active else tk.NORMAL)
+            if active:
+                self._poll_job = self.after(700, self._poll_runner)
+            else:
+                self._poll_job = None
+
         def _run_selected(self) -> None:
             name = self._selected_name()
             if not name:
-                messagebox.showinfo("Запуск", "Выберите пример в списке.")
+                messagebox.showinfo("Run", "Select an example in the list.")
                 return
+            self.run_btn.configure(state=tk.DISABLED)
+            self.status_var.set(f"Starting {name}… spawning cargo")
+            self._set_log("")
+            self.update_idletasks()
             ok, message = self.runner.run(name)
             if ok:
                 self.state.append_log(name, self.state.verified.get(name, False), note="run")
                 self._open_comment_window(name)
-                self.status_var.set(f"Запущен: {name} ({message})")
+                self.status_var.set(
+                    f"Started {name} ({message}). Compiling if needed — see log below."
+                )
+                if self._poll_job is not None:
+                    self.after_cancel(self._poll_job)
+                self._poll_runner()
             else:
-                messagebox.showerror("Ошибка запуска", message)
+                self.run_btn.configure(state=tk.NORMAL)
+                messagebox.showerror("Launch failed", message)
 
         def _stop_running(self) -> None:
+            if self._poll_job is not None:
+                self.after_cancel(self._poll_job)
+                self._poll_job = None
             self.runner.stop()
-            self.status_var.set("Пример остановлен.")
+            self.run_btn.configure(state=tk.NORMAL)
+            self.status_var.set("Example stopped.")
+            self._set_log("")
 
         def _open_logs_dir(self) -> None:
             path = logs_dir()
@@ -834,6 +1053,9 @@ def run_tk_ui() -> int:
                 messagebox.showinfo("logs/", f"{path}\n\n{error}")
 
         def _on_close(self) -> None:
+            if self._poll_job is not None:
+                self.after_cancel(self._poll_job)
+                self._poll_job = None
             for window in list(self.comment_windows.values()):
                 if window.winfo_exists():
                     window.destroy()
@@ -858,7 +1080,7 @@ def main() -> int:
         try:
             import tkinter  # noqa: F401
         except ModuleNotFoundError:
-            print("tkinter не найден — открываю web UI в браузере.")
+            print("tkinter not found — opening the web UI in a browser.")
             use_web = True
 
     if use_web:
