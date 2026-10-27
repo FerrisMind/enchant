@@ -13,10 +13,10 @@
 
 <p align="center">
   <picture>
-    <img alt="marquee" src="crates/enchant-iced/docs/demos/marquee.gif" width="900" />
+    <img alt="border_beam" src="crates/enchant-iced/docs/demos/border_beam.gif.gif" width="900" />
   </picture>
   <br>
-  <sub>marquee — one of 84 captured example demos</sub>
+  <sub>border beam — one of 84 captured example demos</sub>
 </p>
 
 ---
