@@ -13,11 +13,10 @@ documentation = "https://docs.rs/enchant-iced"
 keywords = ["iced", "ui", "animation", "enchant", "ferrismind"]
 categories = ["gui", "rendering"]
 
+# Library sources + runtime assets only — examples/tests stay in git.
 include = [
     "src/**/*",
     "assets/**/*",
-    "examples/**/*",
-    "tests/**/*",
     "Cargo.toml",
     "/README.md",
     "LICENSE*",
