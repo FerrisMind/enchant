@@ -3,7 +3,7 @@
 use iced::widget::{container, stack};
 use iced::{Background, Color, Element, Length};
 
-use super::mask::{AlphaMask, MetalFxMask, MetalGlowMode};
+use super::mask::{MetalFxMask, MetalGlowMode};
 use super::options::MetalFxSurface;
 use super::preset::MetalFxTheme;
 use super::text_mask::{
@@ -209,7 +209,7 @@ where
 mod tests {
     use super::*;
     use crate::widgets::metal_fx::{
-        MetalFxHost, MetalFxOptions, MetalFxResolvedTheme, MetalRenderOptions,
+        AlphaMask, MetalFxHost, MetalFxOptions, MetalFxResolvedTheme, MetalRenderOptions,
     };
     use std::time::Duration;
 
