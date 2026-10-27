@@ -10,8 +10,8 @@ rust-version = "1.93"
 license = "MIT OR Apache-2.0"
 version = "0.29.0"
 authors = ["FerrisMind"]
-homepage = "https://github.com/FerrisMind/enchant-iced"
-repository = "https://github.com/FerrisMind/enchant-iced"
+homepage = "https://github.com/FerrisMind/enchant"
+repository = "https://github.com/FerrisMind/enchant"
 description = "Premium interaction layer for iced — animated text, glow surfaces, patterned backgrounds, builder-first widgets"
 
 [workspace.dependencies]
