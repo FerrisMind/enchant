@@ -64,7 +64,7 @@ def main() -> None:
     crate = f"""# enchant-iced
 
 <p align="center">
-  <strong>Magic UI-inspired premium interaction layer for iced</strong>
+  <strong>Premium interaction layer for iced</strong>
 </p>
 
 <p align="center">
@@ -81,7 +81,7 @@ def main() -> None:
 
 ## Overview
 
-`enchant-iced` ports the [Magic UI](https://magicui.design) component surface to native Rust on [iced](https://github.com/iced-rs/iced): animated text, glow and beam surfaces, patterned backgrounds, media frames, and a builder-first widget API per component.
+`enchant-iced` ports the [Magic UI](https://magicui.design) component surface and [Libraries.dev](https://libraries.dev) effect libraries to native Rust on [iced](https://github.com/iced-rs/iced): animated text, glow and beam surfaces, patterned backgrounds, media frames, and a builder-first widget API per component.
 
 Builder-first API: private fields, fluent validated setters, `#[must_use]` builders, terminal `into_element` / `view`.
 
@@ -149,17 +149,19 @@ cargo clippy -p enchant-iced --all-targets -- -D warnings
 Two levels, tracked separately:
 
 - **Builds and runs** — every user-facing example compiles; CI and `tests/example_inventory.rs` keep the inventory honest
-- **Verified against the Magic UI reference** — hand-checked with `python scripts/example_launcher.py`; ledger lives in `logs/` (gitignored)
+- **Verified against the Magic UI / [Libraries.dev](https://libraries.dev) references** — hand-checked with `python scripts/example_launcher.py`; ledger lives in `logs/` (gitignored)
 
-Internal helpers (not Magic UI public surface) are listed in `tests/example_inventory.rs` (`INTERNAL_HELPER_EXAMPLES`).
+Internal helpers (not Magic UI / Libraries.dev public surface) are listed in `tests/example_inventory.rs` (`INTERNAL_HELPER_EXAMPLES`).
 
 ## License
 
 Dual-licensed under [MIT](https://opensource.org/licenses/MIT) OR [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
+Third-party attribution (Magic UI, Libraries.dev, fonts, demo assets): see [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md).
+
 ---
 
-**Inspired by** [Magic UI](https://magicui.design) · **UI kit** [iced-shadcn](https://github.com/FerrisMind/shadcn-rs) · **Styling** [twill](https://github.com/FerrisMind/twill) · **Framework** [iced](https://github.com/iced-rs/iced)
+**Inspired by** [Magic UI](https://magicui.design) · [Libraries.dev](https://libraries.dev) ([source](https://github.com/Jakubantalik/Libraries.dev)) · **UI kit** [iced-shadcn](https://github.com/FerrisMind/shadcn-rs) · **Styling** [twill](https://github.com/FerrisMind/twill) · **Framework** [iced](https://github.com/iced-rs/iced)
 """
 
     (ROOT / "crates" / "enchant-iced" / "README.md").write_text(
@@ -177,7 +179,7 @@ Dual-licensed under [MIT](https://opensource.org/licenses/MIT) OR [Apache-2.0](h
     workspace = f"""# enchant
 
 <p align="center">
-  <strong>Magic UI-inspired interaction layer for iced</strong><br>
+  <strong>Premium interaction layer for iced</strong><br>
   <i>Animated text, glow surfaces, patterned backgrounds, and builder-first widgets</i>
 </p>
 
@@ -203,7 +205,7 @@ Dual-licensed under [MIT](https://opensource.org/licenses/MIT) OR [Apache-2.0](h
 
 ## Overview
 
-`enchant` is a workspace whose public library crate is [`enchant-iced`](crates/enchant-iced): a Magic UI-inspired premium interaction layer for [`iced`](https://github.com/iced-rs/iced).
+`enchant` is a workspace whose public library crate is [`enchant-iced`](crates/enchant-iced): a premium interaction layer for [`iced`](https://github.com/iced-rs/iced), porting surfaces from [Magic UI](https://magicui.design) and [Libraries.dev](https://libraries.dev).
 
 - builder-first widget API per component
 - examples under `crates/enchant-iced/examples/` (one runnable demo per component or scenario)
@@ -267,7 +269,7 @@ cargo doc -p enchant-iced --no-deps --open
 Readiness is tracked at two levels:
 
 - **Builds and runs** — CI compiles every user-facing example; `crates/enchant-iced/tests/example_inventory.rs` guards inventory drift
-- **Verified against the Magic UI reference** — hand-checked via the launcher:
+- **Verified against the Magic UI / [Libraries.dev](https://libraries.dev) references** — hand-checked via the launcher:
 
 ```powershell
 python scripts/example_launcher.py
@@ -279,9 +281,11 @@ The ledger writes under `logs/` (gitignored).
 
 Dual-licensed under [MIT](https://opensource.org/licenses/MIT) OR [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
+Third-party attribution (Magic UI, Libraries.dev, fonts, demo assets): see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
 ---
 
-**Inspired by** [Magic UI](https://magicui.design) · **UI kit** [iced-shadcn](https://github.com/FerrisMind/shadcn-rs) · **Styling** [twill](https://github.com/FerrisMind/twill) · **Framework** [iced](https://github.com/iced-rs/iced)
+**Inspired by** [Magic UI](https://magicui.design) · [Libraries.dev](https://libraries.dev) ([source](https://github.com/Jakubantalik/Libraries.dev)) · **UI kit** [iced-shadcn](https://github.com/FerrisMind/shadcn-rs) · **Styling** [twill](https://github.com/FerrisMind/twill) · **Framework** [iced](https://github.com/iced-rs/iced)
 """
 
     (ROOT / "README.md").write_text(workspace, encoding="utf-8", newline="\n")

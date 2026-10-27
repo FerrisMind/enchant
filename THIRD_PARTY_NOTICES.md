@@ -23,6 +23,31 @@ Each port names its upstream source file in a module-level doc comment.
 of Magic UI's component registry metadata and is likewise MIT-licensed, with the
 notice above preserved.
 
+### Libraries.dev
+
+Several widgets are ports of [Libraries.dev](https://libraries.dev) effect
+libraries (source: https://github.com/Jakubantalik/Libraries.dev). Those packages
+are licensed under the MIT License:
+
+- Copyright (c) 2026 Jakub Antalik
+- https://libraries.dev
+- https://github.com/Jakubantalik/Libraries.dev
+
+Ported packages include (non-exhaustive):
+
+| Upstream package | enchant-iced surface |
+| --- | --- |
+| `border-beam` | `border_beam` |
+| `thinking-orbs` | `thinking_orb` |
+| `bot-avatars` | `bot_avatar` |
+| `liquid-gooey` | `gooey` / `Liquid` |
+| `voice-glow` | `voice_glow` |
+| `metal-fx` | `metal_fx` |
+
+Each port names its upstream source in a module-level doc comment.
+`crates/enchant-iced/tests/fixtures/border_beam/` holds captured reference frames
+from Libraries.dev `border-beam` used for visual parity tests.
+
 ## Fonts
 
 ### Geist

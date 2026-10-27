@@ -1,7 +1,7 @@
 # enchant-iced
 
 <p align="center">
-  <strong>Magic UI-inspired premium interaction layer for iced</strong>
+  <strong>Premium interaction layer for iced</strong>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 ## Overview
 
-`enchant-iced` ports the [Magic UI](https://magicui.design) component surface to native Rust on [iced](https://github.com/iced-rs/iced): animated text, glow and beam surfaces, patterned backgrounds, media frames, and a builder-first widget API per component.
+`enchant-iced` ports the [Magic UI](https://magicui.design) component surface and [Libraries.dev](https://libraries.dev) effect libraries to native Rust on [iced](https://github.com/iced-rs/iced): animated text, glow and beam surfaces, patterned backgrounds, media frames, and a builder-first widget API per component.
 
 Builder-first API: private fields, fluent validated setters, `#[must_use]` builders, terminal `into_element` / `view`.
 
@@ -770,14 +770,16 @@ cargo clippy -p enchant-iced --all-targets -- -D warnings
 Two levels, tracked separately:
 
 - **Builds and runs** — every user-facing example compiles; CI and `tests/example_inventory.rs` keep the inventory honest
-- **Verified against the Magic UI reference** — hand-checked with `python scripts/example_launcher.py`; ledger lives in `logs/` (gitignored)
+- **Verified against the Magic UI / [Libraries.dev](https://libraries.dev) references** — hand-checked with `python scripts/example_launcher.py`; ledger lives in `logs/` (gitignored)
 
-Internal helpers (not Magic UI public surface) are listed in `tests/example_inventory.rs` (`INTERNAL_HELPER_EXAMPLES`).
+Internal helpers (not Magic UI / Libraries.dev public surface) are listed in `tests/example_inventory.rs` (`INTERNAL_HELPER_EXAMPLES`).
 
 ## License
 
 Dual-licensed under [MIT](https://opensource.org/licenses/MIT) OR [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
+Third-party attribution (Magic UI, Libraries.dev, fonts, demo assets): see [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md).
+
 ---
 
-**Inspired by** [Magic UI](https://magicui.design) · **UI kit** [iced-shadcn](https://github.com/FerrisMind/shadcn-rs) · **Styling** [twill](https://github.com/FerrisMind/twill) · **Framework** [iced](https://github.com/iced-rs/iced)
+**Inspired by** [Magic UI](https://magicui.design) · [Libraries.dev](https://libraries.dev) ([source](https://github.com/Jakubantalik/Libraries.dev)) · **UI kit** [iced-shadcn](https://github.com/FerrisMind/shadcn-rs) · **Styling** [twill](https://github.com/FerrisMind/twill) · **Framework** [iced](https://github.com/iced-rs/iced)
