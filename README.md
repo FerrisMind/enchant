@@ -13,7 +13,7 @@
 
 <p align="center">
   <picture>
-    <img alt="border_beam" src="crates/enchant-iced/docs/demos/border_beam.gif.gif" width="900" />
+    <img alt="border_beam" src="crates/enchant-iced/docs/demos/border_beam.gif" width="900" />
   </picture>
   <br>
   <sub>border beam — one of 84 captured example demos</sub>
